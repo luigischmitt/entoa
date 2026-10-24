@@ -290,6 +290,29 @@ function cleanPracticeSentence(text) {
   return normalizePracticeSentenceCapitalization(value);
 }
 
+const trainingPatternTypes = ["GRAMMAR", "WORD_CHOICE", "FALSE_COGNATE", "STRUCTURE"];
+
+function nonEmptyText(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
+function pronunciationSoundTips(problemWords) {
+  const tips = [];
+  const seen = new Set();
+  for (const word of problemWords) {
+    const phoneme = typeof word.worstPhoneme === "string" && word.worstPhoneme.trim() ? word.worstPhoneme : null;
+    const text = word.word.trim();
+    const key = text.toLocaleLowerCase("en-US");
+    if (!phoneme || seen.has(key)) continue;
+    seen.add(key);
+    tips.push({ word: text, phoneme });
+    if (tips.length === 3) break;
+  }
+  return tips;
+}
+
 /** Keeps a corrected practice sentence natural, complete and ready to be spoken. */
 export function normalizePracticeSentenceCapitalization(text) {
   const value = typeof text === "string" ? text.replace(/\s+/gu, " ").trim() : "";
@@ -451,7 +474,12 @@ export function buildVoiceTrainingPhrases(input) {
       const referenceText = cleanPracticeSentence(pattern?.rephrasedExample);
       const saidText = isText(pattern?.evidence) ? normalizePracticeSpokenText(pattern.evidence) : null;
       if (!referenceText || !saidText) continue;
-      add({ referenceText, saidText, source: "english", sourceKind: "english_correction", interviewId: record.id, candidateSequenceNumber: pattern.sequenceNumber + 1, phraseIndex: null, time: timeOf(record), date: dateOf(record), beforeAccuracy: null, attentionWords: [] });
+      add({
+        referenceText, saidText, source: "english", sourceKind: "english_correction", interviewId: record.id, candidateSequenceNumber: pattern.sequenceNumber + 1, phraseIndex: null, time: timeOf(record), date: dateOf(record), beforeAccuracy: null, attentionWords: [],
+        patternType: trainingPatternTypes.includes(pattern?.type) ? pattern.type : null,
+        explanation: nonEmptyText(pattern?.why) ?? nonEmptyText(pattern?.suggestion),
+        soundTips: [], issue: null,
+      });
     }
     for (const answer of record?.feedback?.azureSummary?.answers ?? []) {
       for (const phrase of answer?.phrases ?? []) {
@@ -480,13 +508,17 @@ export function buildVoiceTrainingPhrases(input) {
           date: dateOf(record),
           beforeAccuracy: score,
           attentionWords: problemWords.map((word) => word.word.trim()),
+          patternType: null,
+          explanation: null,
+          issue: nonEmptyText(phrase?.issue),
+          soundTips: pronunciationSoundTips(problemWords),
         });
       }
     }
   }
 
   return [...candidates.values()]
-    .map((candidate) => ({ ...candidate, recurrence: recurrence.get(candidate.normalizedTarget) ?? 1 }))
+    .map((candidate) => ({ ...candidate, wordCount: candidate.referenceText.split(/\s+/u).filter(Boolean).length, recurrence: recurrence.get(candidate.normalizedTarget) ?? 1 }))
     .sort((first, second) => second.recurrence - first.recurrence || second.time - first.time || first.referenceText.localeCompare(second.referenceText));
 }
 
