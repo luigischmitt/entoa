@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { LoadingRegion, Sk, SkCard, SkChart } from "@/components/ui/loading-state";
-import { ArrowRight, AudioLines, LoaderCircle, Mic, Play, Square, Volume2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, AudioLines, ChevronRight, LoaderCircle, Mic, Play, Square, Volume2, X } from "lucide-react";
 
 import { authorizedFetch } from "@/lib/auth/backend-auth";
 import { readDashboardCache } from "@/lib/dashboard-data-cache.mjs";
@@ -126,7 +126,6 @@ export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
   const [error, setError] = useState(false);
   const [reload, setReload] = useState(0);
   const [session, setSession] = useState<VoiceSessionState | null>(null);
-  const [englishPattern, setEnglishPattern] = useState<string | null>(null);
   const [showWhy, setShowWhy] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<VoiceMetricKey | null>(null);
   const [activeCapture, setActiveCapture] = useState<string | null>(null);
@@ -162,11 +161,21 @@ export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
   const sessionSummary = session?.done ? summarizeVoiceSession(session.phrases, session.attemptsAtStart, attempts) : null;
   const sessionBusy = activeCapture !== null || startingCapture !== null || assessing !== null;
   const sessionTitle = !session ? "" : session.kind === "quick" ? t("Treino rápido") : session.kind === "english" ? `${t("Erros de inglês")}${session.patternType ? ` · ${t(patternLabels[session.patternType] ?? session.patternType)}` : ""}` : t("Pronúncia");
-  const englishAvailable = englishPattern ? catalog.english.types.find((entry) => entry.type === englishPattern)?.count ?? 0 : catalog.english.available;
-  const countLine = (available: number) => available === 0 ? t("Tudo dominado por enquanto. Você pode revisar.") : available === 1 ? t("1 frase para treinar") : t("{n} frases para treinar", { n: available });
   // Prewarm the phrase on screen and the one after it; with no session open, the first quick-session phrases.
   const prewarmTexts = useMemo(() => (session && !session.done ? session.phrases.slice(session.index, session.index + 2) : quickPreview.slice(0, 2)).map((phrase) => phrase.referenceText), [session, quickPreview]);
   const sessionOpen = session !== null;
+  const hasEnglishPhrases = trainingPhrases.some((phrase) => phrase.source === "english");
+  const hasPronunciationPhrases = trainingPhrases.some((phrase) => phrase.source === "pronunciation");
+  // A start row: one tap opens its session. Zero left means the mastered phrases come back to review.
+  const startRow = (key: string, label: string, available: number, onClick: () => void) => <li key={key}>
+    <button type="button" className="vv-start" onClick={onClick}>
+      <span>{label}</span>
+      <span className="vv-start-end">
+        <span className="vv-start-count">{available === 0 ? t("revisar") : available}</span>
+        <ChevronRight className="size-4 vv-start-chevron" aria-hidden="true" />
+      </span>
+    </button>
+  </li>;
 
   useEffect(() => {
     const dialog = sessionDialogRef.current;
@@ -409,6 +418,13 @@ export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
       return current.index >= current.phrases.length - 1 ? { ...current, done: true } : { ...current, index: current.index + 1 };
     });
   };
+  const goBack = () => {
+    if (!session || session.index === 0) return;
+    audioRef.current?.pause();
+    spokenPlaybackRef.current?.cancel();
+    setShowWhy(false);
+    setSession((current) => current && current.index > 0 ? { ...current, index: current.index - 1 } : current);
+  };
   const startMoreSession = () => {
     if (!session) return;
     openSession(session.kind, session.patternType, [...session.doneIds, ...session.phrases.map((phrase) => phrase.id)]);
@@ -467,8 +483,9 @@ export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
           {attempts[currentPhrase.id]?.length ? <AttemptResult attempts={attempts[currentPhrase.id]} focus={activeMetric} beforeAccuracy={currentPhrase.beforeAccuracy} /> : <p className="ds-body mt-4">{t("Ouça a forma correta e grave uma tentativa para ver as palavras avaliadas.")}</p>}
         </div>
         <footer className="vv-session-foot">
-          <button type="button" className="ds-btn ds-btn-quiet" onClick={advanceSession} disabled={sessionBusy}>{t("Pular")}</button>
-          <button type="button" className="ds-btn ds-btn-cta-green" onClick={advanceSession} disabled={sessionBusy || !currentAttempted}>{session.index >= session.phrases.length - 1 ? t("Concluir") : t("Próxima frase")}<ArrowRight className="size-4 ds-arrow" aria-hidden="true" /></button>
+          <button type="button" className="ds-btn ds-btn-quiet vv-foot-back" onClick={goBack} disabled={sessionBusy || session.index === 0}><ArrowLeft className="size-4" aria-hidden="true" />{t("Anterior")}</button>
+          <button type="button" className="ds-btn ds-btn-quiet vv-foot-skip" onClick={advanceSession} disabled={sessionBusy}>{t("Pular")}</button>
+          <button type="button" className="ds-btn ds-btn-cta-green vv-foot-next" onClick={advanceSession} disabled={sessionBusy || !currentAttempted}>{session.index >= session.phrases.length - 1 ? t("Concluir") : t("Próxima frase")}<ArrowRight className="size-4 ds-arrow" aria-hidden="true" /></button>
         </footer>
       </>}
     </div>}
@@ -554,29 +571,36 @@ export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
           </div>
           <p className="ds-lead">{t("Sessões curtas com frases das suas entrevistas. Escolha o que quer treinar agora.")}</p>
         </div>
-        {trainingPhrases.length ? <div className="vv-options">
-          {catalog.total > 0 && <article className="ds-block vv-option">
-            <h3 className="vv-option-title">{t("Treino rápido")}</h3>
-            <p className="vv-option-text">{t("{n} frases curtas, uma atrás da outra. Uns 3 minutos.", { n: quickSessionSize })}</p>
-            <button type="button" className="ds-btn ds-btn-cta-green vv-option-action" onClick={() => openSession("quick", null, [])}>{t("Começar")}</button>
-          </article>}
-          {trainingPhrases.some((phrase) => phrase.source === "english") && <article className="ds-block vv-option">
-            <h3 className="vv-option-title">{t("Erros de inglês")}</h3>
-            <p className="vv-option-text">{t("Frases que você disse de um jeito e o certo é outro, com o porquê de cada correção.")}</p>
-            <p className="vv-option-count ds-small">{countLine(englishAvailable)}</p>
-            {catalog.english.types.length > 1 && <div className="vv-pills" role="group" aria-label={t("Filtrar por tipo de erro")}>
-              <button type="button" className="vv-pill" aria-pressed={englishPattern === null} onClick={() => setEnglishPattern(null)}>{t("Todos")}</button>
-              {catalog.english.types.map(({ type }) => <button key={type} type="button" className="vv-pill" aria-pressed={englishPattern === type} onClick={() => setEnglishPattern(type)}>{t(patternLabels[type] ?? type)}</button>)}
-            </div>}
-            <button type="button" className="ds-btn ds-btn-soft vv-option-action" onClick={() => openSession("english", englishPattern, [])}>{t("Treinar")}</button>
-          </article>}
-          {trainingPhrases.some((phrase) => phrase.source === "pronunciation") && <article className="ds-block vv-option">
-            <h3 className="vv-option-title">{t("Pronúncia")}</h3>
-            <p className="vv-option-text">{t("Trechos em que algumas palavras saíram pouco claras, com uma dica de como fazer o som.")}</p>
-            <p className="vv-option-count ds-small">{countLine(catalog.pronunciation.available)}</p>
-            <button type="button" className="ds-btn ds-btn-soft vv-option-action" onClick={() => openSession("pronunciation", null, [])}>{t("Treinar")}</button>
-          </article>}
-        </div> : <p className="ds-body mt-3">{t("Quando o relatório encontrar uma correção ou a análise de voz sinalizar uma frase, ela aparecerá aqui.")}</p>}
+        {trainingPhrases.length ? <>
+          {catalog.total > 0 && <div className="ds-block vv-quick">
+            <div className="vv-quick-copy">
+              <h3 className="vv-quick-title">{t("Treino rápido")}</h3>
+              <p className="vv-quick-text">{t("{n} frases curtas das suas entrevistas, uns 3 minutos.", { n: quickSessionSize })}</p>
+            </div>
+            <button type="button" className="ds-btn ds-btn-cta-green vv-quick-action" onClick={() => openSession("quick", null, [])}>{t("Começar treino")}<ArrowRight className="size-4 ds-arrow" aria-hidden="true" /></button>
+          </div>}
+          {(hasEnglishPhrases || hasPronunciationPhrases) && <div className="vv-tracks">
+            {hasEnglishPhrases && <article className="ds-block vv-track">
+              <div className="vv-track-head">
+                <h3 className="vv-track-title">{t("Erros de inglês")}</h3>
+                <p className="vv-track-text">{t("Frases que você disse de outro jeito, com o porquê de cada correção.")}</p>
+              </div>
+              <ul className="vv-starts">
+                {startRow("english-all", t("Todos os erros"), catalog.english.available, () => openSession("english", null, []))}
+                {catalog.english.types.length > 1 && catalog.english.types.map(({ type, count }) => startRow(`english-${type}`, t(patternLabels[type] ?? type), count, () => openSession("english", type, [])))}
+              </ul>
+            </article>}
+            {hasPronunciationPhrases && <article className="ds-block vv-track">
+              <div className="vv-track-head">
+                <h3 className="vv-track-title">{t("Pronúncia")}</h3>
+                <p className="vv-track-text">{t("Trechos com palavras pouco claras, com uma dica de como fazer o som.")}</p>
+              </div>
+              <ul className="vv-starts">
+                {startRow("pronunciation", t("Treinar pronúncia"), catalog.pronunciation.available, () => openSession("pronunciation", null, []))}
+              </ul>
+            </article>}
+          </div>}
+        </> :<p className="ds-body mt-3">{t("Quando o relatório encontrar uma correção ou a análise de voz sinalizar uma frase, ela aparecerá aqui.")}</p>}
       </section>
       <section className="vv-section" aria-labelledby="work-words">
         <div className="ds-sec-head"><div><h2 id="work-words" className="ds-section-title">{t("Suas palavras de trabalho")}</h2></div><p className="ds-lead">{t("Palavras que se repetem nas suas entrevistas.")}</p></div>
