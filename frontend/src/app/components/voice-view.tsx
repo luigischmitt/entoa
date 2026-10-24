@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { LoadingRegion, Sk, SkCard, SkChart } from "@/components/ui/loading-state";
-import { ArrowRight, AudioLines, LoaderCircle, Mic, Play, Square, Volume2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, AudioLines, ChevronRight, LoaderCircle, Mic, Play, Square, Volume2, X } from "lucide-react";
 
 import { authorizedFetch } from "@/lib/auth/backend-auth";
 import { readDashboardCache } from "@/lib/dashboard-data-cache.mjs";
@@ -11,7 +11,9 @@ import { loadProgressRecords } from "@/lib/interview/persistence";
 import { stopMediaStreamTracks } from "@/lib/interview/session-policy.mjs";
 import { fetchSpeechBlob, playInterviewerSegments, prewarmInterviewerSpeech, splitInterviewerSpeech } from "@/lib/interview/speech-playback.mjs";
 import { readStoredInterviewerVoice } from "@/lib/interview/voice-picker.mjs";
-import { buildVoiceInsights, buildVoiceLesson, buildVoicePracticePlan, buildVoiceTrainingPhrases, encodeWav16Mono, migrateLegacyPracticeAttempts, normalizePracticeSpokenText, readPracticeAttempts, savePracticeAttempt, type VoiceMetricKey, type VoicePracticeAttempt, type VoiceTip } from "@/lib/interview/voice-insights.mjs";
+import { buildVoiceInsights, buildVoiceLesson, buildVoicePracticePlan, buildVoiceTrainingPhrases, encodeWav16Mono, migrateLegacyPracticeAttempts, normalizePracticeSpokenText, readPracticeAttempts, savePracticeAttempt, type VoiceMetricKey, type VoicePracticeAttempt, type VoiceTip, type VoiceTrainingPhrase } from "@/lib/interview/voice-insights.mjs";
+import { buildVoiceSession, focusedSessionSize, quickSessionSize, summarizeVoiceSession, voiceSessionCatalog, type VoiceSessionKind } from "@/lib/interview/voice-sessions.mjs";
+import { phonemeTip } from "@/lib/interview/report-presentation.mjs";
 import { loadVoicePracticeAttempts, saveVoicePracticeAttempt, type VoicePracticeAssessment, type VoicePracticeSource } from "@/lib/interview/voice-practice-persistence";
 import type { ProgressRecord } from "@/lib/interview/progress-insights.mjs";
 import { useLocale } from "@/lib/locale";
@@ -26,6 +28,25 @@ const speechEndpoint = `${backendUrl}/api/v1/speech`;
 const practiceEndpoint = `${backendUrl}/api/v1/voice/practice`;
 const metricKeys: VoiceMetricKey[] = ["accuracy", "fluency", "prosody"];
 const formatMetric = (value: number | null) => value === null ? "—" : Math.round(value).toString();
+const patternLabels: Record<string, string> = { GRAMMAR: "Gramática", WORD_CHOICE: "Escolha de palavras", FALSE_COGNATE: "Falsos cognatos", STRUCTURE: "Estrutura" };
+
+type VoiceSessionState = {
+  kind: VoiceSessionKind;
+  patternType: string | null;
+  phrases: VoiceTrainingPhrase[];
+  index: number;
+  attemptsAtStart: Record<string, VoicePracticeAttempt[]>;
+  done: boolean;
+  doneIds: string[];
+};
+
+/** What a phrase needs explaining: the reason for a correction, or how to make a hard sound. */
+function phraseNotes(phrase: VoiceTrainingPhrase, t: (key: string, values?: Record<string, string | number>) => string): string[] {
+  if (phrase.source === "english") return phrase.explanation ? [phrase.explanation] : [];
+  const tips = phrase.soundTips.slice(0, 2).map((tip) => `“${tip.word}”: ${phonemeTip(tip.phoneme, tip.word)}`);
+  if (tips.length === 0 && phrase.attentionWords.length > 0) return [t("Fale devagar as palavras em destaque, sílaba por sílaba.")];
+  return tips;
+}
 
 function HighlightedText({ text, words }: { text: string; words: string[] }) {
   const attention = new Set(words.map((word) => word.toLocaleLowerCase()));
@@ -104,7 +125,8 @@ export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
   const [isLoading, setIsLoading] = useState(!cached);
   const [error, setError] = useState(false);
   const [reload, setReload] = useState(0);
-  const [selectedSentenceId, setSelectedSentenceId] = useState<string | null>(null);
+  const [session, setSession] = useState<VoiceSessionState | null>(null);
+  const [showWhy, setShowWhy] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<VoiceMetricKey | null>(null);
   const [activeCapture, setActiveCapture] = useState<string | null>(null);
   const [startingCapture, setStartingCapture] = useState<string | null>(null);
@@ -125,14 +147,42 @@ export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
   const spokenPlaybackRef = useRef<{ cancel: () => void } | null>(null);
   const isMountedRef = useRef(true);
   const trainingRef = useRef<HTMLElement | null>(null);
+  const sessionDialogRef = useRef<HTMLDialogElement | null>(null);
   const insights = useMemo(() => buildVoiceInsights(records), [records]);
   const activeMetric = selectedMetric ?? insights.focus ?? "accuracy";
   const plan = useMemo(() => buildVoicePracticePlan(records, { focus: activeMetric, attempts: practiceHistoryAtOpen }), [records, activeMetric, practiceHistoryAtOpen]);
   const trainingPhrases = useMemo(() => buildVoiceTrainingPhrases(records), [records]);
   const lesson = useMemo(() => buildVoiceLesson(records, activeMetric), [records, activeMetric]);
-  const selectedIndex = selectedSentenceId ? trainingPhrases.findIndex((item) => item.id === selectedSentenceId) : -1;
-  const currentSentenceIndex = selectedIndex >= 0 ? selectedIndex : 0;
-  const sentence = trainingPhrases[selectedIndex >= 0 ? selectedIndex : 0] ?? null;
+  const catalog = useMemo(() => voiceSessionCatalog(trainingPhrases, attempts), [trainingPhrases, attempts]);
+  const quickPreview = useMemo(() => buildVoiceSession(trainingPhrases, attempts, { kind: "quick" }), [trainingPhrases, attempts]);
+  const currentPhrase = session && !session.done ? session.phrases[session.index] ?? null : null;
+  const currentNotes = currentPhrase ? phraseNotes(currentPhrase, t) : [];
+  const currentAttempted = Boolean(session && currentPhrase && (attempts[currentPhrase.id]?.length ?? 0) > (session.attemptsAtStart[currentPhrase.id]?.length ?? 0));
+  const sessionSummary = session?.done ? summarizeVoiceSession(session.phrases, session.attemptsAtStart, attempts) : null;
+  const sessionBusy = activeCapture !== null || startingCapture !== null || assessing !== null;
+  const sessionTitle = !session ? "" : session.kind === "quick" ? t("Treino rápido") : session.kind === "english" ? `${t("Erros de inglês")}${session.patternType ? ` · ${t(patternLabels[session.patternType] ?? session.patternType)}` : ""}` : t("Pronúncia");
+  // Prewarm the phrase on screen and the one after it; with no session open, the first quick-session phrases.
+  const prewarmTexts = useMemo(() => (session && !session.done ? session.phrases.slice(session.index, session.index + 2) : quickPreview.slice(0, 2)).map((phrase) => phrase.referenceText), [session, quickPreview]);
+  const sessionOpen = session !== null;
+  const hasEnglishPhrases = trainingPhrases.some((phrase) => phrase.source === "english");
+  const hasPronunciationPhrases = trainingPhrases.some((phrase) => phrase.source === "pronunciation");
+  // A start row: one tap opens its session. Zero left means the mastered phrases come back to review.
+  const startRow = (key: string, label: string, available: number, onClick: () => void) => <li key={key}>
+    <button type="button" className="vv-start" onClick={onClick}>
+      <span>{label}</span>
+      <span className="vv-start-end">
+        <span className="vv-start-count">{available === 0 ? t("revisar") : available}</span>
+        <ChevronRight className="size-4 vv-start-chevron" aria-hidden="true" />
+      </span>
+    </button>
+  </li>;
+
+  useEffect(() => {
+    const dialog = sessionDialogRef.current;
+    if (!dialog) return;
+    if (sessionOpen && !dialog.open) dialog.showModal();
+    if (!sessionOpen && dialog.open) dialog.close();
+  }, [sessionOpen]);
 
   useEffect(() => {
     let active = true;
@@ -244,8 +294,7 @@ export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
 
   useEffect(() => {
     const speechPrewarms = speechPrewarmsRef.current;
-    const nextSentence = trainingPhrases[(currentSentenceIndex + 1) % trainingPhrases.length];
-    const texts = [sentence?.referenceText, nextSentence?.referenceText, lesson.example.text].filter((text): text is string => Boolean(text));
+    const texts = [...prewarmTexts, lesson.example.text].filter((text): text is string => Boolean(text));
     const seen = new Set<string>();
     for (const text of texts) {
       if (seen.has(text)) continue;
@@ -261,7 +310,7 @@ export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
     return () => {
       for (const prewarm of speechPrewarms.splice(0)) prewarm.cancel();
     };
-  }, [currentSentenceIndex, lesson.example.text, loadSpeechPreview, sentence?.referenceText, speechPreferences, trainingPhrases]);
+  }, [lesson.example.text, loadSpeechPreview, prewarmTexts, speechPreferences]);
 
   const assess = async (target: string, text: string, samples: Float32Array[]) => {
     setAssessing(target); setMessage(null);
@@ -348,10 +397,37 @@ export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
     for (const preview of speechPreviewCacheRef.current.values()) URL.revokeObjectURL(preview.url);
   }, []);
   const retry = () => { setIsLoading(true); setError(false); setReload((value) => value + 1); };
-  const nextSentence = () => {
-    if (!trainingPhrases.length) return;
-    const nextIndex = (currentSentenceIndex + 1) % trainingPhrases.length;
-    setSelectedSentenceId(trainingPhrases[nextIndex].id);
+  const openSession = (kind: VoiceSessionKind, patternType: string | null, doneIds: string[]) => {
+    const phrases = buildVoiceSession(trainingPhrases, attempts, { kind, patternType, excludeIds: doneIds });
+    if (!phrases.length) return;
+    setSession({ kind, patternType, phrases, index: 0, attemptsAtStart: attempts, done: false, doneIds });
+    setShowWhy(false);
+  };
+  const closeSession = () => {
+    if (captureRef.current) void stopRecording(false);
+    audioRef.current?.pause();
+    spokenPlaybackRef.current?.cancel();
+    setSession(null);
+  };
+  const advanceSession = () => {
+    audioRef.current?.pause();
+    spokenPlaybackRef.current?.cancel();
+    setShowWhy(false);
+    setSession((current) => {
+      if (!current) return current;
+      return current.index >= current.phrases.length - 1 ? { ...current, done: true } : { ...current, index: current.index + 1 };
+    });
+  };
+  const goBack = () => {
+    if (!session || session.index === 0) return;
+    audioRef.current?.pause();
+    spokenPlaybackRef.current?.cancel();
+    setShowWhy(false);
+    setSession((current) => current && current.index > 0 ? { ...current, index: current.index - 1 } : current);
+  };
+  const startMoreSession = () => {
+    if (!session) return;
+    openSession(session.kind, session.patternType, [...session.doneIds, ...session.phrases.map((phrase) => phrase.id)]);
   };
   const scrollTrainingIntoView = useCallback(() => {
     const training = trainingRef.current;
@@ -360,10 +436,60 @@ export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
     const tallCard = training.getBoundingClientRect().height > window.innerHeight - 80;
     training.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: tallCard ? "start" : "center" });
   }, []);
-  useEffect(() => {
-    if (selectedSentenceId) requestAnimationFrame(scrollTrainingIntoView);
-  }, [scrollTrainingIntoView, selectedSentenceId]);
-  const practiceNow = scrollTrainingIntoView;
+  const practiceNow = () => {
+    if (trainingPhrases.length) openSession("quick", null, []);
+    else scrollTrainingIntoView();
+  };
+
+  const sessionDialog = <dialog ref={sessionDialogRef} className="vv-session" aria-label={t("Treino de voz")} onClose={closeSession} onClick={(event) => { if (event.target === event.currentTarget) closeSession(); }}>
+    {session && <div className="vv-session-body">
+      <header className="vv-session-head">
+        <p className="ds-label">{sessionTitle}</p>
+        <button type="button" className="ds-btn ds-btn-quiet vv-session-close" onClick={closeSession} aria-label={t("Fechar treino")}><X className="size-4" aria-hidden="true" /></button>
+      </header>
+      {session.done ? sessionSummary && <div className="vv-done">
+        <h2 className="vv-done-title">{t("Treino concluído")}</h2>
+        <p className="vv-done-line">{sessionSummary.practiced === 0 ? t("Nenhuma frase gravada desta vez.") : t("Você gravou {practiced} de {total} frases.", { practiced: sessionSummary.practiced, total: session.phrases.length })}{sessionSummary.improved > 0 && <>{" "}{t("Melhorou a precisão em {improved}.", { improved: sessionSummary.improved })}</>}</p>
+        {sessionSummary.practiced > 0 && <ul className="vv-done-list">{sessionSummary.rows.filter((row) => row.practiced).map((row) => <li className="vv-done-row" key={row.id}>
+          <span className="vv-done-text" lang="en">{row.text}</span>
+          <span className="vv-done-score" data-better={row.before !== null && row.after !== null && row.after > row.before}>{row.before === null ? formatMetric(row.after) : `${formatMetric(row.before)} → ${formatMetric(row.after)}`}</span>
+        </li>)}</ul>}
+        <div className="vv-done-actions">
+          <button type="button" className="ds-btn ds-btn-cta-green" onClick={startMoreSession}>{t("Mais {n} frases", { n: session.kind === "quick" ? quickSessionSize : focusedSessionSize })}</button>
+          <button type="button" className="ds-btn ds-btn-quiet" onClick={closeSession}>{t("Fechar")}</button>
+        </div>
+      </div> : currentPhrase && <>
+        <div className="vv-progress" role="progressbar" aria-label={t("Progresso do treino")} aria-valuemin={1} aria-valuemax={session.phrases.length} aria-valuenow={session.index + 1}>
+          {session.phrases.map((item, position) => <span className="vv-seg" key={item.id} data-state={position < session.index ? "done" : position === session.index ? "current" : "upcoming"} />)}
+        </div>
+        <p className="vv-progress-text ds-small">{t("Frase {current} de {total}", { current: session.index + 1, total: session.phrases.length })}</p>
+        <div className="vv-phrase" key={currentPhrase.id}>
+          {currentPhrase.source === "english" ? <div className="vv-pair">
+            <div className="ds-block vv-pair-block"><p className="vv-pair-label">{t("Você disse")}</p><p className="vv-pair-said" lang="en">{currentPhrase.saidText}</p></div>
+            <div className="ds-block vv-pair-block" data-tone="good"><p className="vv-pair-label">{t("Forma para falar")}</p><p className="vv-training-sentence" lang="en"><HighlightedText text={currentPhrase.referenceText} words={currentPhrase.attentionWords} /></p></div>
+          </div> : <div className="ds-block vv-pair-block mt-5" data-tone="good">
+            <p className="vv-pair-label">{t("Forma para falar")}</p>
+            <p className="vv-training-sentence" lang="en"><HighlightedText text={currentPhrase.referenceText} words={currentPhrase.attentionWords} /></p>
+          </div>}
+          {currentNotes.length > 0 && (session.kind !== "quick" || showWhy
+            ? <div className="vv-why">{currentNotes.map((line) => <p key={line}>{line}</p>)}</div>
+            : <button type="button" className="ds-btn ds-btn-quiet vv-why-toggle" aria-expanded={false} onClick={() => setShowWhy(true)}>{t("Por quê?")}</button>)}
+          <div className="vv-session-actions">
+            <button type="button" className="ds-btn ds-btn-soft" onClick={() => void playText(currentPhrase.referenceText)} disabled={activeCapture !== null || isSpeechLoading(currentPhrase.referenceText)}>{isSpeechLoading(currentPhrase.referenceText) ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <Volume2 className="size-4" aria-hidden="true" />}{t("Ouvir")}</button>
+            {activeCapture === currentPhrase.id ? <button type="button" className="ds-btn ds-btn-cta-green" onClick={() => void stopRecording()}><Square className="size-4 fill-current" aria-hidden="true" />{t("Parar")}</button> : <button type="button" className="ds-btn ds-btn-cta-green" onClick={() => void startRecording(currentPhrase.id, currentPhrase.referenceText)} disabled={startingCapture !== null || activeCapture !== null || assessing !== null}>{startingCapture === currentPhrase.id || assessing === currentPhrase.id ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <Mic className="size-4" aria-hidden="true" />}{t("Gravar")}</button>}
+          </div>
+          <div className="vv-status-slot">{startingCapture === currentPhrase.id ? <p key="starting" className="vv-status ds-small" role="status"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />{t("Preparando o microfone…")}</p> : activeCapture === currentPhrase.id ? <p key="recording" className="vv-status ds-small" role="status"><span className="vv-rec-dot" aria-hidden="true" />{t("Gravando. Leia a frase e toque em Parar.")}</p> : assessing === currentPhrase.id ? <p key="assessing" className="vv-status ds-small" role="status"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />{t("Avaliando sua gravação…")}</p> : null}</div>
+          {message && messageTarget !== "word" && <p className="vv-message mt-4" role="alert">{message}</p>}
+          {attempts[currentPhrase.id]?.length ? <AttemptResult attempts={attempts[currentPhrase.id]} focus={activeMetric} beforeAccuracy={currentPhrase.beforeAccuracy} /> : <p className="ds-body mt-4">{t("Ouça a forma correta e grave uma tentativa para ver as palavras avaliadas.")}</p>}
+        </div>
+        <footer className="vv-session-foot">
+          <button type="button" className="ds-btn ds-btn-quiet vv-foot-back" onClick={goBack} disabled={sessionBusy || session.index === 0}><ArrowLeft className="size-4" aria-hidden="true" />{t("Anterior")}</button>
+          <button type="button" className="ds-btn ds-btn-quiet vv-foot-skip" onClick={advanceSession} disabled={sessionBusy}>{t("Pular")}</button>
+          <button type="button" className="ds-btn ds-btn-cta-green vv-foot-next" onClick={advanceSession} disabled={sessionBusy || !currentAttempted}>{session.index >= session.phrases.length - 1 ? t("Concluir") : t("Próxima frase")}<ArrowRight className="size-4 ds-arrow" aria-hidden="true" /></button>
+        </footer>
+      </>}
+    </div>}
+  </dialog>;
 
   return <main id="main-content" className="mx-auto w-full min-w-0 max-w-6xl px-4 py-8 pb-36 sm:px-8 sm:py-10 sm:pb-28 lg:px-12 lg:py-14 lg:pb-16">
     <PageIntro
@@ -416,7 +542,7 @@ export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
           ariaLabel={t("Escolha um aspecto da sua voz para aprender")}
           options={metricKeys.map((key) => ({ value: key, label: t(key === "accuracy" ? "Precisão" : key === "fluency" ? "Ritmo" : "Prosódia") }))}
           value={activeMetric}
-          onChange={(value) => { setSelectedMetric(value as VoiceMetricKey); setSelectedSentenceId(null); }}
+          onChange={(value) => setSelectedMetric(value as VoiceMetricKey)}
           className="grid-cols-3 w-full sm:w-[24rem]"
         />
         <div className="vv-lesson-card ds-card">
@@ -441,38 +567,40 @@ export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
       <section ref={trainingRef} className="vv-section" aria-labelledby="today-training">
         <div className="ds-sec-head" data-layout="split">
           <div>
-            <p className="ds-kicker">{t("Prática")}</p>
-            <h2 id="today-training" className="ds-section-title">{t("Frases para treinar")}</h2>
+            <h2 id="today-training" className="ds-section-title">{t("Treinar")}</h2>
           </div>
-          <p className="ds-lead">{t("Ouça a forma certa, grave e compare com as tentativas anteriores.")}</p>
+          <p className="ds-lead">{t("Sessões curtas com frases das suas entrevistas. Escolha o que quer treinar agora.")}</p>
         </div>
-        {sentence ? <article className="vv-training ds-card">
-            <div className="vv-training-top">
-              <p className="ds-small">{t(sentence.source === "english" ? "Correção do relatório" : "Trecho com pronúncia para revisar")}</p>
-              <p className="ds-small">{t("{current} de {total}", { current: currentSentenceIndex + 1, total: trainingPhrases.length })}</p>
-            </div>
-            {(() => {
-              const sentenceLine = <p className="vv-training-sentence" lang="en" key={sentence.id}><HighlightedText text={sentence.referenceText} words={sentence.attentionWords} /></p>;
-              return sentence.source === "english" ? <div className="vv-pair">
-                <div className="ds-block vv-pair-block"><p className="vv-pair-label">{t("Você disse")}</p><p className="vv-pair-said" lang="en">{sentence.saidText}</p></div>
-                <div className="ds-block vv-pair-block" data-tone="good"><p className="vv-pair-label">{t("Forma para falar")}</p>{sentenceLine}</div>
-              </div> : <div className="ds-block vv-pair-block mt-5" data-tone="good">
-                <p className="vv-pair-label">{t("Forma para falar")}</p>
-                {sentenceLine}
-              </div>;
-            })()}
-            <div className="vv-training-actions">
-              <div className="vv-training-primary-actions">
-                <button type="button" className="ds-btn ds-btn-soft" onClick={() => void playText(sentence.referenceText)} disabled={activeCapture !== null || isSpeechLoading(sentence.referenceText)}>{isSpeechLoading(sentence.referenceText) ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <Volume2 className="size-4" aria-hidden="true" />}{t("Ouvir")}</button>
-                {activeCapture === sentence.id ? <button type="button" className="ds-btn ds-btn-cta-green" onClick={() => void stopRecording()}><Square className="size-4 fill-current" aria-hidden="true" />{t("Parar")}</button> : <button type="button" className="ds-btn ds-btn-cta-green" onClick={() => void startRecording(sentence.id, sentence.referenceText)} disabled={startingCapture !== null || activeCapture !== null || assessing !== null}>{startingCapture === sentence.id || assessing === sentence.id ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <Mic className="size-4" aria-hidden="true" />}{t("Gravar")}</button>}
+        {trainingPhrases.length ? <>
+          {(catalog.total > 0 || hasPronunciationPhrases) && <div className="vv-pair-row">
+            {catalog.total > 0 && <div className="ds-block vv-pair-card">
+              <div className="vv-track-head">
+                <h3 className="vv-track-title">{t("Treino rápido")}</h3>
+                <p className="vv-track-text">{t("{n} frases curtas das suas entrevistas, uns 3 minutos.", { n: quickSessionSize })}</p>
               </div>
-              <button type="button" className="ds-btn ds-btn-quiet vv-next-sentence" onClick={nextSentence} disabled={activeCapture !== null || trainingPhrases.length < 2}>{t("Próxima frase")}<ArrowRight className="size-4 ds-arrow" aria-hidden="true" /></button>
+              <button type="button" className="ds-btn ds-btn-cta-green" onClick={() => openSession("quick", null, [])}>{t("Começar treino")}<ArrowRight className="size-4 ds-arrow" aria-hidden="true" /></button>
+            </div>}
+            {hasPronunciationPhrases && <article className="ds-block vv-pair-card">
+              <div className="vv-track-head">
+                <h3 className="vv-track-title">{t("Pronúncia")}</h3>
+                <p className="vv-track-text">{t("Trechos com palavras pouco claras, com uma dica de como fazer o som.")}</p>
+              </div>
+              <ul className="vv-starts">
+                {startRow("pronunciation", t("Treinar pronúncia"), catalog.pronunciation.available, () => openSession("pronunciation", null, []))}
+              </ul>
+            </article>}
+          </div>}
+          {hasEnglishPhrases && <article className="ds-block vv-track">
+            <div className="vv-track-head">
+              <h3 className="vv-track-title">{t("Erros de inglês")}</h3>
+              <p className="vv-track-text">{t("Frases que você disse de outro jeito, com o porquê de cada correção.")}</p>
             </div>
-            <div className="vv-status-slot">{startingCapture === sentence.id ? <p key="starting" className="vv-status ds-small" role="status"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />{t("Preparando o microfone…")}</p> : activeCapture === sentence.id ? <p key="recording" className="vv-status ds-small" role="status"><span className="vv-rec-dot" aria-hidden="true" />{t("Gravando. Leia a frase e toque em Parar.")}</p> : assessing === sentence.id ? <p key="assessing" className="vv-status ds-small" role="status"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />{t("Avaliando sua gravação…")}</p> : null}</div>
-            {message && messageTarget !== "word" && <p className="vv-message mt-4" role="alert">{message}</p>}
-            <p className="vv-local-note ds-small">{t("Histórico local: mostramos as últimas tentativas desta frase neste navegador.")}</p>
-            {attempts[sentence.id]?.length ? <AttemptResult attempts={attempts[sentence.id]} focus={activeMetric} beforeAccuracy={sentence.beforeAccuracy} /> : <p className="ds-body mt-4">{t("Ouça a forma correta e grave uma tentativa para ver as palavras avaliadas.")}</p>}
-        </article> : <p className="ds-body mt-3">{t("Quando o relatório encontrar uma correção ou a análise de voz sinalizar uma frase, ela aparecerá aqui.")}</p>}
+            <ul className="vv-starts">
+              {startRow("english-all", t("Todos os erros"), catalog.english.available, () => openSession("english", null, []))}
+              {catalog.english.types.length > 1 && catalog.english.types.map(({ type, count }) => startRow(`english-${type}`, t(patternLabels[type] ?? type), count, () => openSession("english", type, [])))}
+            </ul>
+          </article>}
+        </> :<p className="ds-body mt-3">{t("Quando o relatório encontrar uma correção ou a análise de voz sinalizar uma frase, ela aparecerá aqui.")}</p>}
       </section>
       <section className="vv-section" aria-labelledby="work-words">
         <div className="ds-sec-head"><div><h2 id="work-words" className="ds-section-title">{t("Suas palavras de trabalho")}</h2></div><p className="ds-lead">{t("Palavras que se repetem nas suas entrevistas.")}</p></div>
@@ -484,5 +612,6 @@ export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
       </section>
       {message && messageTarget === "word" && <p className="vv-message" role="alert">{message}</p>}
     </div>}
+    {sessionDialog}
   </main>;
 }

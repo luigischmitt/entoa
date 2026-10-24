@@ -51,7 +51,9 @@ test("Sua voz keeps the full metric, practice and evolution experience", async (
   const source = await readFile(new URL("src/app/components/voice-view.tsx", root), "utf8");
   assert.match(source, /Visão geral da sua voz/);
   assert.match(source, /Como melhorar/);
-  assert.match(source, /Frases para treinar/);
+  assert.match(source, /Treino rápido/);
+  assert.match(source, /buildVoiceSession/);
+  assert.doesNotMatch(source, /Frases para treinar/);
   assert.match(source, /Evolução/);
   assert.match(source, /\/ 100/);
   assert.match(source, /point\.value/);
