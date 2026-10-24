@@ -572,25 +572,15 @@ export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
           <p className="ds-lead">{t("Sessões curtas com frases das suas entrevistas. Escolha o que quer treinar agora.")}</p>
         </div>
         {trainingPhrases.length ? <>
-          {catalog.total > 0 && <div className="ds-block vv-quick">
-            <div className="vv-quick-copy">
-              <h3 className="vv-quick-title">{t("Treino rápido")}</h3>
-              <p className="vv-quick-text">{t("{n} frases curtas das suas entrevistas, uns 3 minutos.", { n: quickSessionSize })}</p>
-            </div>
-            <button type="button" className="ds-btn ds-btn-cta-green vv-quick-action" onClick={() => openSession("quick", null, [])}>{t("Começar treino")}<ArrowRight className="size-4 ds-arrow" aria-hidden="true" /></button>
-          </div>}
-          {(hasEnglishPhrases || hasPronunciationPhrases) && <div className="vv-tracks">
-            {hasEnglishPhrases && <article className="ds-block vv-track">
+          {(catalog.total > 0 || hasPronunciationPhrases) && <div className="vv-pair-row">
+            {catalog.total > 0 && <div className="ds-block vv-pair-card">
               <div className="vv-track-head">
-                <h3 className="vv-track-title">{t("Erros de inglês")}</h3>
-                <p className="vv-track-text">{t("Frases que você disse de outro jeito, com o porquê de cada correção.")}</p>
+                <h3 className="vv-track-title">{t("Treino rápido")}</h3>
+                <p className="vv-track-text">{t("{n} frases curtas das suas entrevistas, uns 3 minutos.", { n: quickSessionSize })}</p>
               </div>
-              <ul className="vv-starts">
-                {startRow("english-all", t("Todos os erros"), catalog.english.available, () => openSession("english", null, []))}
-                {catalog.english.types.length > 1 && catalog.english.types.map(({ type, count }) => startRow(`english-${type}`, t(patternLabels[type] ?? type), count, () => openSession("english", type, [])))}
-              </ul>
-            </article>}
-            {hasPronunciationPhrases && <article className="ds-block vv-track">
+              <button type="button" className="ds-btn ds-btn-cta-green" onClick={() => openSession("quick", null, [])}>{t("Começar treino")}<ArrowRight className="size-4 ds-arrow" aria-hidden="true" /></button>
+            </div>}
+            {hasPronunciationPhrases && <article className="ds-block vv-pair-card">
               <div className="vv-track-head">
                 <h3 className="vv-track-title">{t("Pronúncia")}</h3>
                 <p className="vv-track-text">{t("Trechos com palavras pouco claras, com uma dica de como fazer o som.")}</p>
@@ -600,6 +590,16 @@ export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
               </ul>
             </article>}
           </div>}
+          {hasEnglishPhrases && <article className="ds-block vv-track">
+            <div className="vv-track-head">
+              <h3 className="vv-track-title">{t("Erros de inglês")}</h3>
+              <p className="vv-track-text">{t("Frases que você disse de outro jeito, com o porquê de cada correção.")}</p>
+            </div>
+            <ul className="vv-starts">
+              {startRow("english-all", t("Todos os erros"), catalog.english.available, () => openSession("english", null, []))}
+              {catalog.english.types.length > 1 && catalog.english.types.map(({ type, count }) => startRow(`english-${type}`, t(patternLabels[type] ?? type), count, () => openSession("english", type, [])))}
+            </ul>
+          </article>}
         </> :<p className="ds-body mt-3">{t("Quando o relatório encontrar uma correção ou a análise de voz sinalizar uma frase, ela aparecerá aqui.")}</p>}
       </section>
       <section className="vv-section" aria-labelledby="work-words">
