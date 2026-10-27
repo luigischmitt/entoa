@@ -364,6 +364,24 @@ describe("speculative turn analysis", () => {
     expect(result).toMatchObject({ fixedAction: "KEEP", adaptedFixedQuestion: null, fixedEvidenceAnchor: null });
   });
 
+  it("rejects a DEEPEN rewrite that reuses the topic of an asked question with a different verb (Q3/Q7)", async () => {
+    const q3 = "How do you ensure the texture and anatomical fidelity in the synthetic lung CT and mammography images in your validation framework?";
+    const q7 = "What specific computer vision techniques did you apply to ensure the texture and anatomical fidelity in the synthetic lung CT and mammography images?";
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    try {
+      const fetcher = response({ revision: 2, followUpAction: "NONE", followUpQuestion: null, followUpAnchor: null, fixedAction: "DEEPEN", adaptedFixedQuestion: q7, fixedEvidenceAnchor: "synthetic lung CT and mammography images", secondFixedAction: "NONE" });
+      const result = await new SpeculativeTurnAnalysisService({ apiKey: "key", model: "model", timeoutMs: 500 }, fetcher).analyze({ ...input, snapshot: "We generated synthetic lung CT and mammography images and checked texture and anatomical fidelity against real scans.", currentQuestion: "What did you build for the synthetic images?", firstFixedQuestion: "How do you check the synthetic images for texture and anatomy?", secondFixedQuestion: null, secondFixedType: null, askedQuestions: [q3] });
+      expect(result).toMatchObject({ fixedAction: "KEEP", adaptedFixedQuestion: null, fixedEvidenceAnchor: null });
+      expect(JSON.parse(String(info.mock.calls[0]?.[0])).reason).toContain("deepen_repeats_asked_question");
+    } finally { info.mockRestore(); }
+  });
+
+  it("accepts a DEEPEN that asks a genuinely different angle on the same planned topic", async () => {
+    const fetcher = response({ revision: 2, followUpAction: "NONE", followUpQuestion: null, followUpAnchor: null, fixedAction: "DEEPEN", adaptedFixedQuestion: "Which GLCM features changed most after you tuned the generator?", fixedEvidenceAnchor: "GLCM features", secondFixedAction: "NONE" });
+    const result = await new SpeculativeTurnAnalysisService({ apiKey: "key", model: "model", timeoutMs: 500 }, fetcher).analyze({ ...input, snapshot: "I validated the synthetic images using GLCM features and then tuned the generator.", currentQuestion: "What did you build for the synthetic images?", firstFixedQuestion: "How did you tune the generator for the synthetic images?", secondFixedQuestion: null, secondFixedType: null, askedQuestions: ["How did you validate the synthetic images?"] });
+    expect(result).toMatchObject({ fixedAction: "DEEPEN", adaptedFixedQuestion: "Which GLCM features changed most after you tuned the generator?", fixedEvidenceAnchor: "GLCM features" });
+  });
+
   it("repairs harmless provider field mistakes without losing a grounded follow-up", async () => {
     const fetcher = response({
       revision: 3,
