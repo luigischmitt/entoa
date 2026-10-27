@@ -1,4 +1,16 @@
-import { defaultInterviewConsolidationTimeoutMs, defaultInterviewReportTimeoutMs, defaultInterviewTurnAnalysisTimeoutMs, maxInterviewTurnAnalysisTimeoutMs, type ThinkingConfig } from "./config.js";
+import {
+  defaultInterviewConsolidationTimeoutMs,
+  defaultInterviewReportTimeoutMs,
+  defaultInterviewTurnAnalysisTimeoutMs,
+  defaultReasoningInterviewConsolidationTimeoutMs,
+  defaultReasoningInterviewTurnAnalysisTimeoutMs,
+  defaultReportReasoningEffort,
+  isReasoningReportModel,
+  maxInterviewTurnAnalysisTimeoutMs,
+  reasoningReportTokenAllowance,
+  type ReportReasoningEffort,
+  type ThinkingConfig,
+} from "./config.js";
 import { ThinkingServiceError } from "./errors.js";
 import { isDegenerateProviderOutput } from "./report-degeneration.js";
 import { parseApprovedJobDirection } from "./job-direction-validation.js";
@@ -173,6 +185,52 @@ function schemaForLocale(base: object, locale: ReportLocale | undefined): object
   if (why) why.description = "One specific short sentence (maximum 170 characters) in clear English explaining why Brazilian Portuguese speakers tend to make this exact mistake, grounded in the evidence.";
   return localized;
 }
+
+/**
+ * OpenAI rejects strict json_schema unless every property is listed in `required`. Optional fields therefore become
+ * required and accept null; the parsers treat null exactly like an absent optional field.
+ */
+function strictOpenAiSchema(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(strictOpenAiSchema);
+  if (!isRecord(node)) return node;
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(node)) {
+    if (key === "properties" && isRecord(value)) {
+      const originallyRequired = new Set(Array.isArray(node.required) ? node.required : []);
+      const properties: Record<string, unknown> = {};
+      for (const [name, property] of Object.entries(value)) {
+        const strict = strictOpenAiSchema(property);
+        properties[name] = originallyRequired.has(name) ? strict : nullableSchema(strict);
+      }
+      result.properties = properties;
+      result.required = Object.keys(value);
+    } else if (key === "required" && isRecord(node.properties)) {
+      continue;
+    } else {
+      result[key] = strictOpenAiSchema(value);
+    }
+  }
+  return result;
+}
+
+function nullableSchema(schema: unknown): unknown {
+  if (!isRecord(schema)) return schema;
+  const { type } = schema;
+  if (typeof type === "string") {
+    return { ...schema, type: [type, "null"], ...(Array.isArray(schema.enum) ? { enum: [...schema.enum, null] } : {}) };
+  }
+  if (Array.isArray(type)) return type.includes("null") ? schema : { ...schema, type: [...type, "null"] };
+  return { anyOf: [schema, { type: "null" }] };
+}
+
+/** Empty length cut-offs and unparseable JSON are retried once; the whitespace loop is handled separately. */
+function needsProviderRetry(content: unknown, finishReason: unknown): boolean {
+  if (finishReason === "length" && (content === null || content === undefined || (typeof content === "string" && content.trim() === ""))) return true;
+  if (typeof content !== "string") return true;
+  try { JSON.parse(content); return false; } catch { return true; }
+}
+
+const directFetch: typeof fetch = (input, init) => fetch(input, init);
 
 /** Per-answer limits keep one call small; the consolidated report keeps only the most impactful items. */
 const turnLimits = { strengths: 2, gaps: 1, patterns: 5 } as const;
@@ -542,7 +600,14 @@ function englishEvidenceStatus(accepted: number, candidates: number): InterviewR
 }
 
 function technicalSummary(value: unknown, locale: ReportLocale = "pt-BR"): string {
-  return completeSentence(value, 420) ? localizedField(value.trim(), locale) ?? "" : "";
+  if (typeof value !== "string") return "";
+  // Over the cap, keep the last complete sentence inside the cap instead of rejecting the whole report.
+  let text = value;
+  if (value.length > 420) {
+    const head = value.slice(0, 420).trimEnd();
+    text = /[.!?]$/u.test(head) ? head : repairTruncatedText(head, 420) ?? "";
+  }
+  return completeSentence(text, 420) ? localizedField(text.trim(), locale) ?? "" : "";
 }
 
 function normalizedTechnicalEvidence(value: string): string {
@@ -728,7 +793,8 @@ function revalidateTurnAnalyses(input: InterviewReportConsolidationInput) {
 
 function parseConsolidation(value: unknown, input: InterviewReportConsolidationInput, findings: ReturnType<typeof revalidateTurnAnalyses>): ParsedInterviewReport {
   const parsed = parseJsonRecord(value, ["summary", "overview", "interviewerTakeaway", "clarity", "coveredGapIndexes", "priorities"]);
-  if ((parsed.summary !== undefined && !boundedString(parsed.summary, 420)) || !communicationClarities.includes(parsed.clarity as CommunicationClarity)
+  // An over-long summary is repaired by technicalSummary instead of rejecting the consolidation.
+  if ((parsed.summary !== undefined && (typeof parsed.summary !== "string" || parsed.summary.trim().length === 0)) || !communicationClarities.includes(parsed.clarity as CommunicationClarity)
     || !Array.isArray(parsed.priorities) || parsed.priorities.length > maximumParsedOptionalItems) invalidReportResponse();
   // A gap read from one answer that another answer covers is not a gap; drop it and any priority built on its excerpt.
   const covered = new Set(Array.isArray(parsed.coveredGapIndexes) ? parsed.coveredGapIndexes.filter((index): index is number => Number.isInteger(index)) : []);
@@ -810,25 +876,29 @@ type StructuredRequest = {
 export class OpenRouterInterviewReportService implements InterviewReportService {
   private readonly fetchImplementation: typeof fetch;
 
-  constructor(private readonly options: { key: string; model: string; timeoutMs: number; turnTimeoutMs?: number; consolidationTimeoutMs?: number; fetchImplementation?: typeof fetch }) {
-    this.fetchImplementation = options.fetchImplementation ?? pinnedOpenRouterFetch;
+  constructor(private readonly options: { key: string; model: string; timeoutMs: number; turnTimeoutMs?: number; consolidationTimeoutMs?: number; reasoningEffort?: ReportReasoningEffort; fetchImplementation?: typeof fetch }) {
+    // Parasail (the pin) only serves mistral; pinning any other model would just add a 404 round trip.
+    this.fetchImplementation = options.fetchImplementation ?? (options.model.startsWith("mistralai/") ? pinnedOpenRouterFetch : directFetch);
   }
 
-  /** One privacy-routed structured call; returns the raw message content for validation. */
+  /** One privacy-routed structured call; returns the raw message content for validation. At most one retry per call. */
   private async requestStructured(request: StructuredRequest): Promise<unknown> {
     const startedAt = Date.now();
     const first = await this.requestStructuredOnce(request, []);
-    if (!isDegenerateProviderOutput(first.content, first.finishReason)) return first.content;
+    const degenerate = isDegenerateProviderOutput(first.content, first.finishReason);
+    if (!degenerate && !needsProviderRetry(first.content, first.finishReason)) return first.content;
     // Incremental analysis must never use a second provider call to repair an empty/degenerate answer.
     if (request.scope === "turn") invalidReportResponse();
     // Whitespace loop in JSON mode: retry once immediately, skipping the provider that produced it.
-    const ignored = first.provider ? [first.provider] : [];
+    // Other failures (empty length cut-off, unparseable JSON) retry once on the same routing.
+    const ignored = degenerate && first.provider ? [first.provider] : [];
     const remaining = request.timeoutMs - (Date.now() - startedAt);
     if (remaining <= 1000) invalidReportResponse();
     const retryStartedAt = Date.now();
-    const second = await this.requestStructuredOnce({ ...request, timeoutMs: remaining }, ignored, { providerRetry: "degenerate_output", ignoredProvider: first.provider ?? null });
-    if (isDegenerateProviderOutput(second.content, second.finishReason)) {
-      logReportPhase("provider", retryStartedAt, request.turnCount, request.scope, { providerRetry: "degenerate_output_failed" });
+    const retryReason = degenerate ? "degenerate_output" : "invalid_output";
+    const second = await this.requestStructuredOnce({ ...request, timeoutMs: remaining }, ignored, { providerRetry: retryReason, ignoredProvider: first.provider ?? null });
+    if (isDegenerateProviderOutput(second.content, second.finishReason) || (!degenerate && needsProviderRetry(second.content, second.finishReason))) {
+      logReportPhase("provider", retryStartedAt, request.turnCount, request.scope, { providerRetry: `${retryReason}_failed` });
       invalidReportResponse();
     }
     return second.content;
@@ -839,6 +909,8 @@ export class OpenRouterInterviewReportService implements InterviewReportService 
     const timeoutSignal = AbortSignal.timeout(request.timeoutMs);
     const signal = request.signal ? AbortSignal.any([request.signal, timeoutSignal]) : timeoutSignal;
     const providerStartedAt = Date.now();
+    const reasoning = isReasoningReportModel(this.options.model);
+    const schema = this.options.model.startsWith("openai/") ? strictOpenAiSchema(request.schema) as object : request.schema;
     let response: Response;
     try {
       response = await this.fetchImplementation("https://openrouter.ai/api/v1/chat/completions", {
@@ -850,11 +922,13 @@ export class OpenRouterInterviewReportService implements InterviewReportService 
             { role: "system", content: request.system },
             { role: "user", content: JSON.stringify(request.user) },
           ],
-          temperature: 0,
-          max_tokens: request.maxTokens,
+          // Reasoning models reject temperature tuning; their reasoning tokens count against max_tokens, so the cap gets headroom.
+          ...(reasoning ? {} : { temperature: 0 }),
+          max_tokens: reasoning ? request.maxTokens + reasoningReportTokenAllowance : request.maxTokens,
+          ...(reasoning ? { reasoning: { effort: this.options.reasoningEffort ?? defaultReportReasoningEffort } } : {}),
           usage: { include: true },
           provider: { sort: "latency", require_parameters: true, data_collection: "deny", ...(ignoreProviders.length > 0 ? { ignore: ignoreProviders } : {}) },
-          response_format: { type: "json_schema", json_schema: { name: request.schemaName, strict: true, schema: request.schema } },
+          response_format: { type: "json_schema", json_schema: { name: request.schemaName, strict: true, schema } },
         }),
         signal,
       });
@@ -946,7 +1020,7 @@ export class OpenRouterInterviewReportService implements InterviewReportService 
       system: promptForLocale(turnAnalysisPrompt, input.locale),
       user: { ...(input.locale ? { locale: input.locale } : {}), roleContext: input.roleContext, ...(input.jobDirection ? { jobDirection: input.jobDirection } : {}), turns: [input.turn] },
       maxTokens: 1_000,
-      timeoutMs: Math.min(this.options.turnTimeoutMs ?? defaultInterviewTurnAnalysisTimeoutMs, maxInterviewTurnAnalysisTimeoutMs),
+      timeoutMs: Math.min(this.options.turnTimeoutMs ?? (isReasoningReportModel(this.options.model) ? defaultReasoningInterviewTurnAnalysisTimeoutMs : defaultInterviewTurnAnalysisTimeoutMs), maxInterviewTurnAnalysisTimeoutMs),
       turnCount: 1,
       scope: "turn",
       signal: input.signal,
@@ -986,7 +1060,7 @@ export class OpenRouterInterviewReportService implements InterviewReportService 
         validatedFindings: { technicalStrengths: findings.strengths, technicalGaps: findings.gaps.map((gap, index) => ({ index, ...gap })), englishPatterns: findings.patterns },
       },
       maxTokens: 1_400,
-      timeoutMs: this.options.consolidationTimeoutMs ?? defaultInterviewConsolidationTimeoutMs,
+      timeoutMs: this.options.consolidationTimeoutMs ?? (isReasoningReportModel(this.options.model) ? defaultReasoningInterviewConsolidationTimeoutMs : defaultInterviewConsolidationTimeoutMs),
       turnCount: input.turns.length,
       scope: "consolidate",
     });
@@ -998,5 +1072,5 @@ export class OpenRouterInterviewReportService implements InterviewReportService 
 
 export function createInterviewReportService(config: ThinkingConfig, fetchImplementation?: typeof fetch): InterviewReportService | null {
   if (!config.openRouterApiKey) return null;
-  return new OpenRouterInterviewReportService({ key: config.openRouterApiKey, model: config.reportModel ?? config.model, timeoutMs: config.reportTimeoutMs ?? defaultInterviewReportTimeoutMs, fetchImplementation });
+  return new OpenRouterInterviewReportService({ key: config.openRouterApiKey, model: config.reportModel ?? config.model, timeoutMs: config.reportTimeoutMs ?? defaultInterviewReportTimeoutMs, reasoningEffort: config.reportReasoningEffort, fetchImplementation });
 }

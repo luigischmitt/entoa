@@ -2,7 +2,7 @@ import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../src/app.js";
-import { loadThinkingConfig, defaultThinkingModel, defaultThinkingTimeoutMs, defaultOrchestrationTimeoutMs, defaultInterviewReportTimeoutMs, defaultResumeDirectionTimeoutMs } from "../src/thinking/config.js";
+import { loadThinkingConfig, defaultThinkingModel, defaultThinkingTimeoutMs, defaultOrchestrationTimeoutMs, defaultInterviewReportModel, defaultReasoningInterviewReportTimeoutMs, defaultResumeDirectionTimeoutMs } from "../src/thinking/config.js";
 import { ThinkingServiceError } from "../src/thinking/errors.js";
 import { OpenRouterThinkingService } from "../src/thinking/openrouter-thinking-service.js";
 import type { InterviewThinkingInput } from "../src/thinking/types.js";
@@ -58,13 +58,14 @@ describe("thinking configuration", () => {
     expect(loadThinkingConfig({} as NodeJS.ProcessEnv)).toEqual({
       openRouterApiKey: null,
       model: defaultThinkingModel,
-      reportModel: defaultThinkingModel,
+      reportModel: defaultInterviewReportModel,
+      reportReasoningEffort: "medium",
       timeoutMs: defaultThinkingTimeoutMs,
       orchestrationTimeoutMs: defaultOrchestrationTimeoutMs,
       orchestrationHedgeAfterMs: 2_500,
       bridgeTimeoutMs: 1_800,
       bridgeMode: "merged",
-      reportTimeoutMs: defaultInterviewReportTimeoutMs,
+      reportTimeoutMs: defaultReasoningInterviewReportTimeoutMs,
       resumeDirectionTimeoutMs: defaultResumeDirectionTimeoutMs,
       resumeDirectionHedgeAfterMs: 13_000,
       diagnosticsEnabled: false,
@@ -83,7 +84,8 @@ describe("thinking configuration", () => {
     } as NodeJS.ProcessEnv)).toEqual({
       openRouterApiKey: "secret",
       model: "vendor/model",
-      reportModel: "vendor/model",
+      reportModel: defaultInterviewReportModel,
+      reportReasoningEffort: "medium",
       timeoutMs: 4_500,
       orchestrationTimeoutMs: 6_000,
       orchestrationHedgeAfterMs: 2_500,
@@ -112,11 +114,14 @@ describe("thinking configuration", () => {
     expect(() => loadThinkingConfig({ INTERVIEW_BRIDGE_MODE: "legacy" } as NodeJS.ProcessEnv)).toThrow("INTERVIEW_BRIDGE_MODE must be merged or separate.");
   });
 
-  it("uses a trimmed report model override and otherwise falls back to the reasoning model", () => {
+  it("uses a trimmed report model override and otherwise defaults the report to Claude Haiku", () => {
     const withOverride = loadThinkingConfig({ INTERVIEW_REASONING_MODEL: "vendor/reason", INTERVIEW_REPORT_MODEL: "  vendor/report  " } as NodeJS.ProcessEnv);
     expect(withOverride).toMatchObject({ model: "vendor/reason", reportModel: "vendor/report" });
-    expect(loadThinkingConfig({ INTERVIEW_REASONING_MODEL: "vendor/reason", INTERVIEW_REPORT_MODEL: "   " } as NodeJS.ProcessEnv).reportModel).toBe("vendor/reason");
+    // The report model no longer follows the interview reasoning model; it defaults to Claude Haiku 5.5.
+    expect(loadThinkingConfig({ INTERVIEW_REASONING_MODEL: "vendor/reason", INTERVIEW_REPORT_MODEL: "   " } as NodeJS.ProcessEnv).reportModel).toBe(defaultInterviewReportModel);
     expect(loadThinkingConfig({ INTERVIEW_REPORT_MODEL: "vendor/report" } as NodeJS.ProcessEnv)).toMatchObject({ model: defaultThinkingModel, reportModel: "vendor/report" });
+    expect(loadThinkingConfig({} as NodeJS.ProcessEnv).reportModel).toBe("anthropic/claude-haiku-5.5");
+    expect(loadThinkingConfig({ INTERVIEW_REPORT_MODEL: "mistralai/mistral-small-3.2-24b-instruct" } as NodeJS.ProcessEnv).reportModel).toBe("mistralai/mistral-small-3.2-24b-instruct");
   });
 
   it("rejects a non-positive reasoning timeout", () => {

@@ -10,8 +10,8 @@ describe("speculative handoff config", () => {
 });
 
 describe("per-answer report analysis timeout", () => {
-  it("allows slow background analyses up to 22 seconds", () => {
+  it("keeps 22 seconds by default and allows slow reasoning analyses up to 45 seconds", () => {
     expect(defaultInterviewTurnAnalysisTimeoutMs).toBe(22_000);
-    expect(maxInterviewTurnAnalysisTimeoutMs).toBe(22_000);
+    expect(maxInterviewTurnAnalysisTimeoutMs).toBe(45_000);
   });
 });
