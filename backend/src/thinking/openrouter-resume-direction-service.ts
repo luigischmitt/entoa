@@ -20,14 +20,16 @@ type OpenRouterResponse = {
   provider?: unknown;
   openrouter_metadata?: { endpoints?: { available?: Array<{ provider?: unknown; selected?: unknown }> } };
 };
-type ResumeQuestionDiversityFailure = "too_few_dimensions" | "dimension_overrepresented" | "too_few_subjects" | "subject_overrepresented" | "broad_first_question";
+type ResumeQuestionDiversityFailure = "too_few_dimensions" | "too_few_subjects" | "subject_overrepresented" | "broad_first_question";
 type ResumeDirectionFailureReason = "missing_content" | "invalid_json" | "invalid_shape" | "question_count" | "invalid_question" | "invalid_target_role" | `diversity_${ResumeQuestionDiversityFailure}`;
 export const resumeQuestionDimensions = ["scope", "technical_approach", "decision_tradeoff", "challenge", "impact", "collaboration", "quality_reliability", "learning_growth"] as const;
 type ResumeQuestionDimension = (typeof resumeQuestionDimensions)[number];
 type ProviderQuestion = { question: string; sourceAnchor: string; subject: string; dimension: ResumeQuestionDimension };
 export const maxResumeTailoredQuestions = maxApprovedTailoredQuestions;
 const minimumDistinctDimensions = 5;
-const maximumValidatedQuestionsPerDimension = 3;
+// Dimensions are the model's own labels, and at temperature 0 the same resume gets the same labels on every
+// attempt, so a strict label check rejected some resumes forever. Validation only guards against one repeated intent.
+const minimumValidatedDistinctDimensions = 3;
 const maxQuestionsPerSubjectWhenAlternativesExist = 4;
 const richResumeCharacterThreshold = 800;
 
@@ -111,17 +113,14 @@ function normalizeSubject(value: string): string {
 const broadFirstQuestion = /\b(?:introduce yourself|tell me about (?:your )?(?:background|experience|career|project|work)|tell me about your (?:most )?relevant (?:background|experience|project|work)|describe (?:your )?(?:background|experience|career)|describe (?:a|your) project|walk me through (?:your )?(?:background|experience|career|project|resume|cv)|(?:give|provide|share) (?:me )?(?:a )?(?:quick |brief )?(?:overview|summary) of (?:your |the )?(?:background|experience|career|project|work)|(?:experience|project|work|background) most relevant|most relevant (?:experience|project|work|background))\b/iu;
 
 function questionDiversityFailure(questions: ProviderQuestion[], resumeText: string): ResumeQuestionDiversityFailure | null {
-  const dimensions = new Map<ResumeQuestionDimension, number>();
+  const dimensions = new Set<ResumeQuestionDimension>();
   const subjects = new Map<string, number>();
   for (const question of questions) {
-    dimensions.set(question.dimension, (dimensions.get(question.dimension) ?? 0) + 1);
+    dimensions.add(question.dimension);
     const subject = normalizeSubject(question.subject);
     subjects.set(subject, (subjects.get(subject) ?? 0) + 1);
   }
-  if (dimensions.size < minimumDistinctDimensions) return "too_few_dimensions";
-  // The prompt asks for at most two. Accept three at validation time so an otherwise broad five-dimension
-  // plan does not become a 502 because the provider classified one borderline question differently.
-  if ([...dimensions.values()].some((count) => count > maximumValidatedQuestionsPerDimension)) return "dimension_overrepresented";
+  if (dimensions.size < minimumValidatedDistinctDimensions) return "too_few_dimensions";
   // Use resume length as an independent richness signal so the model cannot bypass subject diversity by labeling
   // every question with the same subject. Short resumes may still explore one or two experiences from distinct angles.
   if (resumeText.trim().length >= richResumeCharacterThreshold && subjects.size < 3) return "too_few_subjects";

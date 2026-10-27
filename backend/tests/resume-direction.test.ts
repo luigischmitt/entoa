@@ -117,6 +117,30 @@ describe("resume direction validation", () => {
     expect(() => parseResumeDirection(JSON.stringify(repetitive), { resumeText, pageCount: 2 })).toThrowError(/validar a análise/iu);
   });
 
+  it("accepts a broad plan whose model labels repeat one dimension, so a deterministic label skew cannot block a resume", () => {
+    // Production (2026-10-27): both attempts labelled more than three questions with one dimension and the resume always failed.
+    const skewedLabels = {
+      ...providerResult,
+      tailoredQuestions: providerResult.tailoredQuestions.map((question, index) => ({
+        ...question,
+        subject: `subject ${index % 4}`,
+        dimension: index < 6 ? "technical_approach" : resumeQuestionDimensions[index]!,
+      })),
+    };
+    expect(parseResumeDirection(JSON.stringify(skewedLabels), { resumeText, pageCount: 2 }).tailoredQuestions).toHaveLength(8);
+  });
+
+  it("rejects a plan that uses only two dimensions", () => {
+    const twoDimensions = {
+      ...providerResult,
+      tailoredQuestions: providerResult.tailoredQuestions.map((question, index) => ({
+        ...question,
+        dimension: index % 2 === 0 ? "challenge" : "impact",
+      })),
+    };
+    expect(() => parseResumeDirection(JSON.stringify(twoDimensions), { resumeText, pageCount: 2 })).toThrowError(/validar a análise/iu);
+  });
+
   it("limits one subject to four questions when the plan contains at least three subjects", () => {
     const concentrated = {
       ...providerResult,
