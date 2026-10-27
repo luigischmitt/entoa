@@ -123,7 +123,7 @@ describe("per-turn analysis service", () => {
     expect(bodies[0].messages[0].content).not.toContain(turns[0].answer);
     const patternSchema = schema.englishPatterns.items as { required: string[]; properties: Record<string, { maxLength?: number }> };
     expect(patternSchema.required).toContain("why");
-    expect(patternSchema.properties.why.maxLength).toBe(170);
+    expect(patternSchema.properties.why.maxLength).toBe(240);
   });
 
   it("accepts up to five English patterns for one answer and drops a sixth", async () => {

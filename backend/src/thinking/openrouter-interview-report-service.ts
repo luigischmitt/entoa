@@ -3,7 +3,7 @@ import { ThinkingServiceError } from "./errors.js";
 import { isDegenerateProviderOutput } from "./report-degeneration.js";
 import { parseApprovedJobDirection } from "./job-direction-validation.js";
 import { parseOpenRouterUsage, type OpenRouterUsage, type OpenRouterUsagePayload } from "./openrouter-usage.js";
-import { analyzeEnglishEdit, checkGrammarRuleLabel, isGenericExercise, isLowContentAnswer, isNearEmptyAnswer, hasBrokenSentenceBoundary, isLikelyTranscriptionArtifactEdit, isLikelyTranscriptionArtifactRephrase, isOffQuestionIntegrationItem, isIdiomaticOnRewritten, isOptionalRelativeThatRemoval, isRephraseUnchanged, isUngrammaticalRephrase, isUnjustifiedNarrativePastToPresent, suggestsFixingNames } from "./report-guards.js";
+import { analyzeEnglishEdit, repairTruncatedText, checkGrammarRuleLabel, isGenericExercise, isLowContentAnswer, isNearEmptyAnswer, hasBrokenSentenceBoundary, isLikelyTranscriptionArtifactEdit, isLikelyTranscriptionArtifactRephrase, isOffQuestionIntegrationItem, isIdiomaticOnRewritten, isOptionalRelativeThatRemoval, isRephraseUnchanged, isUngrammaticalRephrase, isUnjustifiedNarrativePastToPresent, suggestsFixingNames } from "./report-guards.js";
 import {
   communicationClarities,
   communicationObservationTypes,
@@ -181,18 +181,31 @@ const reportLimits = { strengths: 5, gaps: 4, patterns: 3, priorities: 3 } as co
 /** Per-answer items are asked to be short (one sentence of 8–18 words); the parsers still accept the wider report limits. */
 const turnTechnicalItemSchema = {
   ...technicalItemSchema,
-  properties: { ...technicalItemSchema.properties, evidence: { type: "string", minLength: 1, maxLength: 120 }, explanation: { type: "string", minLength: 1, maxLength: 140 } },
+  properties: { ...technicalItemSchema.properties, evidence: { type: "string", minLength: 1, maxLength: 120 }, explanation: { type: "string", minLength: 1, maxLength: 220 } },
 } as const;
 const turnPatternItemSchema = {
   ...patternItemSchema,
   properties: {
     ...patternItemSchema.properties,
     evidence: { type: "string", minLength: 1, maxLength: 120 },
-    suggestion: { ...patternItemSchema.properties.suggestion, maxLength: 150 },
-    why: { ...patternItemSchema.properties.why, maxLength: 170 },
+    suggestion: { ...patternItemSchema.properties.suggestion, maxLength: 220 },
+    why: { ...patternItemSchema.properties.why, maxLength: 240 },
     rephrasedExample: { ...patternItemSchema.properties.rephrasedExample, maxLength: 160 },
   },
 } as const;
+
+/** Field caps the parsers repair against; read from the schema in use so the cap and the repair never drift apart. */
+const fullReportFieldLimits = {
+  explanation: technicalItemSchema.properties.explanation.maxLength,
+  suggestion: patternItemSchema.properties.suggestion.maxLength,
+  why: patternItemSchema.properties.why.maxLength,
+} as const;
+const turnFieldLimits = {
+  explanation: turnTechnicalItemSchema.properties.explanation.maxLength,
+  suggestion: turnPatternItemSchema.properties.suggestion.maxLength,
+  why: turnPatternItemSchema.properties.why.maxLength,
+} as const;
+type FieldLimits = { explanation: number; suggestion: number; why: number };
 
 const turnAnalysisSchema = {
   type: "object", additionalProperties: false,
@@ -236,6 +249,11 @@ function normalizeFeedbackSentence(value: unknown, max: number, minimumWords: nu
   const endsWithLikelyTruncatedWord = /(?:solu|implemen|documen|documenta|configura|performa)$/iu.test(body);
   if (words.length < minimumWords || danglingEnd.test(body) || endsWithLikelyTruncatedWord || (startsWithSubordinateClause && !hasMainClauseSeparator)) return undefined;
   return hasEndingPunctuation ? sentence : `${sentence}.`;
+}
+
+/** Undefined when absent, null when the provider cut the text too far to salvage, otherwise the repaired text. */
+function repairedField(value: unknown, maxLength: number): string | null | undefined {
+  return typeof value === "string" ? repairTruncatedText(value, maxLength) : undefined;
 }
 
 function localizedField(value: string | undefined | null | false, locale: ReportLocale): string | undefined {
@@ -403,7 +421,7 @@ function questionLookup(turns: InterviewReportInput["turns"]): QuestionLookup {
 }
 
 /** Shared by the full report, per-answer analysis and consolidation re-validation. */
-function validateTechnicalItems(items: unknown[], answerFor: AnswerLookup, counts: MutableEvidenceCounts, maxAccepted: number, kind: "strength" | "gap", questionFor?: QuestionLookup, jobDirection?: InterviewReportInput["jobDirection"], locale: ReportLocale = "pt-BR"): TechnicalItem[] {
+function validateTechnicalItems(items: unknown[], answerFor: AnswerLookup, counts: MutableEvidenceCounts, maxAccepted: number, kind: "strength" | "gap", questionFor?: QuestionLookup, jobDirection?: InterviewReportInput["jobDirection"], locale: ReportLocale = "pt-BR", limits: FieldLimits = fullReportFieldLimits): TechnicalItem[] {
   return items.flatMap((item) => {
     counts.candidates += 1;
     if (!isRecord(item) || Object.keys(item).some((key) => !["sequenceNumber", "evidence", "explanation", "vacancyCompetency"].includes(key))) {
@@ -412,13 +430,14 @@ function validateTechnicalItems(items: unknown[], answerFor: AnswerLookup, count
     const answer = answerFor(item.sequenceNumber);
     if (!boundedString(item.evidence, 120)) { counts.rejectionReasons.invalidFormat += 1; return []; }
     const evidence = answer ? resolveCanonicalEvidence(answer, item.evidence, 120) : undefined;
-    const explanation = localizedField(normalizeFeedbackSentence(item.explanation, 180, 1), locale);
+    const repairedExplanation = repairedField(item.explanation, limits.explanation);
+    const explanation = localizedField(normalizeFeedbackSentence(repairedExplanation, limits.explanation, 1), locale);
     // Only an exact approved competency survives; an invented one, or any link on a session without a direction, is
     // dropped from the finding (the finding itself is still judged on its evidence).
     const vacancyCompetency = typeof item.vacancyCompetency === "string" && jobDirection?.priorityCompetencies.includes(item.vacancyCompetency) ? item.vacancyCompetency : undefined;
     if (!answer || !evidence || (kind === "gap" && isNearEmptyAnswer(answer))) { counts.rejectionReasons.mismatch += 1; return []; }
     if (likelyTranscriptionArtifact(evidence)) { counts.rejectionReasons.artifact += 1; return []; }
-    if (!explanation || (kind === "strength" && isTrivialStrength(explanation))) { counts.rejectionReasons.invalidFormat += 1; return []; }
+    if (repairedExplanation === null || !explanation || (kind === "strength" && isTrivialStrength(explanation))) { counts.rejectionReasons.invalidFormat += 1; return []; }
     // A gap about how something was integrated or implemented is unfair when the question never asked for it.
     if (kind === "gap" && isOffQuestionIntegrationItem(explanation, questionFor?.(item.sequenceNumber))) { counts.rejectionReasons.mismatch += 1; return []; }
     if (counts.accepted >= maxAccepted) { counts.rejectionReasons.limit += 1; return []; }
@@ -427,7 +446,7 @@ function validateTechnicalItems(items: unknown[], answerFor: AnswerLookup, count
   });
 }
 
-function validatePatternCandidates(items: unknown[], answerFor: AnswerLookup, counts: MutableEvidenceCounts, locale: ReportLocale = "pt-BR"): PatternItem[] {
+function validatePatternCandidates(items: unknown[], answerFor: AnswerLookup, counts: MutableEvidenceCounts, locale: ReportLocale = "pt-BR", limits: FieldLimits = fullReportFieldLimits): PatternItem[] {
   return items.flatMap((item) => {
     counts.candidates += 1;
     if (!isRecord(item) || Object.keys(item).some((key) => !["type", "sequenceNumber", "evidence", "suggestion", "why", "rephrasedExample"].includes(key))) {
@@ -440,11 +459,13 @@ function validatePatternCandidates(items: unknown[], answerFor: AnswerLookup, co
     const evidence = answer ? resolveCanonicalEvidence(answer, item.evidence, 160) : undefined;
     if (!answer || !evidence || isNearEmptyAnswer(answer)) { counts.rejectionReasons.mismatch += 1; return []; }
     if (likelyTranscriptionArtifact(evidence)) { counts.rejectionReasons.artifact += 1; return []; }
-    const suggestion = localizedField(normalizeFeedbackSentence(item.suggestion, 200, 4), locale);
-    // A why without final punctuation was cut by the provider ("Em portugu"); never repair it into a sentence.
-    const why = typeof item.why === "string" && /[.!?]["'”’)]*$/u.test(item.why.trim()) ? localizedField(normalizeFeedbackSentence(item.why, 170, 4), locale) : undefined;
+    const repairedSuggestion = repairedField(item.suggestion, limits.suggestion);
+    const suggestion = localizedField(normalizeFeedbackSentence(repairedSuggestion, limits.suggestion, 4), locale);
+    // A why that is still unpunctuated after repair was cut too early ("Em portugu") and is dropped, never completed into a sentence.
+    const repairedWhy = repairedField(item.why, limits.why);
+    const why = repairedWhy && /[.!?]["'”’)]*$/u.test(repairedWhy.trim()) ? localizedField(normalizeFeedbackSentence(repairedWhy, limits.why, 4), locale) : undefined;
     const rephrasedExample = normalizeFeedbackSentence(item.rephrasedExample, 200, 3);
-    if (!suggestion || !rephrasedExample || isRephraseUnchanged(evidence, rephrasedExample) || isUngrammaticalRephrase(rephrasedExample) || isIdiomaticOnRewritten(evidence, rephrasedExample)) { counts.rejectionReasons.invalidFormat += 1; return []; }
+    if (repairedSuggestion === null || repairedWhy === null || !suggestion || !rephrasedExample || isRephraseUnchanged(evidence, rephrasedExample) || isUngrammaticalRephrase(rephrasedExample) || isIdiomaticOnRewritten(evidence, rephrasedExample)) { counts.rejectionReasons.invalidFormat += 1; return []; }
     // The "correction" replaces or invents content words: a mis-heard name or garbled phrase, not a candidate error.
     const edit = analyzeEnglishEdit(evidence, rephrasedExample, answer);
     const type = item.type as CommunicationObservationType;
@@ -493,10 +514,12 @@ function validatePriorities(items: unknown[], answerFor: AnswerLookup, counts: M
     const evidence = answer ? resolveCanonicalEvidence(answer, item.evidence, 120) : undefined;
     if (!answer || !evidence || isNearEmptyAnswer(answer)) { counts.rejectionReasons.mismatch += 1; return []; }
     if (likelyTranscriptionArtifact(evidence)) { counts.rejectionReasons.artifact += 1; return []; }
-    const normalizedExercise = typeof item.exercise === "string" ? localizedField(normalizeFeedbackSentence(item.exercise, 140, 1), locale) : undefined;
+    // Exercise is optional: an unrepairable one is omitted instead of dropping the whole priority.
+    const normalizedExercise = typeof item.exercise === "string" ? localizedField(normalizeFeedbackSentence(repairedField(item.exercise, 140) ?? undefined, 140, 1), locale) : undefined;
     const exercise = normalizedExercise && !isGenericExercise(normalizedExercise) ? normalizedExercise : undefined;
     // Focus is a short label ("Processamento da fila"), kept as written.
-    const focus = typeof item.focus === "string" && item.focus.trim() ? localizedField(item.focus.trim(), locale) : undefined;
+    const repairedFocus = repairedField(typeof item.focus === "string" ? item.focus.trim() : undefined, 160);
+    const focus = repairedFocus ? localizedField(repairedFocus.trim(), locale) : undefined;
     const evidenceWordCount = evidence.match(/[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu)?.length ?? 0;
     if (!["TECHNICAL_CONTENT", "ENGLISH_COMMUNICATION"].includes(item.area as string) || !boundedString(item.focus, 160) || !focus || evidenceWordCount < 4 || likelyTranscriptionArtifact(evidence)) {
       counts.rejectionReasons.invalidFormat += 1; return [];
@@ -635,7 +658,7 @@ function parseReport(value: unknown, input: InterviewReportInput): ParsedIntervi
 
 type TurnEvidenceReview = Pick<NonNullable<InterviewReport["evidenceReview"]>, "technicalStrengths" | "technicalGaps" | "englishPatterns">;
 
-function parseTurnAnalysis(value: unknown, input: InterviewTurnAnalysisInput): { analysis: InterviewTurnAnalysis; evidenceReview: TurnEvidenceReview } {
+export function parseTurnAnalysis(value: unknown, input: InterviewTurnAnalysisInput): { analysis: InterviewTurnAnalysis; evidenceReview: TurnEvidenceReview } {
   const { turn } = input;
   const parsed = parseJsonRecord(value, ["technicalStrengths", "technicalGaps", "englishPatterns"]);
   if (!Array.isArray(parsed.technicalStrengths) || parsed.technicalStrengths.length > maximumParsedOptionalItems
@@ -644,13 +667,13 @@ function parseTurnAnalysis(value: unknown, input: InterviewTurnAnalysisInput): {
   const answerFor = answerLookup([turn]);
   const questionFor = questionLookup([turn]);
   const counts = { technicalStrengths: newEvidenceCounts(), technicalGaps: newEvidenceCounts(), englishPatterns: newEvidenceCounts() };
-  const technicalStrengths = validateTechnicalItems(parsed.technicalStrengths, answerFor, counts.technicalStrengths, turnLimits.strengths, "strength", questionFor, input.jobDirection, input.locale ?? "pt-BR");
-  const technicalGaps = removeConflictingTechnicalGaps(technicalStrengths, validateTechnicalItems(parsed.technicalGaps, answerFor, counts.technicalGaps, turnLimits.gaps, "gap", questionFor, input.jobDirection, input.locale ?? "pt-BR"), counts.technicalGaps);
+  const technicalStrengths = validateTechnicalItems(parsed.technicalStrengths, answerFor, counts.technicalStrengths, turnLimits.strengths, "strength", questionFor, input.jobDirection, input.locale ?? "pt-BR", turnFieldLimits);
+  const technicalGaps = removeConflictingTechnicalGaps(technicalStrengths, validateTechnicalItems(parsed.technicalGaps, answerFor, counts.technicalGaps, turnLimits.gaps, "gap", questionFor, input.jobDirection, input.locale ?? "pt-BR", turnFieldLimits), counts.technicalGaps);
   const analysis: InterviewTurnAnalysis = {
     sequenceNumber: turn.sequenceNumber,
     technicalStrengths,
     technicalGaps,
-    englishPatterns: dedupePatterns(validatePatternCandidates(parsed.englishPatterns, answerFor, counts.englishPatterns, input.locale ?? "pt-BR"), counts.englishPatterns, turnLimits.patterns),
+    englishPatterns: dedupePatterns(validatePatternCandidates(parsed.englishPatterns, answerFor, counts.englishPatterns, input.locale ?? "pt-BR", turnFieldLimits), counts.englishPatterns, turnLimits.patterns),
   };
   return {
     analysis,
@@ -689,9 +712,9 @@ function revalidateTurnAnalyses(input: InterviewReportConsolidationInput) {
     const analysis = input.turnAnalyses.find((entry) => entry.sequenceNumber === turn.sequenceNumber);
     const answerFor = answerLookup([turn]);
     const questionFor = questionLookup([turn]);
-    strengthsByTurn.push(validateTechnicalItems(analysis?.technicalStrengths ?? [], answerFor, counts.technicalStrengths, Infinity, "strength", questionFor, input.jobDirection, input.locale ?? "pt-BR"));
-    gapsByTurn.push(validateTechnicalItems(analysis?.technicalGaps ?? [], answerFor, counts.technicalGaps, Infinity, "gap", questionFor, input.jobDirection, input.locale ?? "pt-BR"));
-    const validatedPatterns = validatePatternCandidates(analysis?.englishPatterns ?? [], answerFor, counts.englishPatterns, input.locale ?? "pt-BR");
+    strengthsByTurn.push(validateTechnicalItems(analysis?.technicalStrengths ?? [], answerFor, counts.technicalStrengths, Infinity, "strength", questionFor, input.jobDirection, input.locale ?? "pt-BR", turnFieldLimits));
+    gapsByTurn.push(validateTechnicalItems(analysis?.technicalGaps ?? [], answerFor, counts.technicalGaps, Infinity, "gap", questionFor, input.jobDirection, input.locale ?? "pt-BR", turnFieldLimits));
+    const validatedPatterns = validatePatternCandidates(analysis?.englishPatterns ?? [], answerFor, counts.englishPatterns, input.locale ?? "pt-BR", turnFieldLimits);
     // Per-answer cap as for a single answer; the interview-level list is not capped so every clear error reaches the learner.
     counts.englishPatterns.rejectionReasons.limit += Math.max(0, validatedPatterns.length - turnLimits.patterns);
     patternsByTurn.push(validatedPatterns.slice(0, turnLimits.patterns));
