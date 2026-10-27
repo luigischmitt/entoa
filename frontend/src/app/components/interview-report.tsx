@@ -11,7 +11,8 @@ import type { ProgressRecord } from "@/lib/interview/progress-insights.mjs";
 import { RESUME_PRACTICE_LABEL } from "@/lib/interview/resume-neutral.mjs";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { findingsForAnswer } from "@/lib/interview/report-response.mjs";
-import { analysisCoverageNotice, buildReportDeltas, displayInterviewerTakeaway, displayTechnicalFindings, isCompleteSentence } from "@/lib/interview/report-presentation.mjs";
+import { analysisCoverageNotice, buildReportDeltas, displayInterviewerTakeaway, displayTechnicalFindings, phonemeTip } from "@/lib/interview/report-presentation.mjs";
+import { voiceDeliveryInterpretation } from "@/lib/interview/voice-report-insights.mjs";
 import { buildErrorRows, buildJobCoverage, buildPracticePriorities, buildVoiceNotes, formatReportDate, reportFileBase, reportSummaryText, type JobCoverageItem } from "@/lib/interview/report-document.mjs";
 import { useReplayReveal } from "@/lib/use-replay-reveal";
 import { LoadingMark, LoadingRegion, SkCard } from "@/components/ui/loading-state";
@@ -39,8 +40,12 @@ const reportLoadingSteps = [
   "Analisando seu inglês",
   "Juntando os sinais da sua voz",
 ];
-const maxVisibleErrors = 5;
+const maxVisibleErrors = 8;
 const maxStrengths = 4;
+const maxPronunciationWords = 6;
+const pronunciationScoreLimit = 70;
+/** Answers longer than this are clamped on screen (to four lines) until the reader asks for the full text. */
+const longAnswerChars = 280;
 const seniorityLabels: Record<string, string> = { junior: "Júnior", "mid-level": "Pleno", senior: "Sênior" };
 const jobStatusLabels: Record<JobCoverageItem["status"], string> = {
   shown: "Citado nas respostas",
@@ -50,55 +55,7 @@ const jobStatusLabels: Record<JobCoverageItem["status"], string> = {
 
 const rise = (index: number) => ({ "--i": index }) as CSSProperties;
 
-function AnswerCard({ turn, result, ordinal }: { turn: Turns[number]; result: InterviewReportResult; ordinal: number }) {
-  const [expanded, setExpanded] = useState(false);
-  const findings = findingsForAnswer(result, turn.sequenceNumber);
-  return (
-    <article className="ds-card rp-card rp-answer" aria-labelledby={`answer-${turn.sequenceNumber}`}>
-      <p className="rp-answer-question" lang="en">{turn.question}</p>
-      <h3 id={`answer-${turn.sequenceNumber}`} className="ds-label">{t("Resposta ")}{ordinal}</h3>
-      <p lang="en" className={`rp-answer-text${expanded ? " is-expanded" : ""}`}>{turn.answer}</p>
-      {turn.answer.length > 90 && (
-        <button type="button" className="rp-inline-button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
-          {t(expanded ? "Recolher resposta" : "Ver resposta completa")}
-        </button>
-      )}
-      {(findings.strengths.length > 0 || findings.gaps.length > 0) && (
-        <div className="rp-answer-columns">
-          {findings.strengths.length > 0 && (
-            <section>
-              <h4 className="rp-subtitle">{t("O que funcionou")}</h4>
-              {findings.strengths.map((item, index) => (
-                <p key={index} className="rp-answer-finding">{item.explanation}</p>
-              ))}
-            </section>
-          )}
-          {findings.gaps.length > 0 && (
-            <section>
-              <h4 className="rp-subtitle">{t("O que faltou")}</h4>
-              {findings.gaps.map((item, index) => (
-                <p key={index} className="rp-answer-finding">{item.explanation}</p>
-              ))}
-            </section>
-          )}
-        </div>
-      )}
-      {findings.patterns.length > 0 && (
-        <section className="rp-answer-english">
-          <h4 className="rp-subtitle">{t("Inglês")}</h4>
-          {findings.patterns.map((pattern, index) => (
-            <div className="rp-pattern" key={`${pattern.type}-${index}`}>
-              <p lang="en" className="rp-quote">{t("Você disse: “")}{pattern.evidence}{t("”")}</p>
-              <p className="rp-rephrase-text" lang="en">{t("Mais natural: “")}{pattern.rephrasedExample}{t("”")}</p>
-              {isCompleteSentence(pattern.suggestion) && <p className="rp-hint mt-1">{pattern.suggestion}</p>}
-              {isCompleteSentence(pattern.why) && <p className="rp-hint mt-1">{t("Por que acontece: ")}{pattern.why}</p>}
-            </div>
-          ))}
-        </section>
-      )}
-    </article>
-  );
-}
+type ReadyAnswer = { turn: Turns[number]; ordinal: number; findings: ReturnType<typeof findingsForAnswer> };
 
 function CapturedAnswers({ turns }: { turns: Turns }) {
   return <details className="rp-more"><summary>{t("Transcrição completa")}</summary><ol className="rp-transcript">{turns.map((turn, index) => <li key={`${turn.sequenceNumber}-${index}`}><p lang="en"><span className="font-semibold">{t("Pergunta:")}</span> {turn.question}</p><p lang="en" className="mt-2"><span className="font-semibold">{t("Sua resposta:")}</span> {turn.answer}</p></li>)}</ol></details>;
@@ -114,27 +71,71 @@ function DeltaRow({ label, change, index }: { label: string; change?: string; in
   );
 }
 
-function SectionHeading({
-  title,
-  description,
-  id,
-}: {
-  title: string;
-  description: string;
-  id: string;
-}) {
+/** One answer on the paper: the question, the full answer, what worked, what to improve, and a pointer to the error list. */
+function ReportAnswer({ answer }: { answer: ReadyAnswer }) {
+  const [expanded, setExpanded] = useState(false);
+  const { turn, ordinal, findings } = answer;
+  const long = turn.answer.length > longAnswerChars;
+  const hasNotes = findings.strengths.length > 0 || findings.gaps.length > 0;
   return (
-    <header className="rp-section-heading ds-item">
-      <h2 id={id} className="ds-h2">{t(title)}</h2>
-      <p className="rp-hint mt-1">{t(description)}</p>
-    </header>
+    <div className="rp-answer">
+      <p className="rp-psub">{t("Pergunta {n}", { n: ordinal })}</p>
+      <p className="rp-answer-question" lang="en">{turn.question}</p>
+      <p className="rp-psub">{t("Sua resposta")}</p>
+      <p lang="en" className={`rp-answer-text${long && !expanded ? " is-clamped" : ""}`}>{turn.answer}</p>
+      {long && (
+        <button type="button" className="rp-inline-button rp-noprint" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
+          {t(expanded ? "Recolher resposta" : "Ver resposta completa")}
+        </button>
+      )}
+      {hasNotes ? (
+        <div className="rp-answer-cols">
+          {findings.strengths.length > 0 && (
+            <div className="rp-answer-col">
+              <p className="rp-psub">{t("O que funcionou")}</p>
+              {findings.strengths.map((item, index) => <p key={index}>{item.explanation}</p>)}
+            </div>
+          )}
+          {findings.gaps.length > 0 && (
+            <div className="rp-answer-col">
+              <p className="rp-psub">{t("Como melhorar")}</p>
+              {findings.gaps.map((item, index) => <p key={index}>{item.explanation}</p>)}
+            </div>
+          )}
+        </div>
+      ) : (
+        <p className="rp-pnote">{t("Sem observações de conteúdo nesta resposta.")}</p>
+      )}
+      {findings.patterns.length > 0 && <p className="rp-pnote">{t("Erros de inglês nesta resposta: {k}", { k: findings.patterns.length })}</p>}
+    </div>
   );
+}
+
+/** Words the voice analysis flagged as hard (score under the limit), lowest score first, each word once. */
+function pronunciationWords(summary: AzureMetricSummary) {
+  const words = new Map<string, { word: string; score: number; worstPhoneme: string | null }>();
+  for (const answer of summary.answers ?? []) {
+    for (const phrase of answer.phrases ?? []) {
+      for (const problem of phrase.problemWords ?? []) {
+        if (problem.score === null || problem.score >= pronunciationScoreLimit) continue;
+        const key = problem.word.toLowerCase();
+        const current = words.get(key);
+        if (!current || problem.score < current.score) words.set(key, { word: problem.word, score: problem.score, worstPhoneme: problem.worstPhoneme });
+      }
+    }
+  }
+  return [...words.values()].sort((a, b) => a.score - b.score).slice(0, maxPronunciationWords);
 }
 
 /** Everything the ready report shows, derived once from the result (shared by the paper and the appendix). */
 function buildReadyModel(result: InterviewReportResult, turns: Turns, azureSummary: AzureMetricSummary, progressRecords: ProgressRecord[], currentInterviewId: string | undefined, answerCount: number) {
   const reference = (sequenceNumber: number) => answerOrdinalForSequence(turns, sequenceNumber);
-  const allPatterns = turns.flatMap((turn) => findingsForAnswer(result, turn.sequenceNumber).patterns);
+  const answers: ReadyAnswer[] = turns.map((turn, index) => ({
+    turn,
+    ordinal: reference(turn.sequenceNumber) ?? index + 1,
+    findings: findingsForAnswer(result, turn.sequenceNumber),
+  }));
+  const allPatterns = answers.flatMap((answer) => answer.findings.patterns);
   const initialTakeaway = displayInterviewerTakeaway(result.interviewerTakeaway);
   const technical = displayTechnicalFindings(result.technicalContent.strengths, result.technicalContent.gaps, initialTakeaway.concern ? [{ explanation: initialTakeaway.concern }] : []);
   return {
@@ -142,10 +143,12 @@ function buildReadyModel(result: InterviewReportResult, turns: Turns, azureSumma
     summary: reportSummaryText(result),
     coverageNotice: analysisCoverageNotice(result.analysisCoverage, reference),
     strengths: technical.strengths.slice(0, maxStrengths),
+    answers,
     errorRows: buildErrorRows(allPatterns),
     voiceNotes: buildVoiceNotes(azureSummary),
+    voiceFacts: voiceDeliveryInterpretation(azureSummary.answers ?? []),
+    pronunciation: pronunciationWords(azureSummary),
     priorities: buildPracticePriorities(result),
-    takeaway: displayInterviewerTakeaway(result.interviewerTakeaway, technical.gaps),
     deltas: buildReportDeltas(result, azureSummary, progressRecords, currentInterviewId, answerCount),
   };
 }
@@ -156,10 +159,10 @@ function refLabel(sequenceNumber: number | null | undefined) {
   return sequenceNumber === null || sequenceNumber === undefined ? null : `${t("Resposta ")}${sequenceNumber}`;
 }
 
-/** The document itself: the blocks that the landing's printed report shows, in the same order. */
-function ReadyDocument({ model, jobItems, dateLabel }: { model: ReadyModel; jobItems: JobCoverageItem[]; dateLabel: string }) {
+/** The document itself: the whole report, in the order it prints. */
+function ReadyDocument({ model, jobItems, dateLabel, turnsLoading }: { model: ReadyModel; jobItems: JobCoverageItem[]; dateLabel: string; turnsLoading: boolean }) {
   const [showAllErrors, setShowAllErrors] = useState(false);
-  const { reference, errorRows } = model;
+  const { reference, errorRows, voiceFacts, pronunciation } = model;
   const hasVoice = model.voiceNotes.some((note) => note.value !== null);
   return (
     <>
@@ -191,7 +194,7 @@ function ReadyDocument({ model, jobItems, dateLabel }: { model: ReadyModel; jobI
           </ul>
         </section>
       )}
-      <section className="rp-pblock ds-item" style={rise(3)}>
+      <section className="rp-pblock rp-pblock-long ds-item" style={rise(3)}>
         <h2 className="rp-ph">{t("Seus erros")}</h2>
         {errorRows.length > 0 ? (
           <>
@@ -222,7 +225,17 @@ function ReadyDocument({ model, jobItems, dateLabel }: { model: ReadyModel; jobI
           <p className="rp-pnote">{t("Nenhum erro de inglês recorrente apareceu nesta entrevista.")}</p>
         )}
       </section>
-      <section className="rp-pblock ds-item" style={rise(4)}>
+      <section className="rp-pblock rp-pblock-long ds-item" style={rise(4)}>
+        <h2 className="rp-ph">{t("Resposta por resposta")}</h2>
+        {model.answers.length > 0 ? (
+          <div className="rp-answers">
+            {model.answers.map((answer) => <ReportAnswer key={answer.turn.sequenceNumber} answer={answer} />)}
+          </div>
+        ) : !turnsLoading ? (
+          <p className="rp-pnote">{t("As perguntas e respostas desta entrevista não estão disponíveis.")}</p>
+        ) : null}
+      </section>
+      <section className="rp-pblock ds-item" style={rise(5)}>
         <h2 className="rp-ph">{t("Notas da sua voz")}</h2>
         {hasVoice ? (
           <>
@@ -240,9 +253,33 @@ function ReadyDocument({ model, jobItems, dateLabel }: { model: ReadyModel; jobI
         ) : (
           <p className="rp-pnote">{t("Sem sinais de voz suficientes nesta entrevista.")}</p>
         )}
+        {voiceFacts && (
+          <div className="rp-voice-detail">
+            <p className="rp-psub">{t("Ritmo da fala")}</p>
+            <p className="rp-vfacts">
+              {voiceFacts.wordsPerMinute} {t("palavras/min")} · {voiceFacts.pauseCount} {t("pausas")}
+              {voiceFacts.longestPauseMs >= 1_000 ? <> · {t("pausa mais longa de ")}{Math.round(voiceFacts.longestPauseMs / 100) / 10} {t("s")}</> : null}
+              {voiceFacts.fillerCount > 0 ? <> · {voiceFacts.fillerCount} {t("hesitações")}</> : null}
+            </p>
+            <p className="rp-vinsight">{voiceFacts.insights.map((item, index) => <span key={item.key}>{index > 0 ? " " : ""}{t(item.key, item.values)}</span>)}</p>
+          </div>
+        )}
+        {pronunciation.length > 0 && (
+          <div className="rp-voice-detail">
+            <p className="rp-psub">{t("Palavras para revisar a pronúncia")}</p>
+            <ul className="rp-words">
+              {pronunciation.map((item) => (
+                <li key={item.word}>
+                  <b lang="en">{item.word}</b>
+                  <span>{t(phonemeTip(item.worstPhoneme, item.word))}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
       {model.priorities.length > 0 && (
-        <section className="rp-pblock ds-item" style={rise(5)}>
+        <section className="rp-pblock ds-item" style={rise(6)}>
           <h2 className="rp-ph">{t("Prioridades para praticar")}</h2>
           <ol className="rp-prio">
             {model.priorities.map((item, index) => {
@@ -261,49 +298,24 @@ function ReadyDocument({ model, jobItems, dateLabel }: { model: ReadyModel; jobI
           </ol>
         </section>
       )}
-      <footer className="rp-pfoot ds-item" style={rise(6)}>
+      {model.deltas.length > 0 && (
+        <section className="rp-pblock ds-item" style={rise(7)}>
+          <h2 className="rp-ph">{t("Desde a última entrevista")}</h2>
+          {model.deltas.map((delta, index) => <DeltaRow key={delta.label} label={t(delta.label)} change={delta.change} index={index} />)}
+        </section>
+      )}
+      <footer className="rp-pfoot ds-item" style={rise(8)}>
         {t("Entoa · Gerado a partir da sua entrevista simulada de {date}", { date: dateLabel })}
       </footer>
     </>
   );
 }
 
-/** Screen-only extras below the paper: perception, changes since last time, the detailed voice data and each answer. */
-function ReadyAppendix({ result, model, turns, azureSummary, coverage }: { result: InterviewReportResult; model: ReadyModel; turns: Turns; azureSummary: AzureMetricSummary; coverage: { available: number; pending: number; total: number } }) {
-  const { takeaway, deltas } = model;
+/** Screen-only link below the paper: the paper itself already holds the whole report. */
+function ReadyAppendix() {
   return (
     <div className="rp-appendix">
-      {(takeaway.remember || takeaway.concern) && <section className="rp-section" aria-labelledby="perceived-title" data-reveal="group">
-        <SectionHeading id="perceived-title" title="Como você foi percebido" description="O que pode ficar na memória depois da conversa." />
-        <div className="rp-perception-grid ds-stagger">
-          {takeaway.remember && <article className="ds-card rp-card rp-perception ds-item" data-tone="remember"><h3 className="ds-label">{t("O que o entrevistador vai lembrar")}</h3><p>{takeaway.remember}</p></article>}
-          {takeaway.concern && <article className="ds-card rp-card rp-perception ds-item" data-tone="concern"><h3 className="ds-label">{t("O que pode pesar contra")}</h3><p>{takeaway.concern}</p></article>}
-        </div>
-      </section>}
-      {deltas.length > 0 && <section className="rp-deltas" data-reveal="group" aria-label={t("Desde a última entrevista")}><h3 className="rp-subtitle">{t("Desde a última entrevista")}</h3>{deltas.map((delta, index) => <DeltaRow key={delta.label} label={t(delta.label)} change={delta.change} index={index} />)}</section>}
-      <section className="rp-section" data-reveal="group">
-        <div className="rp-voice-compact">
-          <AzureVoiceReport summary={azureSummary} coverage={coverage} title={t("Ritmo da fala")} />
-        </div>
-      </section>
-      <details className="rp-more rp-response-details">
-        <summary>{t("Resposta por resposta")}</summary>
-        <p className="rp-hint mt-2">{t("Perguntas, transcrições e observações de cada resposta.")}</p>
-        {turns.length ? (
-          <div className="rp-stack mt-4">
-            {turns.map((turn, index) => (
-              <AnswerCard
-                key={turn.sequenceNumber}
-                turn={turn}
-                ordinal={answerOrdinalForSequence(turns, turn.sequenceNumber) ?? index + 1}
-                result={result}
-              />
-            ))}
-          </div>
-        ) : (
-          <p className="ds-body mt-3">{t("As perguntas e respostas desta entrevista não estão disponíveis.")}</p>
-        )}
-      </details>
+      <a className="ds-btn ds-btn-cta-green rp-voice-link" href="/dashboard?view=voice">{t("Treinar minha voz")}</a>
     </div>
   );
 }
@@ -375,7 +387,7 @@ export function InterviewReport({ config, elapsed, totalClock, answerCount, pers
     [isResume, reportDirection, reportState.result],
   );
   const readyResult = reportState.status === "ready" ? reportState.result : undefined;
-  const ready = readyResult && readyModel ? { result: readyResult, model: readyModel } : null;
+  const ready = readyResult && readyModel ? { model: readyModel } : null;
   return (
     <section ref={rootRef} className="rp-root mx-auto w-full max-w-4xl" aria-labelledby="interview-complete-title">
       {historical && <button type="button" className="ds-btn ds-btn-quiet mb-3" onClick={onLeave}>
@@ -449,10 +461,10 @@ export function InterviewReport({ config, elapsed, totalClock, answerCount, pers
             <AzureVoiceReport summary={azureSummary} coverage={coverage} />
           </div>
         ) : ready ? (
-          <ReadyDocument model={ready.model} jobItems={jobItems} dateLabel={dateLabel} />
+          <ReadyDocument model={ready.model} jobItems={jobItems} dateLabel={dateLabel} turnsLoading={loadingTurns} />
         ) : null}
       </article>
-      {ready && <ReadyAppendix result={ready.result} model={ready.model} turns={loadedTurns} azureSummary={azureSummary} coverage={coverage} />}
+      {ready && <ReadyAppendix />}
       <div className="rp-foot">
         <button type="button" className={`ds-btn ${reportState.status === "pending" ? "ds-btn-quiet" : "ds-btn-cta-green"} rp-back`} onClick={onLeave}>{t(historical ? "Voltar ao Progresso " : "Voltar ao dashboard ")}
           <ArrowUpRight className="ds-arrow size-4" aria-hidden="true" />
