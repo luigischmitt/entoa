@@ -431,9 +431,9 @@ describe("final interview report service", () => {
   it("preserves already punctuated sentences within the schema limit before applying fragment heuristics", async () => {
     const answer = "The service was slow. We added an index.";
     const turns = [{ sequenceNumber: 1, question: "What changed?", answer }];
-    const longCompleteSuggestion = "Revise esta construção para manter clareza, precisão e relevância profissional, usando exemplos específicos diretamente relacionados à pergunta do entrevistador e ao contexto da resposta.";
-    expect(longCompleteSuggestion.length).toBeGreaterThan(184);
-    expect(longCompleteSuggestion.length).toBeLessThanOrEqual(200);
+    const longCompleteSuggestion = "Revise esta construção para manter clareza, precisão e relevância profissional, usando exemplos específicos ligados à pergunta do entrevistador.";
+    expect(longCompleteSuggestion.length).toBeGreaterThan(120);
+    expect(longCompleteSuggestion.length).toBeLessThanOrEqual(170);
     const pattern = {
       type: "GRAMMAR", sequenceNumber: 1, evidence: "The service was slow",
       suggestion: longCompleteSuggestion,

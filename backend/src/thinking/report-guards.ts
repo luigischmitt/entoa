@@ -346,3 +346,26 @@ export function isNearEmptyAnswer(answer: string): boolean {
   const words = answer.match(/[\p{L}\p{N}]+(?:['’][\p{L}]+)?/gu) ?? [];
   return words.length < 6;
 }
+
+/**
+ * Repairs user-facing text that the provider cut at its schema `maxLength` (for example "…para entender a aplic.").
+ * Text clearly shorter than the cap is returned unchanged. Text at the cap is presumed cut: it keeps the last complete
+ * sentence when that is at least 40 characters, otherwise the clause before the last comma or semicolon, closed with a period.
+ * Returns null when nothing long enough survives, so the caller can reject the item.
+ */
+export function repairTruncatedText(text: string, maxLength: number): string | null {
+  if (text.length < maxLength - 3) return text;
+  const value = text.trim();
+  let sentenceEnd = -1;
+  for (let index = value.length - 2; index >= 0; index -= 1) {
+    if (/[.!?]/u.test(value[index]!) && value[index + 1] === " ") { sentenceEnd = index; break; }
+  }
+  if (sentenceEnd >= 0) {
+    const sentence = value.slice(0, sentenceEnd + 1).trim();
+    if (sentence.length >= 40) return sentence;
+  }
+  const clauseEnd = Math.max(value.lastIndexOf(","), value.lastIndexOf(";"));
+  if (clauseEnd < 0) return null;
+  const clause = `${value.slice(0, clauseEnd).trimEnd()}.`;
+  return clause.length >= 25 ? clause : null;
+}
