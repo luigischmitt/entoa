@@ -4,6 +4,14 @@ export const defaultOrchestrationTimeoutMs = 6_000;
 export const defaultOrchestrationHedgeAfterMs = 2_500;
 export const defaultBridgeTimeoutMs = 1_800;
 export const defaultInterviewReportTimeoutMs = 45_000;
+/** Final report model; `INTERVIEW_REPORT_MODEL` overrides it. */
+export const defaultInterviewReportModel = "anthropic/claude-haiku-5.5";
+export const reportReasoningEfforts = ["minimal", "low", "medium", "high"] as const;
+export type ReportReasoningEffort = (typeof reportReasoningEfforts)[number];
+export const defaultReportReasoningEffort: ReportReasoningEffort = "medium";
+/** Reasoning tokens are billed against max_tokens, so reasoning models get this much headroom on top of the visible reply. */
+export const reasoningReportTokenAllowance = 6_000;
+export const defaultReasoningInterviewReportTimeoutMs = 90_000;
 /** Resume analysis can use one provider retry while staying within this single overall deadline. */
 export const defaultResumeDirectionTimeoutMs = 30_000;
 /** A second, provider-excluding resume attempt starts in parallel when the first has not answered after this long. */
@@ -11,14 +19,24 @@ export const defaultResumeDirectionTimeoutMs = 30_000;
 export const defaultResumeDirectionHedgeAfterMs = 13_000;
 /** Per-answer analysis is background work and must accommodate slow provider responses. */
 export const defaultInterviewTurnAnalysisTimeoutMs = 22_000;
-export const maxInterviewTurnAnalysisTimeoutMs = 22_000;
+export const maxInterviewTurnAnalysisTimeoutMs = 45_000;
 export const defaultInterviewConsolidationTimeoutMs = 25_000;
+/** Reasoning report models need longer per-answer and consolidation budgets. */
+export const defaultReasoningInterviewTurnAnalysisTimeoutMs = 45_000;
+export const defaultReasoningInterviewConsolidationTimeoutMs = 45_000;
+
+/** Reasoning models (Claude 5.5 and GPT-5/6 families): no temperature is sent, reasoning effort is set and the token cap gets headroom. */
+export function isReasoningReportModel(model: string): boolean {
+  return model.startsWith("anthropic/") || model.startsWith("openai/gpt-6") || model.startsWith("openai/gpt-5");
+}
 
 export type ThinkingConfig = {
   openRouterApiKey: string | null;
   model: string;
-  /** Model for the final report; falls back to `model` when absent. */
+  /** Model for the final report; defaults to Claude Haiku 5.5 (`INTERVIEW_REPORT_MODEL` overrides it). */
   reportModel?: string;
+  /** Reasoning effort sent to reasoning report models; defaults to medium. */
+  reportReasoningEffort?: ReportReasoningEffort;
   timeoutMs: number;
   orchestrationTimeoutMs: number;
   /** Start one identical hedge request after this many ms without a response; 0 disables. Defaults to 2500. */
@@ -54,10 +72,18 @@ function parseNonNegativeNumber(value: string | undefined, fallback: number): nu
   return parsed;
 }
 
-function parseReportTimeout(value: string | undefined): number {
+function parseReportTimeout(value: string | undefined, reportModel: string): number {
+  // Reasoning models take longer, so their default budget is larger; an explicit env value always wins and keeps the 60 s cap.
+  if (value === undefined) return isReasoningReportModel(reportModel) ? defaultReasoningInterviewReportTimeoutMs : defaultInterviewReportTimeoutMs;
   const timeout = parsePositiveNumber(value, defaultInterviewReportTimeoutMs);
   if (timeout > 60_000) throw new Error("Interview report timeout must not exceed 60000 milliseconds.");
   return timeout;
+}
+
+function parseReportReasoningEffort(value: string | undefined): ReportReasoningEffort {
+  const effort = value?.trim().toLowerCase() || defaultReportReasoningEffort;
+  if (!(reportReasoningEfforts as readonly string[]).includes(effort)) throw new Error("INTERVIEW_REPORT_REASONING_EFFORT must be minimal, low, medium or high.");
+  return effort as ReportReasoningEffort;
 }
 
 function parseResumeDirectionTimeout(value: string | undefined): number {
@@ -91,16 +117,18 @@ function parseSpeculativeHandoff(value: string | undefined): boolean {
 
 export function loadThinkingConfig(environment = process.env): ThinkingConfig {
   const model = environment.INTERVIEW_REASONING_MODEL?.trim() || defaultThinkingModel;
+  const reportModel = environment.INTERVIEW_REPORT_MODEL?.trim() || defaultInterviewReportModel;
   return {
     openRouterApiKey: environment.OPENROUTER_API_KEY?.trim() || null,
     model,
-    reportModel: environment.INTERVIEW_REPORT_MODEL?.trim() || model,
+    reportModel,
+    reportReasoningEffort: parseReportReasoningEffort(environment.INTERVIEW_REPORT_REASONING_EFFORT),
     timeoutMs: parsePositiveNumber(environment.INTERVIEW_REASONING_TIMEOUT_MS, defaultThinkingTimeoutMs),
     orchestrationTimeoutMs: parsePositiveNumber(environment.INTERVIEW_ORCHESTRATION_TIMEOUT_MS, defaultOrchestrationTimeoutMs),
     orchestrationHedgeAfterMs: parseNonNegativeNumber(environment.INTERVIEW_ORCHESTRATION_HEDGE_AFTER_MS, defaultOrchestrationHedgeAfterMs),
     bridgeTimeoutMs: normalizeBridgeTimeout(environment.INTERVIEW_BRIDGE_TIMEOUT_MS),
     bridgeMode: parseBridgeMode(environment.INTERVIEW_BRIDGE_MODE),
-    reportTimeoutMs: parseReportTimeout(environment.INTERVIEW_REPORT_TIMEOUT_MS),
+    reportTimeoutMs: parseReportTimeout(environment.INTERVIEW_REPORT_TIMEOUT_MS, reportModel),
     resumeDirectionTimeoutMs: parseResumeDirectionTimeout(environment.INTERVIEW_RESUME_DIRECTION_TIMEOUT_MS),
     resumeDirectionHedgeAfterMs: parseResumeDirectionHedgeAfter(environment.INTERVIEW_RESUME_DIRECTION_HEDGE_AFTER_MS),
     diagnosticsEnabled: environment.INTERVIEW_REASONING_DIAGNOSTICS?.trim().toLowerCase() === "true",

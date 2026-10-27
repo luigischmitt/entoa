@@ -436,6 +436,8 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
 
   /** Analyze a submitted answer in the background, retrying once; a final miss is recovered when the interview ends. */
   const startTurnAnalysis = (turn: { sequenceNumber: number; question: string; answer: string }, reviewed: Promise<string | null>) => {
+    // A saved interview gets its report from the backend, which analyses every answer itself; these would be thrown away.
+    if (sessionId) return;
     const controller = new AbortController();
     turnAnalysisAbortsRef.current.add(controller);
     const startedAt = Date.now();
