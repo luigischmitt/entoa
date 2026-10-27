@@ -119,6 +119,7 @@ export function createApp({ speechConfig, speechProvider, transcriptionConfig, t
   app.use(
     cors({
       origin: (origin, callback) => callback(null, isOriginAllowed(origin, getAllowedOrigins())),
+      exposedHeaders: ["X-Voice-Source"],
     }),
   );
   app.use(express.json());

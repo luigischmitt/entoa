@@ -84,13 +84,39 @@ export function resolveInterviewerCaption({ audioEnabled, isSpeaking, playbackFa
 const speechFlights = new Map();
 // Finished blobs of prepared (pre-synthesized) utterances, reusable by an identical request for a short time.
 const retainedSpeechBlobs = new Map();
+const VOICE_SOURCES = ["openrouter", "azure", "kokoro"];
+// The provider that answered the interview's first line; every later request asks for it so the voice stays the same.
+let interviewVoiceSource = null;
 
-function retainSpeechBlob(key, blob, retainMs) {
+/** Starts a new interview: the next line that comes back decides the voice source again. */
+export function resetInterviewVoiceSource() {
+  interviewVoiceSource = null;
+}
+
+export function getInterviewVoiceSource() {
+  return interviewVoiceSource;
+}
+
+function voiceSourceOf(response) {
+  const source = response.headers?.get?.("x-voice-source");
+  return VOICE_SOURCES.includes(source) ? source : null;
+}
+
+function rememberInterviewVoiceSource(source) {
+  if (source && interviewVoiceSource === null) interviewVoiceSource = source;
+}
+
+// A blob or in-flight request from another provider than the interview's must not be reused.
+function isOtherInterviewVoice(source) {
+  return Boolean(source && interviewVoiceSource && source !== interviewVoiceSource);
+}
+
+function retainSpeechBlob(key, blob, retainMs, source) {
   const previous = retainedSpeechBlobs.get(key);
   if (previous) clearTimeout(previous.timer);
   const timer = setTimeout(() => { if (retainedSpeechBlobs.get(key)?.blob === blob) retainedSpeechBlobs.delete(key); }, retainMs);
   timer.unref?.();
-  retainedSpeechBlobs.set(key, { blob, timer });
+  retainedSpeechBlobs.set(key, { blob, source, timer });
 }
 
 // Live prewarms per request key: identical utterances share one retained blob, so it is only forgotten when the
@@ -132,19 +158,25 @@ export function resetSpeechFlights() {
 }
 
 function speechRequestFor(options, text) {
+  const body = options.requestBody ?? { text, ...(typeof options.voice === "string" && options.voice ? { voice: options.voice } : {}), ...(typeof options.speed === "number" && options.speed !== 1 ? { speed: options.speed } : {}) };
   const request = {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(options.requestBody ?? { text, ...(typeof options.voice === "string" && options.voice ? { voice: options.voice } : {}), ...(typeof options.speed === "number" && options.speed !== 1 ? { speed: options.speed } : {}) }),
+    body: JSON.stringify(body),
   };
-  return { request, key: JSON.stringify([options.endpoint, request.method, request.headers, request.body]) };
+  // The key ignores the interview's voice source so audio fetched earlier for the same text can still be reused.
+  const key = JSON.stringify([options.endpoint, request.method, request.headers, request.body]);
+  if (options.requestBody || interviewVoiceSource === null) return { request, key };
+  return { request: { ...request, body: JSON.stringify({ ...body, voiceSource: interviewVoiceSource }) }, key };
 }
 
 function acquireSpeechBlob(options, text) {
   const { request, key } = speechRequestFor(options, text);
   const retained = retainedSpeechBlobs.get(key);
-  if (retained) return { promise: Promise.resolve(retained.blob), release() {} };
+  if (retained && isOtherInterviewVoice(retained.source)) forgetRetainedSpeechBlob(key);
+  else if (retained) return { promise: Promise.resolve(retained.blob), release() {} };
   let flight = speechFlights.get(key);
+  if (flight && isOtherInterviewVoice(flight.source)) flight = null;
   if (!flight) {
     const controller = new AbortController();
     const fetcher = options.fetcher ?? fetch;
@@ -152,6 +184,7 @@ function acquireSpeechBlob(options, text) {
       controller,
       consumers: new Set(),
       settled: false,
+      source: null,
       promise: Promise.resolve().then(async () => {
         const response = await fetcher(options.endpoint, { ...request, signal: controller.signal });
         if (!response.ok) {
@@ -161,8 +194,11 @@ function acquireSpeechBlob(options, text) {
           error.status = response.status;
           throw error;
         }
+        const source = voiceSourceOf(response);
+        flight.source = source;
+        rememberInterviewVoiceSource(source);
         const blob = await response.blob();
-        if (options.retainMs > 0 && !controller.signal.aborted) retainSpeechBlob(key, blob, options.retainMs);
+        if (options.retainMs > 0 && !controller.signal.aborted) retainSpeechBlob(key, blob, options.retainMs, source);
         return blob;
       }),
     };

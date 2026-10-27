@@ -41,7 +41,7 @@ import { isAcknowledgeableAnswer, pickAcknowledgement, stripLeadingAcknowledgeme
 import { closingReactionVariants, composeClosingLead, createClosingReactionTracker, isLastAnswerExpected, pickClosingFallbackReaction } from "@/lib/interview/closing-reaction.mjs";
 import { requestClosingReaction } from "@/lib/interview/closing-reaction-request";
 import { useMicEngine } from "../hooks/use-mic-engine";
-import { composeAcknowledgedQuestion, composeContextualOpening, composeInterviewClosing, pickInterviewClosing, type ClosingReason, resolveInterviewerCaption, resolveSkippedQuestion, splitInterviewerSpeech } from "@/lib/interview/speech-playback.mjs";
+import { composeAcknowledgedQuestion, composeContextualOpening, composeInterviewClosing, pickInterviewClosing, resetInterviewVoiceSource, type ClosingReason, resolveInterviewerCaption, resolveSkippedQuestion, splitInterviewerSpeech } from "@/lib/interview/speech-playback.mjs";
 import { createInterviewHandoffTiming, createListeningHandoffTiming, isHandoffTimingEnabled } from "@/lib/interview/handoff-timing.mjs";
 import { buildRoleContext, isResumePractice, RESUME_PRACTICE_LABEL } from "@/lib/interview/resume-neutral.mjs";
 import { createOpeningSpeechTiming, isOpeningTimingEnabled } from "@/lib/interview/opening-timing.mjs";
@@ -271,6 +271,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
     phaseRef.current = nextPhase;
     setPhase(nextPhase);
   };
+  useEffect(() => { resetInterviewVoiceSource(); }, []);
   useEffect(() => { elapsedSecondsRef.current = seconds; }, [seconds]);
   useEffect(() => { setAskedQuestionIdsSnapshot([...askedPlannedQuestionIdsRef.current]); }, [currentIndex, followUpUsed, question.id]);
   useEffect(() => { voiceAssessmentsRef.current = voiceAssessments; }, [voiceAssessments]);

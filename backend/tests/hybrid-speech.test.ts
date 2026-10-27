@@ -410,3 +410,61 @@ describe("warmup route and logging", () => {
     expect(entry).not.toContain("SECRET");
   });
 });
+
+describe("hybrid voice source preference", () => {
+  it("starts a preferred secondary at once and never calls the primary while it answers", async () => {
+    vi.useFakeTimers();
+    const { provider, primary, secondary } = hybrid();
+    const pending = provider.synthesize({ ...req, preferredSource: "openrouter" });
+    expect(secondary.calls).toHaveLength(1);
+    expect(secondary.calls[0].request.voice).toBe("af_heart");
+    expect(secondary.calls[0].request).not.toHaveProperty("preferredSource");
+    secondary.calls[0].resolve(audio("s"));
+    expect((await pending).diagnostics).toMatchObject({ voiceSource: "openrouter" });
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(primary.calls).toHaveLength(0);
+  });
+
+  it("falls back to the primary when the preferred secondary fails, and the primary wins", async () => {
+    vi.useFakeTimers();
+    const { provider, primary, secondary } = hybrid();
+    const pending = provider.synthesize({ ...req, preferredSource: "openrouter" });
+    secondary.calls[0].reject(new SpeechProviderUnavailableError("down"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(primary.calls).toHaveLength(1);
+    expect(primary.calls[0].request).not.toHaveProperty("preferredSource");
+    primary.calls[0].resolve(audio("p"));
+    expect((await pending).diagnostics).toMatchObject({ voiceSource: "kokoro" });
+  });
+
+  it("rejects with both_failed when the preferred secondary and the fallback primary both fail", async () => {
+    vi.useFakeTimers();
+    const { provider, primary, secondary } = hybrid();
+    const pending = provider.synthesize({ ...req, preferredSource: "openrouter" });
+    const assertion = expect(pending).rejects.toMatchObject({ diagnostics: { hedge: "both_failed" } });
+    secondary.calls[0].reject(new SpeechProviderUnavailableError("down"));
+    await vi.advanceTimersByTimeAsync(0);
+    primary.calls[0].reject(new SpeechProviderUnavailableError("down"));
+    await assertion;
+  });
+
+  it("never races the other voice when the interview is pinned to the primary source", async () => {
+    vi.useFakeTimers();
+    const { provider, primary, secondary } = hybrid();
+    const pending = provider.synthesize({ ...req, preferredSource: "kokoro" });
+    expect(primary.calls).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(2_500);
+    expect(secondary.calls).toHaveLength(0);
+    primary.calls[0].resolve(audio("p"));
+    expect((await pending).diagnostics).toMatchObject({ hedge: "not_needed", voiceSource: "kokoro" });
+  });
+
+  it("still falls back to the other voice when the pinned primary fails", async () => {
+    const { provider, primary, secondary } = hybrid();
+    const pending = provider.synthesize({ ...req, preferredSource: "kokoro" });
+    primary.calls[0].reject(new Error("down"));
+    await vi.waitFor(() => expect(secondary.calls).toHaveLength(1));
+    secondary.calls[0].resolve(audio("s"));
+    expect((await pending).diagnostics).toMatchObject({ voiceSource: "openrouter" });
+  });
+});

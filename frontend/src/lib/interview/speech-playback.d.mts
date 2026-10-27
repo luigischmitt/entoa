@@ -112,5 +112,8 @@ export function prewarmInterviewerSpeech(segments: string[], options: SpeechPlay
 export function fetchSpeechBlob(text: string, options: SpeechPlaybackOptions): Promise<Blob>;
 export function clearRetainedSpeechBlobs(): void;
 export function resetSpeechFlights(): void;
+/** Starts a new interview: the first line that comes back fixes the voice source for the rest of it. */
+export function resetInterviewVoiceSource(): void;
+export function getInterviewVoiceSource(): "openrouter" | "azure" | "kokoro" | null;
 
 export function warmUpInterviewerSpeech(endpoint: string, fetcher: (input: string, init?: RequestInit) => Promise<unknown>, preferences?: { voice?: string; speed?: number }): void;
