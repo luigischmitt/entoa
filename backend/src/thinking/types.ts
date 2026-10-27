@@ -126,6 +126,8 @@ export type InterviewReport = {
     exercise?: string;
     vacancyCompetency?: string;
   }>;
+  /** Per-answer findings the consolidated report was built from; absent on reports from the single-call path. */
+  turns?: InterviewTurnAnalysis[];
 };
 
 export type InterviewReportEvidenceCounts = {

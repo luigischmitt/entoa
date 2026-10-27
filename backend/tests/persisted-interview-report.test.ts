@@ -44,11 +44,19 @@ function store(initial: { status: "pending" | "ready" | "unavailable"; analysis?
   return { persistence, get feedback() { return feedback; }, stateChanges };
 }
 
-const serviceStub = (generate = vi.fn(async () => ({ ...report, model: "test-model", analysisVersion: "v2" }))) => ({
-  generate,
-  analyzeTurn: vi.fn(),
-  consolidate: vi.fn(),
-}) as unknown as InterviewReportService;
+const echoAnalysis = async (input: { turn: { sequenceNumber: number } }) => ({ sequenceNumber: input.turn.sequenceNumber, technicalStrengths: [], technicalGaps: [], englishPatterns: [], model: "test-model" });
+const serviceStub = (
+  generate = vi.fn(async () => ({ ...report, model: "test-model", analysisVersion: "v2" })),
+  analyzeTurn = vi.fn(echoAnalysis),
+  consolidate = vi.fn(async () => ({ ...report, model: "test-model", analysisVersion: "v2" })),
+) => ({ generate, analyzeTurn, consolidate }) as unknown as InterviewReportService;
+
+const twoAnswers = [
+  { sequence_number: 1, speaker: "interviewer" as const, content: "How did you deploy it?" },
+  { sequence_number: 2, speaker: "candidate" as const, content: "I used blue green deployment." },
+  { sequence_number: 3, speaker: "interviewer" as const, content: "How do you monitor it?" },
+  { sequence_number: 4, speaker: "candidate" as const, content: "We monitor errors in production." },
+];
 
 describe("persisted interview reports", () => {
   it("forwards the user's bearer and publishable key to every RLS-scoped REST request", async () => {
@@ -119,11 +127,11 @@ describe("persisted interview reports", () => {
     const data = store();
     let finish!: (value: InterviewReport & { model: string; analysisVersion: "v2" }) => void;
     const gate = new Promise<InterviewReport & { model: string; analysisVersion: "v2" }>((resolve) => { finish = resolve; });
-    const generate = vi.fn(() => gate);
-    const generator = createPersistedInterviewReportService(serviceStub(generate), data.persistence);
+    const consolidate = vi.fn(() => gate);
+    const generator = createPersistedInterviewReportService(serviceStub(undefined, undefined, consolidate), data.persistence);
     const first = generator.generate(token, interviewId, { locale: "en" }, "user-a");
     const second = generator.generate(token, interviewId, { locale: "en" }, "user-a");
-    await vi.waitFor(() => expect(generate).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(consolidate).toHaveBeenCalledOnce());
     finish({ ...report, model: "test-model", analysisVersion: "v2" });
 
     const [one, two] = await Promise.all([first, second]);
@@ -135,13 +143,13 @@ describe("persisted interview reports", () => {
 
   it("keeps concurrent users isolated in the in-process idempotency map", async () => {
     const data = store();
-    const generate = vi.fn(async () => ({ ...report, model: "test-model", analysisVersion: "v2" }));
-    const generator = createPersistedInterviewReportService(serviceStub(generate), data.persistence);
+    const consolidate = vi.fn(async () => ({ ...report, model: "test-model", analysisVersion: "v2" }));
+    const generator = createPersistedInterviewReportService(serviceStub(undefined, undefined, consolidate), data.persistence);
     await Promise.all([
       generator.generate(token, interviewId, { locale: "en" }, "user-a"),
       generator.generate("other-token", interviewId, { locale: "en" }, "user-b"),
     ]);
-    expect(generate).toHaveBeenCalledTimes(2);
+    expect(consolidate).toHaveBeenCalledTimes(2);
   });
 
   it("returns an existing ready report without generation or state changes", async () => {
@@ -157,7 +165,8 @@ describe("persisted interview reports", () => {
 
   it("marks a report unavailable after generation failure so the user can retry", async () => {
     const data = store();
-    const generator = createPersistedInterviewReportService(serviceStub(vi.fn(async () => { throw new Error("provider failed"); })), data.persistence);
+    const failing = vi.fn(async () => { throw new Error("provider failed"); });
+    const generator = createPersistedInterviewReportService(serviceStub(failing, undefined, failing as never), data.persistence);
     await expect(generator.generate(token, interviewId, { locale: "pt-BR" }, "user-a")).rejects.toThrow("provider failed");
     expect(data.persistence.markUnavailable).toHaveBeenCalledOnce();
     expect(data.feedback.status).toBe("unavailable");
@@ -168,6 +177,89 @@ describe("persisted interview reports", () => {
     await data.persistence.markUnavailable(token, interviewId);
     expect(data.feedback.status).toBe("ready");
     expect(data.stateChanges).toEqual(["ready"]);
+  });
+
+  it("analyzes each answer once, consolidates once and saves the per-answer turns without the single-call report", async () => {
+    const data = store();
+    data.persistence.loadTurns = vi.fn(async () => twoAnswers);
+    const generate = vi.fn();
+    const analyzeTurn = vi.fn(echoAnalysis);
+    const consolidate = vi.fn(async (_input: unknown) => ({ ...report, model: "test-model", analysisVersion: "v2" as const }));
+    const generator = createPersistedInterviewReportService(serviceStub(generate, analyzeTurn, consolidate as never), data.persistence);
+
+    const result = await generator.generate(token, interviewId, { locale: "en" }, "user-a");
+
+    expect(generate).not.toHaveBeenCalled();
+    expect(analyzeTurn).toHaveBeenCalledTimes(2);
+    expect(analyzeTurn).toHaveBeenCalledWith({
+      locale: "en",
+      roleContext: { targetRole: "Backend Engineer", seniority: "senior", focus: "technical-depth" },
+      turn: { sequenceNumber: 1, question: "How did you deploy it?", answer: "I used blue green deployment." },
+    });
+    expect(consolidate).toHaveBeenCalledOnce();
+    const consolidation = consolidate.mock.calls[0]![0] as { turns: unknown[]; turnAnalyses: Array<{ sequenceNumber: number; model?: string }> };
+    expect(consolidation.turns).toHaveLength(2);
+    expect(consolidation.turnAnalyses.map((entry) => entry.sequenceNumber)).toEqual([1, 3]);
+    expect(consolidation.turnAnalyses.every((entry) => !("model" in entry))).toBe(true);
+    const saved = (data.persistence.saveReady as ReturnType<typeof vi.fn>).mock.calls[0]![2] as InterviewReport;
+    expect(saved.turns?.map((entry) => entry.sequenceNumber)).toEqual([1, 3]);
+    expect(result.report.turns).toHaveLength(2);
+  });
+
+  it("retries a failed answer once and recovers without falling back", async () => {
+    const data = store();
+    data.persistence.loadTurns = vi.fn(async () => twoAnswers);
+    let failedOnce = false;
+    const analyzeTurn = vi.fn(async (input: { turn: { sequenceNumber: number } }) => {
+      if (input.turn.sequenceNumber === 3 && !failedOnce) { failedOnce = true; throw new Error("timeout"); }
+      return echoAnalysis(input);
+    });
+    const generate = vi.fn();
+    const consolidate = vi.fn(async () => ({ ...report, model: "test-model", analysisVersion: "v2" as const }));
+    const generator = createPersistedInterviewReportService(serviceStub(generate, analyzeTurn, consolidate as never), data.persistence);
+
+    await generator.generate(token, interviewId, { locale: "en" }, "user-a");
+
+    expect(analyzeTurn).toHaveBeenCalledTimes(3);
+    expect(consolidate).toHaveBeenCalledOnce();
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the single-call report when one answer fails twice", async () => {
+    const data = store();
+    data.persistence.loadTurns = vi.fn(async () => twoAnswers);
+    const analyzeTurn = vi.fn(async (input: { turn: { sequenceNumber: number } }) => {
+      if (input.turn.sequenceNumber === 3) throw new Error("timeout");
+      return echoAnalysis(input);
+    });
+    const generate = vi.fn(async () => ({ ...report, model: "single-call", analysisVersion: "v2" }));
+    const consolidate = vi.fn();
+    const generator = createPersistedInterviewReportService(serviceStub(generate, analyzeTurn, consolidate as never), data.persistence);
+
+    const result = await generator.generate(token, interviewId, { locale: "en" }, "user-a");
+
+    expect(analyzeTurn).toHaveBeenCalledTimes(3);
+    expect(consolidate).not.toHaveBeenCalled();
+    expect(generate).toHaveBeenCalledOnce();
+    const saved = (data.persistence.saveReady as ReturnType<typeof vi.fn>).mock.calls[0]![2] as InterviewReport;
+    expect(saved.turns).toBeUndefined();
+    expect(result.status).toBe("ready");
+    expect(data.feedback.status).toBe("ready");
+  });
+
+  it("falls back to the single-call report when consolidation throws", async () => {
+    const data = store();
+    data.persistence.loadTurns = vi.fn(async () => twoAnswers);
+    const generate = vi.fn(async () => ({ ...report, model: "single-call", analysisVersion: "v2" }));
+    const consolidate = vi.fn(async () => { throw new Error("consolidation failed"); });
+    const generator = createPersistedInterviewReportService(serviceStub(generate, undefined, consolidate), data.persistence);
+
+    const result = await generator.generate(token, interviewId, { locale: "en" }, "user-a");
+
+    expect(consolidate).toHaveBeenCalledOnce();
+    expect(generate).toHaveBeenCalledOnce();
+    expect(result.status).toBe("ready");
+    expect(data.feedback.status).toBe("ready");
   });
 
   it("keeps generation alive after the HTTP request is aborted", async () => {

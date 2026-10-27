@@ -1,4 +1,4 @@
-import type { InterviewReport, InterviewReportService } from "./types.js";
+import type { InterviewReport, InterviewReportInput, InterviewReportService, InterviewTurnAnalysis, InterviewTurnAnalysisInput } from "./types.js";
 import { parseApprovedJobDirection } from "./job-direction-validation.js";
 
 type InterviewRow = {
@@ -121,6 +121,55 @@ export function createSupabaseReportPersistence({ supabaseUrl, publishableKey, f
   };
 }
 
+const turnAnalysisConcurrency = 6;
+
+/** Runs `mapper` over `items` with at most `limit` in flight; results keep the input order. */
+async function mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await mapper(items[index]!);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+/** One answer at a time with a single retry; a second failure rejects. */
+async function analyzeTurnWithRetry(reportService: InterviewReportService, input: InterviewTurnAnalysisInput): Promise<InterviewTurnAnalysis> {
+  let analysis: Awaited<ReturnType<InterviewReportService["analyzeTurn"]>>;
+  try {
+    analysis = await reportService.analyzeTurn(input);
+  } catch {
+    analysis = await reportService.analyzeTurn(input);
+  }
+  return { sequenceNumber: analysis.sequenceNumber, technicalStrengths: analysis.technicalStrengths, technicalGaps: analysis.technicalGaps, englishPatterns: analysis.englishPatterns };
+}
+
+/**
+ * Per-answer analyses, then one consolidation. Returns null when any answer still failed or consolidation throws,
+ * so the caller can fall back to the single-call report and the user always gets a report.
+ */
+async function generatePerAnswerReport(reportService: InterviewReportService, input: InterviewReportInput): Promise<(InterviewReport & { model: string; analysisVersion: "v2" }) | null> {
+  const analyses = await mapWithConcurrency(input.turns, turnAnalysisConcurrency, async (turn) => {
+    try {
+      return await analyzeTurnWithRetry(reportService, { locale: input.locale, roleContext: input.roleContext, turn, ...(input.jobDirection ? { jobDirection: input.jobDirection } : {}) });
+    } catch {
+      return null;
+    }
+  });
+  if (analyses.some((analysis) => analysis === null)) return null;
+  const turnAnalyses = analyses as InterviewTurnAnalysis[];
+  try {
+    const consolidated = await reportService.consolidate({ ...input, turnAnalyses });
+    return { ...consolidated, turns: turnAnalyses };
+  } catch {
+    return null;
+  }
+}
+
 export type GeneratePersistedReportInput = { locale: "pt-BR" | "en"; azureSummary?: unknown };
 export type GeneratePersistedReportResult = { status: "ready"; report: InterviewReport & { model: string; analysisVersion: string }; feedback: FeedbackRow };
 
@@ -171,7 +220,8 @@ export function createPersistedInterviewReportService(reportService: InterviewRe
         const jobDirection = !isResume && interview.job_direction
           ? parseApprovedJobDirection(interview.job_direction, interview.target_role, interview.seniority ?? undefined) ?? undefined
           : undefined;
-        const generated = await reportService.generate({ locale: input.locale, roleContext, turns: questionTurns, ...(jobDirection ? { jobDirection } : {}) });
+        const generated = await generatePerAnswerReport(reportService, { locale: input.locale, roleContext, turns: questionTurns, ...(jobDirection ? { jobDirection } : {}) })
+          ?? await reportService.generate({ locale: input.locale, roleContext, turns: questionTurns, ...(jobDirection ? { jobDirection } : {}) });
         const { model, analysisVersion, ...analysis } = generated;
         const saved = await persistence.saveReady(token, interviewId, analysis, model, analysisVersion);
         const final = saved.analysis ?? analysis;
