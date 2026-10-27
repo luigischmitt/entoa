@@ -421,3 +421,57 @@ describe("static phrase prefetch", () => {
     }
   });
 });
+
+describe("voice source preference", () => {
+  it("adds the preference to the cache key only when it is given", async () => {
+    const key = speechCacheKey(base);
+    expect(speechCacheKey({ ...base, preferredSource: undefined })).toBe(key);
+    expect(speechCacheKey({ ...base, preferredSource: "azure" })).not.toBe(key);
+    expect(speechCacheKey({ ...base, preferredSource: "azure" })).not.toBe(speechCacheKey({ ...base, preferredSource: "openrouter" }));
+    const provider = new ControlledProvider(true);
+    const cache = new SpeechCache({ provider, ttlMs: 60_000 });
+    await cache.synthesize({ ...base, preferredSource: "azure" });
+    expect(provider.calls[0]!.preferredSource).toBe("azure");
+  });
+
+  const speechConfig: SpeechConfig = { provider: "fake", kokoroBaseUrl: "http://x", kokoroTimeoutMs: 1000, interviewerVoice: "en-US-AndrewNeural", defaultSpeed: 1, format: "mp3" };
+  function recordingProvider(voiceSource?: "azure" | "openrouter" | "kokoro") {
+    const calls: SpeechSynthesisRequest[] = [];
+    const provider: SpeechProvider = {
+      name: "hybrid",
+      health: async () => ({ status: "ready" as const }),
+      synthesize: async (req) => {
+        calls.push(req);
+        return { audio: Buffer.from("audio"), contentType: "audio/mpeg", ...(voiceSource ? { diagnostics: { voiceSource } } : {}) };
+      },
+    };
+    return { provider, calls };
+  }
+
+  it("passes a valid voiceSource to the provider as preferredSource and drops anything else", async () => {
+    const { provider, calls } = recordingProvider("azure");
+    const app = createApp({ speechConfig, speechProvider: provider, accessTokenVerifier: null, thinkingService: null, reportService: null, jobDirectionService: null });
+    await request(app).post("/api/v1/speech").send({ text: "One.", voiceSource: "azure" });
+    await request(app).post("/api/v1/speech").send({ text: "Two.", voiceSource: "gpt" });
+    await request(app).post("/api/v1/speech").send({ text: "Three.", voiceSource: 5 });
+    await request(app).post("/api/v1/speech").send({ text: "Four." });
+    expect(calls[0]).toHaveProperty("preferredSource", "azure");
+    expect(calls[1]).not.toHaveProperty("preferredSource");
+    expect(calls[2]).not.toHaveProperty("preferredSource");
+    expect(calls[3]).not.toHaveProperty("preferredSource");
+  });
+
+  it("sets X-Voice-Source from the diagnostics and omits it when the provider reports none", async () => {
+    const withSource = recordingProvider("openrouter");
+    const app = createApp({ speechConfig, speechProvider: withSource.provider, accessTokenVerifier: null, thinkingService: null, reportService: null, jobDirectionService: null });
+    const response = await request(app).post("/api/v1/speech").send({ text: "Hello." });
+    expect(response.status).toBe(200);
+    expect(response.headers["x-voice-source"]).toBe("openrouter");
+
+    const bare = recordingProvider();
+    const appBare = createApp({ speechConfig, speechProvider: bare.provider, accessTokenVerifier: null, thinkingService: null, reportService: null, jobDirectionService: null });
+    const bareResponse = await request(appBare).post("/api/v1/speech").send({ text: "Hello." });
+    expect(bareResponse.status).toBe(200);
+    expect(bareResponse.headers["x-voice-source"]).toBeUndefined();
+  });
+});

@@ -5,6 +5,8 @@ export type SpeechSynthesisRequest = {
   voice: string;
   speed: number;
   format: AudioFormat;
+  /** Preference for which provider answers; only the hybrid provider acts on it, others ignore it. */
+  preferredSource?: "openrouter" | "azure" | "kokoro";
 };
 
 export type HedgeOutcome = "not_needed" | "primary_won" | "hedge_won" | "both_failed";

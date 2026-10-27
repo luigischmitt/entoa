@@ -57,7 +57,10 @@ type Entry = {
 };
 
 export function speechCacheKey(request: SpeechSynthesisRequest): string {
-  return createHash("sha256").update(JSON.stringify([request.text, request.voice, request.speed, request.format])).digest("hex");
+  const parts: unknown[] = [request.text, request.voice, request.speed, request.format];
+  // Appended only when present, so requests without a preference keep their existing keys.
+  if (request.preferredSource !== undefined) parts.push(request.preferredSource);
+  return createHash("sha256").update(JSON.stringify(parts)).digest("hex");
 }
 
 function copyOf(speech: SynthesizedSpeech): SynthesizedSpeech {

@@ -11,6 +11,12 @@ import type {
 
 type Source = "kokoro" | "azure" | "openrouter";
 
+function withoutPreference(request: SpeechSynthesisRequest): SpeechSynthesisRequest {
+  const copy = { ...request };
+  delete copy.preferredSource;
+  return copy;
+}
+
 type HybridSpeechProviderOptions = {
   primary: SpeechProvider;
   secondary: SpeechProvider;
@@ -62,10 +68,13 @@ export class HybridSpeechProvider implements SpeechProvider {
     const controllers = { primary: new AbortController(), secondary: new AbortController() };
     let hedgeTimer: ReturnType<typeof setTimeout> | undefined;
     let overallTimer: ReturnType<typeof setTimeout> | undefined;
+    let primaryStarted = false;
     let secondaryStarted = false;
     let settled = false;
     let primaryFailed = false;
     let secondaryFailed = false;
+    // A preferred secondary starts at once and the primary only as its fallback.
+    const preferSecondary = request.preferredSource === secondarySource;
 
     return new Promise<SynthesizedSpeech>((resolve, reject) => {
       const finish = (action: () => void) => {
@@ -96,7 +105,7 @@ export class HybridSpeechProvider implements SpeechProvider {
         finish(() => resolve({ ...speech, diagnostics: { ...speech.diagnostics, hedge, voiceSource: source } }));
       };
       const run = (provider: SpeechProvider, voice: string, source: Source, attemptSignal: AbortSignal) =>
-        provider.synthesize({ ...request, voice }, attemptSignal).then((speech) => {
+        provider.synthesize({ ...withoutPreference(request), voice }, attemptSignal).then((speech) => {
           if (speech.audio.length === 0) throw new SpeechProviderUnavailableError("Speech provider returned no audio.");
           return speech;
         }).then((speech) => win(source, speech));
@@ -107,7 +116,19 @@ export class HybridSpeechProvider implements SpeechProvider {
         clearTimeout(hedgeTimer);
         run(secondary, secondaryVoiceForRequest, secondarySource, controllers.secondary.signal).catch(() => {
           secondaryFailed = true;
-          if (primaryFailed) fail();
+          if (settled) return;
+          if (!primaryStarted) startPrimary();
+          else if (primaryFailed) fail();
+        });
+      };
+      const startPrimary = () => {
+        if (settled || primaryStarted) return;
+        primaryStarted = true;
+        run(primary, primaryVoiceForRequest, primarySource, controllers.primary.signal).catch(() => {
+          primaryFailed = true;
+          if (settled) return;
+          if (!secondaryStarted) startSecondary();
+          else if (secondaryFailed) fail();
         });
       };
 
@@ -115,13 +136,12 @@ export class HybridSpeechProvider implements SpeechProvider {
       if (signal?.aborted) { onCallerAbort(); return; }
 
       overallTimer = setTimeout(fail, timeoutMs);
-      run(primary, primaryVoiceForRequest, primarySource, controllers.primary.signal).catch(() => {
-        primaryFailed = true;
-        if (settled) return;
-        if (!secondaryStarted) startSecondary();
-        else if (secondaryFailed) fail();
-      });
-      if (hedgeAfterMs > 0) hedgeTimer = setTimeout(startSecondary, hedgeAfterMs);
+      if (preferSecondary) startSecondary();
+      else {
+        startPrimary();
+        // An interview already pinned to the primary voice never races the other voice; it falls back only on failure.
+        if (hedgeAfterMs > 0 && request.preferredSource !== primarySource) hedgeTimer = setTimeout(startSecondary, hedgeAfterMs);
+      }
     });
   }
 

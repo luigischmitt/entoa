@@ -15,7 +15,15 @@ type SpeechBody = {
   speed?: unknown;
   /** Optional; must be one of the selectable voices, otherwise the configured default is used. */
   voice?: unknown;
+  /** Optional preference for which provider answers; any other value is ignored. */
+  voiceSource?: unknown;
 };
+
+const voiceSources = ["openrouter", "azure", "kokoro"] as const;
+
+function requestedVoiceSource(value: unknown): (typeof voiceSources)[number] | undefined {
+  return voiceSources.find((source) => source === value);
+}
 
 function invalidSpeechRequest(responseMessage: string, response: Parameters<RequestHandler>[1]) {
   response.status(400).json({
@@ -99,6 +107,7 @@ export function createSpeechController(provider: SpeechProvider, config: SpeechC
     };
 
     try {
+      const preferredSource = requestedVoiceSource(body.voiceSource);
       const synthesisRequest = {
         text: normalizeTextForSpeech(text),
         voice: config.provider === "azure-openrouter" || config.provider === "openrouter-azure"
@@ -106,6 +115,7 @@ export function createSpeechController(provider: SpeechProvider, config: SpeechC
           : resolveKokoroVoice(body.voice, config.interviewerVoice),
         speed,
         format: config.format,
+        ...(preferredSource ? { preferredSource } : {}),
       };
       let speech;
       if (cache) {
@@ -126,6 +136,7 @@ export function createSpeechController(provider: SpeechProvider, config: SpeechC
       response.once("finish", clearOnFinish);
       responseOwnsAudio = true;
       try {
+        if (speech.diagnostics?.voiceSource) response.setHeader("X-Voice-Source", speech.diagnostics.voiceSource);
         response.status(200).contentType(speech.contentType).send(audio);
         logTiming("ok", speech.diagnostics);
       } catch (error) {
