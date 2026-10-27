@@ -1,4 +1,5 @@
 import { hasTimeForNextQuestion } from "./session-policy.mjs";
+import { repeatsTopic } from "./question-overlap.mjs";
 
 function isTailoredQuestion(question) {
   return question.id.startsWith("job-");
@@ -69,10 +70,15 @@ export function shouldUseMonotonicFixedFallback({ speculationAttempted, speculat
   return skipCommitted === true || (speculationAttempted === true && speculationEnabled === true);
 }
 
-/** Keep every unasked planned question, with vacancy-tailored questions first and bank order stable within each group. */
+/**
+ * Keep every unasked planned question, with vacancy-tailored questions first and bank order stable within each group.
+ * A non-job question that repeats the topic of an already asked planned question is dropped; job questions are never dropped.
+ */
 export function remainingPlannedQuestions(questions, askedQuestionIds) {
   const asked = new Set(askedQuestionIds);
-  const remaining = questions.filter((question) => !asked.has(question.id));
+  const askedPrompts = questions.filter((question) => asked.has(question.id)).map((question) => question.prompt);
+  const remaining = questions.filter((question) => !asked.has(question.id)
+    && (plannedQuestionType(question) === "job" || !askedPrompts.some((prompt) => repeatsTopic(question.prompt, prompt))));
   return [
     ...remaining.filter(isTailoredQuestion),
     ...remaining.filter((question) => !isTailoredQuestion(question)),

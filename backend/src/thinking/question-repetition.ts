@@ -87,6 +87,18 @@ export function questionRepetition(candidate: string, earlier: string, checkTopi
   return overlap >= overlapThreshold || jaccard >= jaccardThreshold ? "high_overlap" : null;
 }
 
+/** Shared stems needed before topic overlap counts: two shared stems are often just a project name ("payments dashboard"). */
+const minTopicStems = 3;
+
+/** True when `candidate` reuses the topic of `earlier` (same leading template, or mostly the same content words), even if its main verb differs. */
+export function repeatsAskedTopic(candidate: string, earlier: string): boolean {
+  const reason = questionRepetition(candidate, earlier, true);
+  if (reason === "shared_lead") return true;
+  if (reason !== "high_overlap") return false;
+  const earlierStems = new Set(questionStems(earlier));
+  return new Set(questionStems(candidate).filter((word) => earlierStems.has(word))).size >= minTopicStems;
+}
+
 /** Compares a proposed question with the last `recentQuestionWindow` asked questions. */
 export function repeatsRecentQuestion(candidate: string, askedQuestions: readonly string[] = [], checkTopicOverlap = true): RepetitionReason | null {
   for (const earlier of askedQuestions.slice(-recentQuestionWindow)) {

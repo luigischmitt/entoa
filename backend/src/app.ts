@@ -1,3 +1,4 @@
+import { pinnedOpenRouterFetch } from "./thinking/openrouter-routing.js";
 import cors from "cors";
 import express from "express";
 
@@ -34,6 +35,16 @@ import { loadAuthConfig } from "./auth/config.js";
 import { createSupabaseReportPersistence, createPersistedInterviewReportService, type ReportPersistence } from "./thinking/persisted-interview-report.js";
 
 /** Speculative analysis deadline; the call is off the critical path, so it gets 7 s unless SPECULATIVE_ANALYSIS_TIMEOUT_MS overrides it. */
+/**
+ * The live answer analysis needs speed above all (it must finish while the candidate still talks). Measured on 2026-10-27
+ * with real interview snapshots: gemma-4-26b answered in ~1.6 s and wrote follow-up bridges; mistral-small-3.2 took 6-9 s
+ * and hit the 7 s timeout. `INTERVIEW_SPECULATIVE_MODEL` overrides it without a deploy.
+ */
+export const defaultSpeculativeAnalysisModel = "google/gemma-4-26b-a4b-it";
+function speculativeAnalysisModel(): string {
+  return process.env.INTERVIEW_SPECULATIVE_MODEL?.trim() || defaultSpeculativeAnalysisModel;
+}
+
 function speculativeAnalysisTimeoutMs(): number {
   const value = Number(process.env.SPECULATIVE_ANALYSIS_TIMEOUT_MS);
   return Number.isFinite(value) && value >= 1_000 && value <= 30_000 ? Math.round(value) : 7_000;
@@ -92,7 +103,9 @@ export function createApp({ speechConfig, speechProvider, transcriptionConfig, t
   const resolvedJobDirectionService = jobDirectionService === undefined ? createJobDirectionService(resolvedThinkingConfig) : jobDirectionService;
   const resolvedResumeDirectionService = resumeDirectionService === undefined ? createResumeDirectionService({ ...resolvedThinkingConfig, timeoutMs: resolvedThinkingConfig.resumeDirectionTimeoutMs ?? resolvedThinkingConfig.timeoutMs, hedgeAfterMs: resolvedThinkingConfig.resumeDirectionHedgeAfterMs }) : resumeDirectionService;
   const resolvedJobDirectionUserLimit = jobDirectionUserLimit ?? new JobDirectionUserLimit();
-  const speculativeService = resolvedThinkingConfig.openRouterApiKey ? new SpeculativeTurnAnalysisService({ apiKey: resolvedThinkingConfig.openRouterApiKey, model: resolvedThinkingConfig.model, timeoutMs: speculativeAnalysisTimeoutMs() }) : null;
+  const speculativeModel = speculativeAnalysisModel();
+  // Only mistral is served by the pinned provider; other models use plain OpenRouter routing.
+  const speculativeService = resolvedThinkingConfig.openRouterApiKey ? new SpeculativeTurnAnalysisService({ apiKey: resolvedThinkingConfig.openRouterApiKey, model: speculativeModel, timeoutMs: speculativeAnalysisTimeoutMs() }, speculativeModel.startsWith("mistralai/") ? pinnedOpenRouterFetch : fetch) : null;
   const resolvedClosingReactionService = closingReactionService === undefined ? (resolvedThinkingConfig.openRouterApiKey ? createClosingReactionService(resolvedThinkingConfig) : null) : closingReactionService;
   const resolvedPolishedAnswerService = polishedAnswerService === undefined && resolvedThinkingConfig.openRouterApiKey
     ? new OpenRouterPolishedAnswerService({ key: resolvedThinkingConfig.openRouterApiKey, model: resolvedThinkingConfig.model, timeoutMs: 20_000 })

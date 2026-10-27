@@ -2,7 +2,7 @@ import { pinnedOpenRouterFetch } from "./openrouter-routing.js";
 import { parseOpenRouterUsage, type OpenRouterUsagePayload } from "./openrouter-usage.js";
 import { isGroundedFollowUp } from "./openrouter-orchestration-service.js";
 import { clipAnchorSpan, contentWords as sharedContentWords, tolerantAnchorSpan } from "./interview-text.js";
-import { followUpRepetition, questionRepetition, sameQuestion } from "./question-repetition.js";
+import { followUpRepetition, questionRepetition, repeatsAskedTopic, sameQuestion } from "./question-repetition.js";
 import { assignBridgeLeadIn, evaluateBridge } from "./interview-bridge-service.js";
 
 export type CandidateCompatibility = "OPEN" | "COVERED" | "INVALID" | "NONE";
@@ -304,7 +304,7 @@ export class SpeculativeTurnAnalysisService {
         const anchor = canonicalLiteral(input.snapshot, value.fixedEvidenceAnchor) ?? canonicalLiteral((input.previousAnswers ?? []).map((pair) => pair.answer).join("\n"), value.fixedEvidenceAnchor);
         const adapted = typeof value.adaptedFixedQuestion === "string" ? value.adaptedFixedQuestion.trim() : "";
         const previouslyAsked = [input.currentQuestion, ...input.askedQuestions, ...(input.previousAnswers ?? []).map(({ question }) => question)];
-        const repeats = sameQuestion(adapted, input.firstFixedQuestion) || previouslyAsked.some((earlier) => sameQuestion(adapted, earlier) || questionRepetition(adapted, earlier, false) !== null);
+        const repeats = sameQuestion(adapted, input.firstFixedQuestion) || previouslyAsked.some((earlier) => sameQuestion(adapted, earlier) || questionRepetition(adapted, earlier, false) !== null || repeatsAskedTopic(adapted, earlier));
         if (hasQuestionShape(value.adaptedFixedQuestion, 220) && anchor && deepenKeepsCompetency(adapted, input.firstFixedQuestion, [input.secondFixedQuestion]) && !repeats && deepenGrounded(adapted, anchor, [input.snapshot, (input.previousAnswers ?? []).map((pair) => pair.answer).join("\n")])) fixed = { fixedAction: "DEEPEN", adaptedFixedQuestion: adapted, fixedEvidenceAnchor: anchor };
         else {
           const reason = !hasQuestionShape(value.adaptedFixedQuestion, 220) ? "deepen_invalid_shape" : !anchor ? "deepen_anchor_missing" : !deepenKeepsCompetency(adapted, input.firstFixedQuestion, [input.secondFixedQuestion]) ? "deepen_competency_changed" : repeats ? "deepen_repeats_asked_question" : "deepen_not_grounded";
@@ -337,7 +337,7 @@ export class SpeculativeTurnAnalysisService {
           const anchor = canonicalLiteral(input.snapshot, value.secondFixedEvidenceAnchor) ?? canonicalLiteral((input.previousAnswers ?? []).map((pair) => pair.answer).join("\n"), value.secondFixedEvidenceAnchor);
           const adapted = typeof value.adaptedSecondFixedQuestion === "string" ? value.adaptedSecondFixedQuestion.trim() : "";
           const previouslyAsked = [input.currentQuestion, ...input.askedQuestions, ...(input.previousAnswers ?? []).map(({ question }) => question)];
-          const repeats = sameQuestion(adapted, input.secondFixedQuestion) || previouslyAsked.some((earlier) => sameQuestion(adapted, earlier) || questionRepetition(adapted, earlier, false) !== null);
+          const repeats = sameQuestion(adapted, input.secondFixedQuestion) || previouslyAsked.some((earlier) => sameQuestion(adapted, earlier) || questionRepetition(adapted, earlier, false) !== null || repeatsAskedTopic(adapted, earlier));
           if (input.secondFixedType === "job" && !hasQuestionShape(value.adaptedSecondFixedQuestion, 220)) repairs.push("second_deepen_invalid_shape");
           if (hasQuestionShape(value.adaptedSecondFixedQuestion, 220) && anchor && deepenKeepsCompetency(adapted, input.secondFixedQuestion, [input.firstFixedQuestion]) && !repeats && deepenGrounded(adapted, anchor, [input.snapshot, (input.previousAnswers ?? []).map((pair) => pair.answer).join("\n")])) second = { secondFixedAction: "DEEPEN", adaptedSecondFixedQuestion: adapted, secondFixedEvidenceAnchor: anchor };
           else {
