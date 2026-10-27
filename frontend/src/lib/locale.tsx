@@ -1274,6 +1274,13 @@ const englishCopy: Record<string, string> = {
   "Você gravou {practiced} de {total} frases.": "You recorded {practiced} of {total} phrases.",
   "Melhorou a precisão em {improved}.": "Accuracy improved in {improved}.",
   "Mais {n} frases": "{n} more phrases",
+  "Pergunta {n}": "Question {n}",
+  "Sua resposta": "Your answer",
+  "Como melhorar": "How to improve",
+  "Sem observações de conteúdo nesta resposta.": "No content notes for this answer.",
+  "Erros de inglês nesta resposta: {k}": "English mistakes in this answer: {k}",
+  "Palavras para revisar a pronúncia": "Words to review for pronunciation",
+  "Treinar minha voz": "Train my voice",
 };
 
 const interpolate = (text: string, values?: Record<string, string | number>) => values

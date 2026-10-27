@@ -1,7 +1,7 @@
 /*
  * Final report (ENG-114): prefix rp-. Builds on ds-* primitives and --ds-* tokens.
- * The report is one printed page (the paper, mirrors the landing's .pp-page) with the screen-only document bar above it
- * and the extras (perception, changes, voice detail, answers) below it.
+ * The report is one printed document (the paper, mirrors the landing's .pp-page) with the screen-only document bar above it
+ * and only the voice training link below it. Everything inside the paper prints.
  */
 .rp-root { color: var(--ds-ink); }
 .rp-stack { display: flex; flex-direction: column; gap: 1.25rem; }
@@ -10,8 +10,6 @@
 
 .rp-hint { font-size: 0.8125rem; line-height: 1.5; letter-spacing: 0.005em; color: var(--ds-text-2); max-width: 70ch; }
 .rp-alert { border-radius: var(--ds-r-xl); background: var(--ds-warning-tint); color: var(--ds-warning); padding: 0.875rem 1.125rem; font-size: 0.875rem; line-height: 1.5; }
-.rp-subtitle { margin-bottom: 0.75rem; font-size: 0.9375rem; font-weight: 600; line-height: 1.3; }
-.rp-quote { font-size: 0.8125rem; line-height: 1.5; color: var(--ds-text-2); overflow-wrap: anywhere; }
 .rp-more > summary { cursor: pointer; width: fit-content; max-width: 100%; border-radius: var(--ds-r-pill); box-shadow: inset 0 0 0 1.5px var(--ds-line-strong); padding: 0.625rem 1.125rem; font-size: 0.9375rem; font-weight: 600; color: var(--ds-green-deep); }
 .rp-more > summary:hover { background: var(--ds-tint); }
 .rp-more > summary:focus-visible { outline: var(--ds-focus-outline); outline-offset: 2px; }
@@ -99,35 +97,17 @@
   .rp-voice li::after { grid-column: 1 / -1; }
 }
 
-/* Screen-only extras below the paper. */
-.rp-appendix { margin-top: 2.25rem; display: flex; flex-direction: column; gap: 2.25rem; }
-.rp-section { scroll-margin-top: 1rem; }
-.rp-section-heading { margin-bottom: 0.875rem; }
-.rp-answer-finding + .rp-answer-finding { margin-top: 0.875rem; }
-.rp-response-details { padding-top: 0.25rem; }
-.rp-response-details > summary { font-size: 1.1875rem; }
-.rp-voice-compact .rp-card { padding: 1rem; }
-.rp-voice-compact .rp-metrics { margin-top: 0.75rem; gap: 0.5rem; }
-.rp-voice-compact .rp-metric { padding: 0.75rem; }
-.rp-voice-compact .rp-metric-value { font-size: 1.375rem; }
-.rp-voice-compact .rp-metric > .rp-hint.mt-2 { display: none; }
-.rp-voice-compact .rp-metric-insight { margin-top: 0.5rem; }
-
-.rp-perception-grid { display: grid; gap: 0.75rem; }
-@media (min-width: 640px) { .rp-perception-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; } }
-.rp-perception { box-shadow: inset 3px 0 0 var(--ds-green), var(--ds-shadow-card); }
-.rp-perception[data-tone="concern"] { box-shadow: inset 3px 0 0 var(--ds-warning), var(--ds-shadow-card); }
-.rp-perception p { margin-top: 0.5rem; font-size: 0.9375rem; line-height: 1.55; }
-.rp-deltas { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--ds-line); }
-.rp-deltas > p { margin-top: 0.5rem; color: var(--ds-text-2); font-size: 0.8125rem; }
-.rp-deltas > p[data-change="better"] { color: var(--ds-green-deep); }
-.rp-deltas > p[data-change="worse"] { color: var(--ds-warning); }
+/* Screen-only extras below the paper: just the link to train the voice (the paper holds the rest). */
+.rp-appendix { margin-top: 1.5rem; display: flex; flex-direction: column; }
+.rp-voice-link { align-self: flex-start; }
 
 /* Desde a última entrevista: rows slide in, the arrow points, then the new value lands. */
 @keyframes rp-delta-in { from { opacity: 0; transform: translateX(-14px); } }
 @keyframes rp-arrow { from { opacity: 0; transform: translateX(-10px); } 60% { transform: translateX(3px); } }
 @keyframes rp-to { from { opacity: 0; transform: translateY(6px) scale(0.9); } 60% { transform: translateY(-1px) scale(1.06); } }
-.rp-delta { display: block; }
+.rp-delta { display: block; font-size: 0.8125rem; line-height: 1.5; color: var(--ds-text-2); }
+.rp-delta[data-change="better"] { color: var(--ds-green-deep); }
+.rp-delta[data-change="worse"] { color: var(--ds-warning); }
 .rp-delta.ds-item { animation: rp-delta-in 600ms var(--ease-out) backwards; animation-delay: calc(var(--rd, 0ms) + 80ms + var(--i, 0) * 200ms); }
 .rp-delta-arrow, .rp-delta-to { display: inline-block; font-weight: 700; }
 .rp-delta-arrow { animation: rp-arrow 520ms var(--ease-out) calc(var(--rd, 0ms) + 360ms + var(--i, 0) * 200ms) backwards; }
@@ -171,11 +151,30 @@
 .rp-loading-step > span { animation: rp-loading-fade var(--ds-dur-slow) var(--ease-out); }
 @keyframes rp-loading-fade { from { opacity: 0; } to { opacity: 1; } }
 
-/* Answers. */
-.rp-rephrase-text { display: block; margin-top: 0.125rem; font-size: 1.0625rem; line-height: 1.45; font-weight: 500; color: var(--ds-ink); overflow-wrap: anywhere; }
+/* Resposta por resposta: one block per answer, each starting on a hairline. */
+.rp-answers { display: flex; flex-direction: column; gap: 1.1rem; }
+.rp-answer { display: grid; gap: 0.45rem; padding-top: 0.85rem; border-top: 1px solid var(--ds-hairline); }
+.rp-answer > p { margin: 0; }
+.rp-answer-question { font-family: var(--font-display); font-size: 1rem; line-height: 1.4; color: var(--ds-ink); overflow-wrap: anywhere; }
+.rp-answer-text { font-size: 0.875rem; line-height: 1.6; color: var(--ds-text-2); overflow-wrap: anywhere; }
+.rp-answer-text.is-clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
+.rp-answer-cols { display: grid; gap: 0.9rem; margin-top: 0.25rem; }
+@media (min-width: 640px) { .rp-answer-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 1.2rem; } }
+.rp-answer-col { display: grid; gap: 0.3rem; align-content: start; font-size: 0.875rem; line-height: 1.5; }
+.rp-answer-col > p:not(.rp-psub) { margin: 0; }
+.rp-answer > .rp-pnote { margin-top: 0.1rem; }
 
-/* The appendix voice card keeps only delivery and the training link: the three scores are already on the paper. */
-.rp-appendix .rp-voice-compact :is(.rp-metrics, .rp-card > .rp-hint.mt-2) { display: none; }
+/* Notas da sua voz: the speech rhythm facts and the words to review, under the score tiles. */
+.rp-voice-detail { display: grid; gap: 0.5rem; margin-top: 0.5rem; }
+.rp-vfacts { margin: 0; font-size: 0.8125rem; line-height: 1.5; color: var(--ds-text-2); }
+.rp-vinsight { margin: 0; font-size: 0.875rem; line-height: 1.55; }
+.rp-words { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.rp-words li { display: grid; gap: 0.1rem; padding-top: 0.5rem; border-top: 1px solid var(--ds-hairline); }
+.rp-words b { font-size: 0.95rem; font-weight: 600; overflow-wrap: anywhere; }
+.rp-words span { font-size: 0.8rem; line-height: 1.45; color: var(--ds-text-2); }
+
+/* Small uppercase labels used inside the paper (answers, voice detail). */
+.rp-psub { margin: 0; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.1em; line-height: 1.2; text-transform: uppercase; color: var(--ds-text-2); }
 
 /* Print: the paper alone, on white, one A4 page (or more), with the export file name as the document title. */
 @media print {
@@ -189,6 +188,14 @@
   html.rp-printing .rp-paper .ds-item { animation: none !important; opacity: 1 !important; transform: none !important; }
   html.rp-printing .rp-paper .rp-extra { display: grid !important; }
   html.rp-printing .rp-pblock { break-inside: avoid; }
+  /* long blocks (errors, answers) may break across pages; each answer and error row stays whole */
+  html.rp-printing .rp-pblock.rp-pblock-long { break-inside: auto; }
+  html.rp-printing .rp-ph, html.rp-printing .rp-errh { break-after: avoid; page-break-after: avoid; }
+  html.rp-printing .rp-pblock-long > .rp-ph + * { break-before: avoid; }
   html.rp-printing .rp-errs li { break-inside: avoid; }
+  html.rp-printing .rp-answer { break-inside: avoid; }
+  html.rp-printing .rp-words li, html.rp-printing .rp-voice-detail { break-inside: avoid; }
+  /* answers print in full, whatever the screen clamp */
+  html.rp-printing .rp-answer-text { -webkit-line-clamp: unset; display: block; overflow: visible; }
   html.rp-printing .rp-noprint, html.rp-printing .rp-docbar, html.rp-printing .rp-appendix, html.rp-printing .rp-foot { display: none !important; }
 }
