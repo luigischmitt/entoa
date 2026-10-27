@@ -111,11 +111,12 @@ describe("per-turn analysis service", () => {
     } finally { info.mockRestore(); }
   });
 
-  it("asks for at most two strengths, one gap and three English patterns per answer with a bounded output", async () => {
+  it("asks for at most two strengths, one gap and five English patterns per answer with a bounded output", async () => {
     const { bodies, fetchImplementation } = capture({ technicalStrengths: [], technicalGaps: [], englishPatterns: [] });
     await makeService(fetchImplementation).analyzeTurn({ roleContext, turn: turns[0] });
     const schema = bodies[0].response_format.json_schema.schema.properties;
-    expect([schema.technicalStrengths.maxItems, schema.technicalGaps.maxItems, schema.englishPatterns.maxItems]).toEqual([2, 1, 3]);
+    expect([schema.technicalStrengths.maxItems, schema.technicalGaps.maxItems, schema.englishPatterns.maxItems]).toEqual([2, 1, 5]);
+    expect(bodies[0].messages[0].content).toContain("Report every clear English error a proficient listener would notice");
     expect(bodies[0].max_tokens).toBeLessThanOrEqual(1_000);
     expect(bodies[0].max_tokens).toBeGreaterThanOrEqual(450);
     // Static rules first, identical between calls (prompt caching); the answer lives only in the user message.
@@ -123,6 +124,26 @@ describe("per-turn analysis service", () => {
     const patternSchema = schema.englishPatterns.items as { required: string[]; properties: Record<string, { maxLength?: number }> };
     expect(patternSchema.required).toContain("why");
     expect(patternSchema.properties.why.maxLength).toBe(170);
+  });
+
+  it("accepts up to five English patterns for one answer and drops a sixth", async () => {
+    const answer = "Yesterday I have deployed the service. We use queue for jobs. I use Redis for to cache the results. I am agree with the plan. She don't like the tests. I live here since 2019.";
+    const turn = { sequenceNumber: 2, question: "Tell me about your last week.", answer };
+    const item = (type: "GRAMMAR", evidence: string, rephrasedExample: string, suggestion: string) => ({ type, sequenceNumber: 2, evidence, suggestion, rephrasedExample });
+    const sixPatterns = [
+      item("GRAMMAR", "Yesterday I have deployed", "Yesterday I deployed the service.", "Use o passado simples com marcadores de tempo passado."),
+      item("GRAMMAR", "We use queue for jobs", "We use a queue for jobs.", "Use um artigo antes de substantivo contável singular: a queue."),
+      item("GRAMMAR", "I use Redis for to cache the results", "I use Redis to cache the results.", "Use to + verbo base para indicar finalidade: to cache."),
+      item("GRAMMAR", "I am agree with the plan", "I agree with the plan.", "Agree é verbo, não adjetivo: use I agree."),
+      item("GRAMMAR", "She don't like the tests", "She doesn't like the tests.", "Use doesn't para terceira pessoa do singular."),
+      item("GRAMMAR", "I live here since 2019", "I have lived here since 2019.", "Com since, use present perfect: I have lived here since 2019."),
+    ];
+    const { bodies, fetchImplementation } = capture({ technicalStrengths: [], technicalGaps: [], englishPatterns: sixPatterns });
+    const result = await makeService(fetchImplementation).analyzeTurnDetailed({ roleContext, turn });
+    expect(bodies[0].response_format.json_schema.schema.properties.englishPatterns.maxItems).toBe(5);
+    expect(result.analysis.englishPatterns.length).toBe(5);
+    expect(result.evidenceReview.englishPatterns).toMatchObject({ candidates: 6, accepted: 5, rejected: 1 });
+    expect(result.evidenceReview.englishPatterns.rejectionReasons?.limit).toBe(1);
   });
 
   it("keeps valid why and drops only invalid why text", async () => {
@@ -321,7 +342,7 @@ describe("consolidation service", () => {
     expect(result.evidenceReview?.priorities.rejectionReasons?.mismatch).toBe(1);
   });
 
-  it("dedupes patterns across turns and caps every list at the full-report limits", async () => {
+  it("dedupes patterns across turns, keeps English patterns beyond the single-call cap and caps strengths at the report limit", async () => {
     const manyTurns = Array.from({ length: 6 }, (_, index) => ({ sequenceNumber: index + 1, question: "Q?", answer: "I have deployed yesterday. We use queue for jobs. The team are small." }));
     const item = (sequenceNumber: number, evidence: string) => ({ type: "GRAMMAR", sequenceNumber, evidence, suggestion: "Use a forma correta do verbo nesta frase.", rephrasedExample: "I deployed it yesterday." });
     const evidences = ["I have deployed yesterday", "We use queue for jobs", "The team are small", "have deployed", "use queue", "team are", "We use queue", "The team"];
@@ -335,11 +356,12 @@ describe("consolidation service", () => {
     const result = await makeService(fetchImplementation).consolidate({ roleContext, turns: manyTurns, turnAnalyses: perTurn as InterviewTurnAnalysis[] });
     expect(result.technicalContent.strengths).toHaveLength(5);
     expect(result.evidenceReview?.technicalStrengths.rejectionReasons?.limit).toBe(13);
-    expect(result.englishCommunication.patterns).toHaveLength(3);
+    expect(result.englishCommunication.patterns.length).toBeGreaterThan(3);
+    expect(result.englishCommunication.patterns.length).toBeLessThanOrEqual(manyTurns.length * 5);
+    for (const turn of manyTurns) expect(result.englishCommunication.patterns.filter((pattern) => pattern.sequenceNumber === turn.sequenceNumber).length).toBeLessThanOrEqual(5);
     expect(result.englishCommunication.evidenceStatus).toBe("SUFFICIENT");
     const reasons = result.evidenceReview?.englishPatterns.rejectionReasons;
     expect(reasons?.duplicate).toBeGreaterThanOrEqual(1);
-    expect(reasons?.limit).toBeGreaterThanOrEqual(1);
     const signatures = result.englishCommunication.patterns.map((pattern) => `${pattern.sequenceNumber}:${pattern.evidence.toLowerCase()}`);
     expect(new Set(signatures).size).toBe(signatures.length);
   });
