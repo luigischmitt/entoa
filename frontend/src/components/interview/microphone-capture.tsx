@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { reportAudioDiagnostic } from "@/lib/interview/audio-diagnostics";
 import { detectPlatform } from "@/lib/interview/client-environment.mjs";
-import { getAccessToken } from "@/lib/auth/backend-auth";
+import { authorizedFetch, getAccessToken } from "@/lib/auth/backend-auth";
 import { buildStreamStartMessage, notifySessionExpired } from "@/lib/auth/access-token.mjs";
 import type { VoiceTranscription } from "@/lib/interview/transcription";
 import { createSilentMicDetector, type SilentMicState } from "@/lib/interview/silent-mic-detector.mjs";
 import { createBrowserMicDeps, createMicEngine, defaultSpeechThreshold, type MicEngine } from "@/lib/interview/mic-engine.mjs";
 import { createAnswerStream, StreamConnectionError, StreamSetupError, type AnswerStream, type AnswerStreamFailure, type AnswerStreamSocket } from "@/lib/interview/answer-stream.mjs";
 import { toStreamQuestion } from "@/lib/interview/stream-question.mjs";
-import { finalVoiceTranscription, transcriptionFailureMessage } from "@/lib/interview/transcription-state.mjs";
+import { finalVoiceTranscription, RETAINED_AUDIO_FAILURE_MESSAGE, transcriptionFailureMessage } from "@/lib/interview/transcription-state.mjs";
 import { nextAutoStartSignal } from "@/lib/interview/session-policy.mjs";
 import { MAX_SPECULATIVE_REVISIONS } from "@/lib/interview/speculative-epoch.mjs";
 import type { AssessmentSocketRegistry } from "@/lib/interview/assessment-socket-registry.mjs";
@@ -28,6 +28,8 @@ type StreamMessage = {
   changed?: boolean;
   code?: string;
   message?: string;
+  /** Present only when the server kept the audio of a failed final transcription (for retry). */
+  retryToken?: unknown;
   features?: { pronunciationAssessment?: boolean };
   scores?: { accuracy: number | null; fluency: number | null; prosody: number | null };
   phrases?: unknown;
@@ -99,6 +101,10 @@ export type MicControls = {
   retry: () => void;
   /** Reopens the microphone on another input (null = default) and restarts this answer's capture. */
   switchDevice: (deviceId: string | null) => void;
+  /** The failed answer's audio was kept by the server: retryTranscription re-sends it instead of recording again. */
+  canRetryTranscription: boolean;
+  /** Re-sends the kept audio for transcription (only when canRetryTranscription). */
+  retryTranscription: () => void;
 };
 
 type MicrophoneCaptureProps = {
@@ -194,6 +200,9 @@ export function MicrophoneCapture({ disabled = false, render, onLevel, onTranscr
   const [error, setError] = useState<string | null>(null);
   const [transcription, setTranscription] = useState<VoiceTranscriptionState>({ status: "idle" });
   const [micNotice, setMicNotice] = useState<Exclude<SilentMicState, "ok"> | null>(null);
+  const [canRetryTranscription, setCanRetryTranscription] = useState(false);
+  /** Server-held audio reference of the last failed final transcription; cleared when a new answer starts. */
+  const retryTokenRef = useRef<string | null>(null);
   const micDetectorRef = useRef<ReturnType<typeof createSilentMicDetector> | null>(null);
   const micCheckTimerRef = useRef<number | null>(null);
   /** The answer in progress (its socket is owned by its AnswerStream). Null once handed to the assessment registry. */
@@ -289,6 +298,64 @@ export function MicrophoneCapture({ disabled = false, render, onLevel, onTranscr
     onTranscriptionChangeRef.current(failed);
   }, [releaseCapture]);
 
+  /** Re-sends the audio the server kept after a failed final transcription (no new recording). */
+  const retryTranscription = useCallback(async () => {
+    const retryToken = retryTokenRef.current;
+    if (!retryToken) return;
+    // The token is held only while the request is in flight, so a second tap cannot send it twice.
+    retryTokenRef.current = null;
+    setCanRetryTranscription(false);
+    setStatus("finalizing");
+    onCaptureStateChangeRef.current?.("finalizing");
+    const pending: VoiceTranscriptionState = { status: "pending" };
+    setTranscription(pending);
+    onTranscriptionChangeRef.current(pending);
+    setError(null);
+
+    const keepAudio = () => {
+      retryTokenRef.current = retryToken;
+      setCanRetryTranscription(true);
+      fail(RETAINED_AUDIO_FAILURE_MESSAGE);
+    };
+    let response: Response;
+    try {
+      response = await authorizedFetch(`${backendBaseUrl}/api/v1/transcriptions/retry`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ retryToken }),
+      });
+    } catch {
+      keepAudio();
+      return;
+    }
+    if (response.status === 410 || response.status === 422) {
+      const body = (await response.json().catch(() => null)) as { error?: { message?: unknown } } | null;
+      const message = typeof body?.error?.message === "string" ? body.error.message : transcriptionFailureMessage(response.status === 410 ? "RETRY_EXPIRED" : "NO_SPEECH_RECOGNIZED");
+      fail(message);
+      return;
+    }
+    if (!response.ok) {
+      keepAudio();
+      return;
+    }
+    const body = (await response.json().catch(() => null)) as { status?: unknown; provider?: unknown; transcript?: unknown } | null;
+    const result = finalVoiceTranscription({ status: body?.status, provider: body?.provider, transcript: body?.transcript });
+    onAnswerCompleteRef.current?.({ speechEpoch: null, pendingFollowUpCheck: null });
+    setTranscription(result);
+    onTranscriptionChangeRef.current(result);
+    if (result.status === "available") {
+      onCaptureStateChangeRef.current?.("ready");
+      setStatus("idle");
+      setError(null);
+      // The retried audio gets no pronunciation assessment, so report it as unavailable for the current question.
+      onAssessmentChangeRef.current?.(crypto.randomUUID(), { status: "unavailable", reason: "not_enabled" }, assessmentContextRef.current);
+    } else {
+      onCaptureStateChangeRef.current?.("unavailable");
+      setStatus("error");
+      setError(result.message);
+    }
+  }, [fail]);
+
   const stopRecording = useCallback(() => {
     const attempt = attemptRef.current;
     const socket = attempt?.stream.socket;
@@ -312,6 +379,8 @@ export function MicrophoneCapture({ disabled = false, render, onLevel, onTranscr
   const cancelRecording = useCallback(() => {
     generationRef.current += 1;
     finalizationRequestedRef.current = true;
+    retryTokenRef.current = null;
+    setCanRetryTranscription(false);
     releaseCapture();
     const attempt = attemptRef.current;
     attemptRef.current = null;
@@ -456,7 +525,13 @@ export function MicrophoneCapture({ disabled = false, render, onLevel, onTranscr
       return;
     }
     if (message.type === "error" || message.type === "transcription-error") {
-      fail(transcriptionFailureMessage(message.code));
+      if (typeof message.retryToken === "string") {
+        retryTokenRef.current = message.retryToken;
+        setCanRetryTranscription(true);
+        fail(RETAINED_AUDIO_FAILURE_MESSAGE);
+      } else {
+        fail(transcriptionFailureMessage(message.code));
+      }
     }
   };
 
@@ -520,6 +595,8 @@ export function MicrophoneCapture({ disabled = false, render, onLevel, onTranscr
     if ((!force && (status === "requesting" || status === "recording" || status === "finalizing")) || disabled) return;
     setMicNotice(null);
     setError(null);
+    retryTokenRef.current = null;
+    setCanRetryTranscription(false);
     setStatus("requesting");
     onCaptureStateChangeRef.current?.("requesting");
     finalizationRequestedRef.current = false;
@@ -675,6 +752,8 @@ export function MicrophoneCapture({ disabled = false, render, onLevel, onTranscr
     discard: cancelRecording,
     retry: retryCapture,
     switchDevice,
+    canRetryTranscription,
+    retryTranscription,
   }} />;
 }
 

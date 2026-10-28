@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { finalVoiceTranscription, transcriptionFailureMessage } from "../src/lib/interview/transcription-state.mjs";
+import { finalVoiceTranscription, RETAINED_AUDIO_FAILURE_MESSAGE, transcriptionFailureMessage } from "../src/lib/interview/transcription-state.mjs";
 
 test("the batch complete event is the only source of a submittable transcript", () => {
   assert.deepEqual(finalVoiceTranscription({
@@ -51,4 +51,9 @@ test("stream setup and capacity errors offer retry, skip, and end without naming
     assert.match(message, /encerre a prática/, code);
     assert.doesNotMatch(message, /OpenRouter|Whisper|Azure|\b429\b/i, code);
   }
+});
+
+test("a failure whose audio the server kept offers retry instead of asking to speak again", () => {
+  assert.equal(RETAINED_AUDIO_FAILURE_MESSAGE, "Não conseguimos transcrever sua resposta. Seu áudio foi guardado: toque em Tentar novamente.");
+  assert.doesNotMatch(RETAINED_AUDIO_FAILURE_MESSAGE, /OpenRouter|Whisper|Azure|\b429\b/i);
 });

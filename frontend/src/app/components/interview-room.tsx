@@ -15,7 +15,7 @@ import { assessmentContextKey, composeClarificationTurn, planTurnAfterDecision, 
 import { plannedQuestionType, resolveFixedPromptForAudio, resolveMonotonicFixedAction, resolveSpeculativeFixedSelection, selectNextPlannedQuestion, selectNextPlannedQuestions, shouldUseMonotonicFixedFallback } from "@/lib/interview/question-scheduling.mjs";
 import { createNextTurnPreparationRegistry } from "@/lib/interview/next-turn-preparation.mjs";
 import { createFixedHandoffPreparationRegistry, type FixedHandoffEntry } from "@/lib/interview/fixed-handoff-preparation.mjs";
-import { type InterviewTurnInput } from "@/lib/interview/persistence";
+import { renameInterview, type InterviewTurnInput } from "@/lib/interview/persistence";
 import { pairInterviewTurns, requestInterviewConsolidation, requestInterviewReport, requestInterviewTurnAnalysis, summarizeAzureAssessments, type InterviewReportResult, type InterviewTurnAnalysis } from "@/lib/interview/report";
 import { requestPersistedInterviewReport } from "@/lib/interview/persisted-report";
 import { resolveCandidateVoicePreferences } from "@/lib/interview/candidate-voice-preferences.mjs";
@@ -1514,9 +1514,10 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
           {mic.errorMessage && (
             <Toast tone="error" role="alert" actions={<>
               {inAppDenied && inApp?.openUrl && <a href={inApp.openUrl} className="mt-toast-btn mt-toast-link">{t("Abrir no ")}{inApp.browserName}</a>}
-              <button type="button" className="mt-toast-btn" onClick={mic.start} disabled={micDisabled || !mic.canStart}>{t("Tentar novamente")}</button>
+              <button type="button" className="mt-toast-btn" onClick={mic.canRetryTranscription ? () => { void mic.retryTranscription(); } : mic.start} disabled={mic.canRetryTranscription ? micDisabled : micDisabled || !mic.canStart}>{t("Tentar novamente")}</button>
+              {mic.canRetryTranscription && <button type="button" className="mt-toast-btn" onClick={mic.start} disabled={micDisabled || !mic.canStart}>{t("Gravar de novo")}</button>}
               <button type="button" className="mt-toast-btn" onClick={skipQuestion} disabled={!canSkip}>{t("Pular")}</button>
-            </>}>{inAppDenied && inApp ? <><strong>{inAppMicTitle(inApp)}{t(".")}</strong> {inAppMicBody(inApp)}</> : mic.errorMessage}</Toast>
+            </>}>{inAppDenied && inApp ? <><strong>{inAppMicTitle(inApp)}{t(".")}</strong> {inAppMicBody(inApp)}</> : mic.errorMessage && t(mic.errorMessage)}</Toast>
           )}
           {mic.micNotice && (
             <Toast tone="warn" actions={<>
@@ -1576,6 +1577,8 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
             reportState={reportState}
             progressRecords={progressRecords}
             currentInterviewId={sessionId ?? undefined}
+            customTitle={null}
+            onRename={sessionId ? (title) => renameInterview(sessionId, title) : undefined}
             turns={capturedReportTurns}
             azureSummary={currentAzureSummary}
             coverage={coverage}
