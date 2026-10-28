@@ -108,6 +108,15 @@ test("copy and labels never suggest an overall level or percentile", () => {
   assert.doesNotMatch(text, /CEFR|\bB1\b|\bB2\b|Top \d|percentil/i);
 });
 
+test("passes the interview title through to session rows, null when absent", () => {
+  const named = { ...record("a", 1), title: "Mock Google, rodada 2" };
+  const result = buildProgressInsights([named, record("b", 2)]);
+  const byId = Object.fromEntries(result.sessions.map((s) => [s.id, s]));
+  assert.equal(byId.a.title, "Mock Google, rodada 2");
+  assert.equal(byId.b.title, null);
+  assert.equal(byId.a.role, "Backend Engineer");
+});
+
 test("weekly sessions cover eight Monday-based weeks", () => {
   const now = new Date(2026, 8, 30, 12).getTime(); // Wed
   const sessions = [new Date(2026, 8, 28, 9), new Date(2026, 8, 27, 9), new Date(2026, 7, 1, 9)].map((d) => ({ time: d.getTime() }));

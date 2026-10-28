@@ -6,6 +6,7 @@ export type ProgressRecord = {
   status: string;
   targetRole: string;
   focus: string | null;
+  title?: string | null;
   seniority: string | null;
   startedAt: string | null;
   completedAt: string | null;
@@ -21,7 +22,7 @@ export type ProgressCommonError = { type: PatternType; label: string; count: num
 export type ProgressStudyTopic = { id: string; kind: "english" | "technical"; patternType?: PatternType; title: string; count: number; sessionCount: number; exercise: string; exerciseSource: "report" | "default"; focuses: string[]; rank: number };
 export type ProgressPoint = { id: string; date: string | null; label: string; value: number };
 export type ProgressSeriesKey = "patterns" | "gaps" | AzureReportDimension;
-export type ProgressSessionRow = { id: string; date: string | null; role: string; seniority: string | null; durationMs: number | null; answerCount: number; reportStatus: "ready" | "pending" | "unavailable" | "none"; patternCount: number | null };
+export type ProgressSessionRow = { id: string; date: string | null; role: string; title: string | null; seniority: string | null; durationMs: number | null; answerCount: number; reportStatus: "ready" | "pending" | "unavailable" | "none"; patternCount: number | null };
 export type ProgressInsights = {
   sessionCount: number;
   practiceMs: number | null;

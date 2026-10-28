@@ -21,6 +21,7 @@ type InterviewRow = {
   id: string;
   user_id: string;
   target_role: string;
+  title: string | null;
   seniority: string | null;
   focus: string | null;
   job_direction: JobDirection | null;
@@ -49,13 +50,14 @@ export type InterviewTurnInput = {
   content: string | null;
 };
 
-const sessionColumns = "id,user_id,target_role,seniority,focus,job_direction,duration_minutes,question_count,status,started_at,completed_at,created_at,updated_at";
+const sessionColumns = "id,user_id,target_role,title,seniority,focus,job_direction,duration_minutes,question_count,status,started_at,completed_at,created_at,updated_at";
 const turnColumns = "id,interview_id,sequence_number,speaker,content,created_at";
 
-const toSession = (row: InterviewRow): InterviewSession => ({
+const toSession = (row: InterviewRow): InterviewSession & { title: string | null } => ({
   id: row.id,
   userId: row.user_id,
   targetRole: row.target_role,
+  title: row.title ?? null,
   seniority: row.seniority,
   focus: row.focus,
   jobDirection: row.job_direction,
@@ -183,6 +185,25 @@ export async function updateInterviewStatus(
   return { ok: true, value: toSession(data as InterviewRow) };
 }
 
+/** Renames an interview for its owner; an empty name clears it back to the target role. */
+export async function renameInterview(interviewId: string, title: string | null): Promise<{ ok: true; title: string | null } | { ok: false; message: string }> {
+  const trimmed = (title ?? "").trim();
+  // Same length rule as the interviews_title_length_check constraint (characters, not UTF-16 units).
+  if (Array.from(trimmed).length > 80) return { ok: false, message: "Use até 80 caracteres." };
+  const nextTitle = trimmed === "" ? null : trimmed;
+  const auth = await authenticatedClient();
+  if (!auth.ok) return { ok: false, message: auth.message };
+  const { data, error } = await auth.value.client
+    .from("interviews")
+    .update({ title: nextTitle })
+    .eq("id", interviewId)
+    .select("title")
+    .single();
+  if (error || !data) return { ok: false, message: "Não foi possível renomear agora. Tente novamente." };
+  invalidateDashboardCache("progress");
+  return { ok: true, title: (data as { title: string | null }).title ?? null };
+}
+
 type ProgressFeedbackRow = {
   status: "pending" | "ready" | "unavailable";
   azure_summary: AzureMetricSummary | null;
@@ -245,6 +266,7 @@ async function loadProgressRecordsUncached(): Promise<PersistenceResult<Progress
         id: session.id,
         status: session.status,
         targetRole: session.targetRole,
+        title: session.title,
         focus: session.focus,
         seniority: session.seniority,
         startedAt: session.startedAt,

@@ -41,6 +41,15 @@
 .rp-brand span { font-family: var(--font-display); font-size: 1.1rem; line-height: 1; }
 .rp-cover { display: grid; gap: 0.7rem; }
 .rp-ptitle { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 1.7rem; line-height: 1.1; letter-spacing: -0.02em; color: var(--ds-ink); }
+.rp-title-row { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.rp-ptitle-editing { flex: 1 1 auto; }
+.rp-rename { display: inline-flex; flex: none; padding: 0.35rem; border: 0; border-radius: 8px; background: transparent; color: var(--ds-text-2); cursor: pointer; }
+.rp-rename:hover { background: var(--ds-field); color: var(--ds-ink); }
+.rp-rename:focus-visible { outline: 2px solid var(--ds-green); outline-offset: 2px; }
+.rp-title-input { width: 100%; min-width: 0; margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--ds-green); border-radius: 0; background: transparent; color: var(--ds-ink); font-family: var(--font-display); font-weight: 400; font-size: 1.7rem; line-height: 1.1; letter-spacing: -0.02em; outline: none; }
+.rp-title-input:focus-visible { outline: none; border-bottom-width: 2px; }
+.rp-rename-hint { margin: 0; font-size: 0.78rem; color: var(--ds-text-2); }
+.rp-rename-error { margin: 0; font-size: 0.78rem; color: var(--ds-error); }
 .rp-pfacts { display: flex; flex-wrap: wrap; gap: 0.4rem 1.8rem; margin: 0; }
 .rp-pfacts dt { font-size: 0.64rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ds-text-2); }
 .rp-pfacts dd { margin: 0; font-size: 0.9rem; color: var(--ds-ink); overflow-wrap: anywhere; }
