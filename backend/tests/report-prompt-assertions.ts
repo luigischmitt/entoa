@@ -19,12 +19,14 @@ export function expectPrecisionRules(prompt: string) {
 }
 
 export function expectConciseTechnicalRules(prompt: string) {
-  expect(prompt).toContain("at most 1 per answer and 4 in total, and ONLY material ones");
-  expect(prompt).toContain("a real interviewer for that role and seniority would consider important to answer THAT question well");
-  expect(prompt).toContain("If the answer covered the question reasonably, return no gaps");
+  expect(prompt).toContain("Report every material technical gap, at most 2 per answer");
+  expect(prompt).toContain("a real interviewer for that role and seniority would expect in order to answer THAT question well");
+  expect(prompt).toContain("If the answer fully covered the question, return no gaps");
+  expect(prompt).toContain("an answer without the concrete criterion or result is a material gap");
+  expect(prompt).toContain("For every gap also write howToAnswer");
   expect(prompt).toContain("Never list optional details the candidate simply did not mention");
   expect(prompt).toContain("nitpicks, generic \"could have mentioned X\" items, or gaps about things outside the question");
-  expect(prompt).toContain("unless the question explicitly asks for them");
+  expect(prompt).toContain("Do not demand process steps, checks, rollback steps or trade-offs the question did not ask for");
   expect(prompt).toContain("never \"mentioned technology X\"");
   expect(prompt).toContain("how an API was integrated, how data was separated, or how conflicts were avoided");
   expect(prompt).toContain("report at most 2 strengths per answer and 5 in total");

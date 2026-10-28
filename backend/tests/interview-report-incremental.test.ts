@@ -111,11 +111,13 @@ describe("per-turn analysis service", () => {
     } finally { info.mockRestore(); }
   });
 
-  it("asks for at most two strengths, one gap and five English patterns per answer with a bounded output", async () => {
+  it("asks for at most two strengths, two gaps and five English patterns per answer with a bounded output", async () => {
     const { bodies, fetchImplementation } = capture({ technicalStrengths: [], technicalGaps: [], englishPatterns: [] });
     await makeService(fetchImplementation).analyzeTurn({ roleContext, turn: turns[0] });
     const schema = bodies[0].response_format.json_schema.schema.properties;
-    expect([schema.technicalStrengths.maxItems, schema.technicalGaps.maxItems, schema.englishPatterns.maxItems]).toEqual([2, 1, 5]);
+    expect([schema.technicalStrengths.maxItems, schema.technicalGaps.maxItems, schema.englishPatterns.maxItems]).toEqual([2, 2, 5]);
+    const gapSchema = schema.technicalGaps.items as { required: string[] };
+    expect(gapSchema.required).toContain("howToAnswer");
     expect(bodies[0].messages[0].content).toContain("Report every clear English error a proficient listener would notice");
     expect(bodies[0].max_tokens).toBeLessThanOrEqual(1_000);
     expect(bodies[0].max_tokens).toBeGreaterThanOrEqual(450);
@@ -124,6 +126,15 @@ describe("per-turn analysis service", () => {
     const patternSchema = schema.englishPatterns.items as { required: string[]; properties: Record<string, { maxLength?: number }> };
     expect(patternSchema.required).toContain("why");
     expect(patternSchema.properties.why.maxLength).toBe(240);
+  });
+
+  it("keeps a gap's howToAnswer advice and still keeps the gap when the advice is null", async () => {
+    const withAdvice = { ...gap4, vacancyCompetency: null, howToAnswer: "Diga qual limite de latência dispara um alerta e quem o recebe." };
+    const { fetchImplementation } = capture({ technicalStrengths: [], technicalGaps: [withAdvice], englishPatterns: [] });
+    const result = await makeService(fetchImplementation).analyzeTurn({ roleContext, turn: turns[1] });
+    expect(result.technicalGaps).toEqual([{ ...gap4, howToAnswer: withAdvice.howToAnswer }]);
+    const { fetchImplementation: nullAdvice } = capture({ technicalStrengths: [], technicalGaps: [{ ...withAdvice, howToAnswer: null }], englishPatterns: [] });
+    expect((await makeService(nullAdvice).analyzeTurn({ roleContext, turn: turns[1] })).technicalGaps).toEqual([gap4]);
   });
 
   it("accepts up to five English patterns for one answer and drops a sixth", async () => {
