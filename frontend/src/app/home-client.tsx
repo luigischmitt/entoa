@@ -732,6 +732,7 @@ export default function App({ initialView = "home" }: { initialView?: InitialVie
               onStart={() => navigate("interview-setup")}
               initialReportId={initialReportId}
               onInitialReportOpened={() => setInitialReportId(null)}
+              canRegenerateReports={isAdmin}
             />
           )}
           {view === "voice" && <VoiceView onStart={() => navigate("interview-setup")} />}

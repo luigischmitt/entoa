@@ -334,7 +334,7 @@ describe("persisted interview reports", () => {
     const app = express();
     app.use(express.json());
     app.use("/api", requireAccessToken(verifier));
-    app.post("/api/report/:interviewId", createPersistedInterviewReportController({ generate }));
+    app.post("/api/report/:interviewId", createPersistedInterviewReportController({ generate }, "user-private-id"));
 
     const accepted = await request(app).post(`/api/report/${interviewId}`).set("authorization", `Bearer ${token}`).send({ locale: "en", regenerate: true });
     expect(accepted.status).toBe(200);
@@ -343,6 +343,24 @@ describe("persisted interview reports", () => {
     const rejected = await request(app).post(`/api/report/${interviewId}`).set("authorization", `Bearer ${token}`).send({ locale: "en", regenerate: "yes" });
     expect(rejected.status).toBe(400);
     expect(rejected.body.error.code).toBe("INVALID_INTERVIEW_REPORT_REQUEST");
+    expect(generate).toHaveBeenCalledOnce();
+  });
+
+  it("rejects regenerate from a non-admin user without calling generate", async () => {
+    const generate = vi.fn(async () => ({ status: "ready", report }));
+    const verifier: AccessTokenVerifier = { verify: vi.fn(async () => ({ userId: "user-private-id" })) };
+    const app = express();
+    app.use(express.json());
+    app.use("/api", requireAccessToken(verifier));
+    app.post("/api/report/:interviewId", createPersistedInterviewReportController({ generate }, "someone-else"));
+
+    const forbidden = await request(app).post(`/api/report/${interviewId}`).set("authorization", `Bearer ${token}`).send({ locale: "en", regenerate: true });
+    expect(forbidden.status).toBe(403);
+    expect(forbidden.body.error).toEqual({ code: "FORBIDDEN", message: "Acesso administrativo necessário." });
+    expect(generate).not.toHaveBeenCalled();
+
+    const plain = await request(app).post(`/api/report/${interviewId}`).set("authorization", `Bearer ${token}`).send({ locale: "en" });
+    expect(plain.status).toBe(200);
     expect(generate).toHaveBeenCalledOnce();
   });
 
