@@ -40,7 +40,8 @@ function isAbortFailure(error: unknown, signal?: AbortSignal): boolean {
 function logFallback(from: TranscriptionProvider, to: TranscriptionProvider, error: unknown): void {
   const httpStatus = error instanceof TranscriptionUnavailableError ? error.httpStatus : undefined;
   const reason = error instanceof TranscriptionUnavailableError ? (error.providerStatus ?? "unknown") : "unknown";
-  console.info(JSON.stringify({ event: "transcription_fallback", from, to, reason, ...(httpStatus ? { httpStatus } : {}) }));
+  const providerMessage = error instanceof TranscriptionUnavailableError ? error.providerMessage : undefined;
+  console.info(JSON.stringify({ event: "transcription_fallback", from, to, reason, ...(httpStatus ? { httpStatus } : {}), ...(providerMessage ? { providerMessage } : {}) }));
 }
 
 class ExperimentalTranscriptionService implements TranscriptionService {

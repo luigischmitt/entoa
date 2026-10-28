@@ -153,4 +153,12 @@ describe("OpenRouter Whisper final request", () => {
       expect(mixed).toHaveBeenCalledTimes(3);
     });
   });
+
+  it("keeps the provider's error message of a rejected request, masking anything key-like", async () => {
+    const body = JSON.stringify({ error: { code: 402, message: "Insufficient credits for sk-or-v1-abcdefghijklmnop", metadata: { provider_name: "Groq" } } });
+    const fetcher = vi.fn(async () => new Response(body, { status: 402 }));
+    const service = new OpenRouterWhisperTranscriptionService({ key: "test", timeoutMs: 1_000, fetchImplementation: fetcher });
+    const error = await service.transcribe(pcmToWav(Buffer.alloc(32_000)), "whisper-large-v3-turbo").catch((caught: unknown) => caught);
+    expect(error).toMatchObject({ httpStatus: 402, providerMessage: "Insufficient credits for sk-*** | Groq" });
+  });
 });

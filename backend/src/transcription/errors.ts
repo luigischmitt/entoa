@@ -7,12 +7,15 @@ export type TranscriptionUnavailableErrorOptions = ErrorOptions & {
   attempts?: number;
   /** Numeric HTTP status of the upstream response, when one was received. Content-free. */
   httpStatus?: number;
+  /** The provider's own error message for a rejected request (never audio or transcript content). */
+  providerMessage?: string;
 };
 
 export class TranscriptionUnavailableError extends Error {
   readonly providerStatus?: TranscriptionFailureCategory;
   readonly attempts?: number;
   readonly httpStatus?: number;
+  readonly providerMessage?: string;
 
   constructor(message: string, options?: TranscriptionUnavailableErrorOptions) {
     super(message, options);
@@ -20,5 +23,6 @@ export class TranscriptionUnavailableError extends Error {
     this.providerStatus = options?.providerStatus;
     this.attempts = options?.attempts;
     this.httpStatus = options?.httpStatus;
+    this.providerMessage = options?.providerMessage;
   }
 }
