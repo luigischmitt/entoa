@@ -87,8 +87,10 @@ export function analysisCoverageNotice(coverage, ordinalForSequence = (sequenceN
 const rateCopy = (name, oldValue, newValue) => {
   const same = Math.abs(oldValue - newValue) < 0.05;
   const direction = same ? `${name} iguais` : newValue < oldValue ? `Menos ${name.toLocaleLowerCase()}` : `Mais ${name.toLocaleLowerCase()}`;
-  return { label: same ? `${direction}: ${formatNumber(newValue)}` : `${direction}: ${formatNumber(oldValue)} → ${formatNumber(newValue)}`, before: formatNumber(oldValue), after: formatNumber(newValue), change: same ? "same" : newValue < oldValue ? "better" : "worse" };
+  return withTemplate(same ? `${direction}: {after}` : `${direction}: {before} → {after}`, formatNumber(oldValue), formatNumber(newValue), same ? "same" : newValue < oldValue ? "better" : "worse");
 };
+/** `template` is the translatable source text (locale keys); `label` is it filled in, in Portuguese. */
+const withTemplate = (template, before, after, change) => ({ template, label: template.replace("{before}", before).replace("{after}", after), before, after, change });
 const formatNumber = (value) => value.toFixed(1).replace(/\.0$/, "").replace(".", ",");
 
 /** Compare this ready report with the newest previous completed report. */
@@ -116,12 +118,12 @@ export function buildReportDeltas(current, currentAzure, records = [], currentIn
   const newAccuracy = currentAzure.accuracy?.mean;
   if (oldWpm !== null && newWpm !== null && Math.abs(newWpm - oldWpm) >= 5) {
     const direction = newWpm > oldWpm ? "Fala mais rápida" : "Fala mais pausada";
-    deltas.push({ label: `${direction}: ${Math.round(oldWpm)} → ${Math.round(newWpm)} palavras por minuto`, before: String(Math.round(oldWpm)), after: String(Math.round(newWpm)), change: "same" });
+    deltas.push(withTemplate(`${direction}: {before} → {after} palavras por minuto`, String(Math.round(oldWpm)), String(Math.round(newWpm)), "same"));
   }
   if (Number.isFinite(oldAccuracy) && Number.isFinite(newAccuracy)) {
     const same = Math.abs(newAccuracy - oldAccuracy) < 1;
     const direction = same ? "Precisão da pronúncia igual" : newAccuracy > oldAccuracy ? "Precisão da pronúncia maior" : "Precisão da pronúncia menor";
-    deltas.push({ label: same ? `${direction}: ${Math.round(newAccuracy)}%` : `${direction}: ${Math.round(oldAccuracy)}% → ${Math.round(newAccuracy)}%`, before: `${Math.round(oldAccuracy)}%`, after: `${Math.round(newAccuracy)}%`, change: same ? "same" : newAccuracy > oldAccuracy ? "better" : "worse" });
+    deltas.push(withTemplate(same ? `${direction}: {after}` : `${direction}: {before} → {after}`, `${Math.round(oldAccuracy)}%`, `${Math.round(newAccuracy)}%`, same ? "same" : newAccuracy > oldAccuracy ? "better" : "worse"));
   }
   return deltas;
 }

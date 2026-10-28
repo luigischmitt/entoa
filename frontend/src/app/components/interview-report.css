@@ -31,7 +31,7 @@
 .rp-regenerate { flex: none; white-space: nowrap; padding: 0.45rem 1rem; font-size: 0.82rem; font-weight: 600; }
 
 /* The paper: a printed page, read top to bottom. */
-.rp-paper { display: flex; flex-direction: column; gap: 1.9rem; margin-top: 0.75rem; background: #fff; border-radius: 6px; padding: clamp(1.2rem, 3vw, 2.2rem) clamp(1.1rem, 3.4vw, 2.4rem); box-shadow: 0 1px 2px rgba(14, 42, 31, 0.08), 0 16px 32px -24px rgba(14, 42, 31, 0.28); font-size: 0.92rem; color: var(--ds-ink); }
+.rp-paper { display: flex; flex-direction: column; gap: 2.6rem; margin-top: 0.75rem; background: #fff; border-radius: 6px; padding: clamp(1.2rem, 3vw, 2.2rem) clamp(1.1rem, 3.4vw, 2.4rem); box-shadow: 0 1px 2px rgba(14, 42, 31, 0.08), 0 16px 32px -24px rgba(14, 42, 31, 0.28); font-size: 0.92rem; color: var(--ds-ink); }
 :root[data-color-scheme="dark"] .rp-paper { background: var(--ds-surface); box-shadow: var(--ds-tile-shadow); }
 .rp-paper s { color: var(--ds-error); text-decoration-thickness: 1px; }
 .rp-paper u { color: var(--ds-green-deep); text-decoration: none; background: var(--ds-tint); border-radius: 3px; padding: 0 0.15em; }
@@ -45,6 +45,13 @@
 .rp-pfacts dt { font-size: 0.64rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ds-text-2); }
 .rp-pfacts dd { margin: 0; font-size: 0.9rem; color: var(--ds-ink); overflow-wrap: anywhere; }
 .rp-pblock { display: flex; flex-direction: column; gap: 0.75rem; }
+/* Report parts: a ruled block with a serif title and one hint line, grouping the sections it holds. */
+.rp-part { display: flex; flex-direction: column; gap: 1.6rem; padding-top: 1.6rem; border-top: 2px solid var(--ds-ink); }
+.rp-part-head { display: grid; gap: 0.25rem; }
+.rp-part-title { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: clamp(1.55rem, 1.3rem + 0.8vw, 1.95rem); line-height: 1.1; letter-spacing: -0.01em; color: var(--ds-ink); }
+.rp-part-hint { margin: 0; font-size: 0.86rem; color: var(--ds-text-2); }
+.rp-part-body { display: flex; flex-direction: column; gap: 1.6rem; }
+.rp-part-body > .rp-pblock:first-child > .rp-sh { border-top: 0; padding-top: 0; }
 /* Section head: a hairline, a readable title with the green mark, and one plain line on what the section holds. */
 .rp-sh { display: grid; gap: 0.2rem; padding-top: 1.1rem; border-top: 1px solid var(--ds-hairline); }
 .rp-ph { margin: 0; display: flex; align-items: center; gap: 0.55rem; font-size: 1.08rem; font-weight: 600; letter-spacing: -0.01em; line-height: 1.3; color: var(--ds-ink); }
@@ -183,6 +190,7 @@
   /* long blocks (errors, answers) may break across pages; each answer and error row stays whole */
   html.rp-printing .rp-pblock.rp-pblock-long { break-inside: auto; }
   html.rp-printing .rp-sh, html.rp-printing .rp-errh { break-after: avoid; page-break-after: avoid; }
+  html.rp-printing .rp-part-head { break-after: avoid; page-break-after: avoid; }
   html.rp-printing .rp-pblock-long > .rp-sh + * { break-before: avoid; }
   html.rp-printing .rp-errs li { break-inside: avoid; }
   html.rp-printing .rp-gaps li { break-inside: avoid; }
