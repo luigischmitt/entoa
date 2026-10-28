@@ -12,6 +12,7 @@ import type { SpeechConfig } from "../speech/config.js";
 import type { SpeechProvider } from "../speech/types.js";
 import { createSpeechServices } from "../speech/speech-services.js";
 import type { ClosingReactionService } from "../thinking/closing-reaction-service.js";
+import type { ShortReplyService } from "../thinking/short-reply-service.js";
 import type { SpeculativeTurnAnalysisService } from "../thinking/speculative-turn-analysis-service.js";
 import type { PolishedAnswerService } from "../thinking/polished-answer-service.js";
 import type { RedoCheckService } from "../thinking/redo-check-service.js";
@@ -21,12 +22,12 @@ import type { TranscriptionService } from "../transcription/types.js";
 import type { PronunciationAssessmentService } from "../transcription/azure-pronunciation-assessment.js";
 import type { PersistedReportGenerator } from "../controllers/persisted-interview-report-controller.js";
 
-export function createApiRouter(provider: SpeechProvider, config: SpeechConfig, transcriptionService: TranscriptionService, thinkingService: ThinkingService | null, orchestrationService: InterviewOrchestrationService, reportService: InterviewReportService | null, jobDirectionService: JobDirectionService | null, resumeDirectionService: ResumeDirectionService | null, jobDirectionUserLimit: JobDirectionUserLimit, clientEventLogger?: (line: string) => void, speculativeService: SpeculativeTurnAnalysisService | null = null, speculativeEnabled = false, closingReactionService: ClosingReactionService | null = null, polishedAnswerService: PolishedAnswerService | null = null, redoCheckService: RedoCheckService | null = null, adminUsageService: AdminUsageService = new AdminUsageService(), adminUserIds = process.env.ADMIN_USER_IDS, pronunciationAssessmentService: PronunciationAssessmentService | null = null, practiceDailyLimit: PracticeDailyLimit = new PracticeDailyLimit(), practiceLogger?: (line: string) => void, persistedReportGenerator: PersistedReportGenerator | null = null) {
+export function createApiRouter(provider: SpeechProvider, config: SpeechConfig, transcriptionService: TranscriptionService, thinkingService: ThinkingService | null, orchestrationService: InterviewOrchestrationService, reportService: InterviewReportService | null, jobDirectionService: JobDirectionService | null, resumeDirectionService: ResumeDirectionService | null, jobDirectionUserLimit: JobDirectionUserLimit, clientEventLogger?: (line: string) => void, speculativeService: SpeculativeTurnAnalysisService | null = null, speculativeEnabled = false, closingReactionService: ClosingReactionService | null = null, polishedAnswerService: PolishedAnswerService | null = null, redoCheckService: RedoCheckService | null = null, adminUsageService: AdminUsageService = new AdminUsageService(), adminUserIds = process.env.ADMIN_USER_IDS, pronunciationAssessmentService: PronunciationAssessmentService | null = null, practiceDailyLimit: PracticeDailyLimit = new PracticeDailyLimit(), practiceLogger?: (line: string) => void, persistedReportGenerator: PersistedReportGenerator | null = null, shortReplyService: ShortReplyService | null = null) {
   const apiRouter = Router();
   const speechServices = createSpeechServices(provider, config);
 
   apiRouter.use("/transcriptions", createTranscriptionRouter(transcriptionService));
-  apiRouter.use("/thinking", createThinkingRouter(thinkingService, orchestrationService, reportService, jobDirectionService, resumeDirectionService, jobDirectionUserLimit, speechServices.prefetcher, speculativeService, speculativeEnabled, closingReactionService, polishedAnswerService, redoCheckService, persistedReportGenerator));
+  apiRouter.use("/thinking", createThinkingRouter(thinkingService, orchestrationService, reportService, jobDirectionService, resumeDirectionService, jobDirectionUserLimit, speechServices.prefetcher, speculativeService, speculativeEnabled, closingReactionService, polishedAnswerService, redoCheckService, persistedReportGenerator, shortReplyService));
   apiRouter.use("/voice", createVoiceRouter(pronunciationAssessmentService, practiceDailyLimit, practiceLogger));
   apiRouter.use("/formulations", formulationRouter);
   apiRouter.use("/client-events", createClientEventsRouter(clientEventLogger));

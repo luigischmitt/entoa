@@ -12,6 +12,9 @@ test("composes the spoken turn for each clarification outcome", () => {
   const rephrased = composeClarificationTurn({ decision: "REPHRASE", clarificationText: "What was a hard technical choice you made?", question });
   assert.deepEqual(rephrased, { acknowledgement: "Let me put it another way.", question: "What was a hard technical choice you made?", base: "What was a hard technical choice you made?", speed: 1 });
   const defined = composeClarificationTurn({ decision: "DEFINE", clarificationText: "Scalability means how well a system handles more users or data", question });
+  assert.equal(composeClarificationTurn({ decision: "REPEAT", question, leadIn: "Please, more slowly." }).acknowledgement, "Please, more slowly.");
+  assert.equal(composeClarificationTurn({ decision: "REPHRASE", clarificationText: "What was a hard technical choice you made?", question, leadIn: "Here's a simpler version." }).acknowledgement, "Here's a simpler version.");
+  assert.equal(composeClarificationTurn({ decision: "DEFINE", clarificationText: "x".repeat(200), question }).acknowledgement.length, 201);
   assert.deepEqual(defined, { acknowledgement: "Scalability means how well a system handles more users or data.", question: `So, tell me about a difficult technical decision you made.`, base: question, speed: 1 });
 });
 
@@ -19,7 +22,7 @@ test("an unusable rephrase or definition degrades to a plain repeat", () => {
   for (const clarificationText of [null, "", "Not a question", `${"x".repeat(230)}?`]) {
     assert.equal(composeClarificationTurn({ decision: "REPHRASE", clarificationText, question }).acknowledgement, "Sure.");
   }
-  for (const clarificationText of [null, "Is it this?", "x".repeat(170)]) {
+  for (const clarificationText of [null, "Is it this?", "x".repeat(261)]) {
     assert.equal(composeClarificationTurn({ decision: "DEFINE", clarificationText, question }).acknowledgement, "Sure.");
   }
 });

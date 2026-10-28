@@ -10,7 +10,7 @@ export const repeatLeadIn = "Sure.";
 export const rephraseLeadIn = "Let me put it another way.";
 /** Neutral bridge when the candidate keeps asking: never blames the candidate. */
 export const moveOnBridge = "Let's move on to the next one.";
-export const maxDefinitionLength = 160;
+export const maxDefinitionLength = 260;
 export const maxRephraseLength = 220;
 
 const clarificationDecisions = new Set(["REPEAT", "REPHRASE", "DEFINE"]);
@@ -38,15 +38,16 @@ function sentence(text) {
  * candidate last heard). `base` is what a later REPEAT should repeat. An unusable REPHRASE/DEFINE text degrades to a
  * plain REPEAT, so the candidate always hears the question.
  */
-export function composeClarificationTurn({ decision, clarificationText = null, question }) {
+export function composeClarificationTurn({ decision, clarificationText = null, question, leadIn = null }) {
+  const customLeadIn = typeof leadIn === "string" ? leadIn.trim() : "";
   const text = typeof clarificationText === "string" ? clarificationText.trim() : "";
   if (decision === "REPHRASE" && text && text.length <= maxRephraseLength && text.endsWith("?")) {
-    return { acknowledgement: rephraseLeadIn, question: text, base: text, speed: 1 };
+    return { acknowledgement: customLeadIn || rephraseLeadIn, question: text, base: text, speed: 1 };
   }
   if (decision === "DEFINE" && text && text.length <= maxDefinitionLength && !text.includes("?") && !/[\r\n]/u.test(text)) {
     return { acknowledgement: sentence(text), question: `So, ${lowerFirst(question)}`, base: question, speed: 1 };
   }
-  return { acknowledgement: repeatLeadIn, question, base: question, speed: repeatSpeechSpeed };
+  return { acknowledgement: customLeadIn || repeatLeadIn, question, base: question, speed: repeatSpeechSpeed };
 }
 
 /** Assessment attempts recorded while the candidate was only asking for a clarification are excluded from pronunciation scores. */

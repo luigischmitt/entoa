@@ -8,7 +8,7 @@ export const maxRephraseLength: number;
 export function isClarificationDecision(decision: unknown): boolean;
 export function canClarifyAgain(clarificationsSoFar: number): boolean;
 export type ClarificationTurn = { acknowledgement: string; question: string; base: string; speed: number };
-export function composeClarificationTurn(input: { decision: "REPEAT" | "REPHRASE" | "DEFINE"; clarificationText?: string | null; question: string }): ClarificationTurn;
+export function composeClarificationTurn(input: { decision: "REPEAT" | "REPHRASE" | "DEFINE"; clarificationText?: string | null; question: string; leadIn?: string | null }): ClarificationTurn;
 export function assessmentContextKey(context: { sequenceNumber: number; round?: number }): string;
 export function planTurnAfterDecision<T extends { decision: string }>(input: { decision: T; clarificationsSoFar: number; nextQuestion: string | null }): {
   countsAsAnswer: boolean;
