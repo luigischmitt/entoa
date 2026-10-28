@@ -297,10 +297,12 @@ const pageMain = "mx-auto w-full min-w-0 max-w-6xl px-4 py-8 pb-36 sm:px-8 sm:py
 function HomeView({
   onStart,
   onProgress,
+  onOpenReport,
   onVoice,
 }: {
   onStart: () => void;
   onProgress: () => void;
+  onOpenReport: (interviewId: string) => void;
   onVoice: () => void;
 }) {
   const { locale, t } = useLocale();
@@ -372,12 +374,16 @@ function HomeView({
                   <p className="ds-kicker">{t("Sua última entrevista")}</p>
                   <p className="ds-small">{lastInterviewDate ?? t("Data não disponível")}</p>
                 </div>
-                <blockquote className="shl-home-takeaway">
-                  {insights.lastTakeaway ?? t(insights.lastReportReady ? "O relatório desta entrevista está disponível no seu progresso." : "A análise desta entrevista ainda não está disponível.")}
-                </blockquote>
+                <p className="shl-home-priority">
+                  {insights.lastPriority ?? t(insights.lastReportReady ? "Abra o relatório para ver o que praticar." : "A análise desta entrevista ainda não está disponível.")}
+                </p>
                 <div className="ds-hairline-top shl-home-card-foot">
-                  <button type="button" className="shl-home-link" onClick={onProgress}>
-                    {t("Ver relatório e progresso")} <ArrowUpRight className="ds-arrow size-4" aria-hidden="true" />
+                  <button
+                    type="button"
+                    className="shl-home-link"
+                    onClick={() => (insights.lastInterviewId ? onOpenReport(insights.lastInterviewId) : onProgress())}
+                  >
+                    {t("Ver relatório")} <ArrowUpRight className="ds-arrow size-4" aria-hidden="true" />
                   </button>
                 </div>
               </>
@@ -609,6 +615,7 @@ export default function App({ initialView = "home" }: { initialView?: InitialVie
   const dashboardPrefetchStarted = useRef(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [startError, setStartError] = useState(false);
+  const [initialReportId, setInitialReportId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
@@ -695,6 +702,10 @@ export default function App({ initialView = "home" }: { initialView?: InitialVie
             <HomeView
               onStart={() => navigate("interview-setup")}
               onProgress={() => navigate("progress")}
+              onOpenReport={(id) => {
+                setInitialReportId(id);
+                navigate("progress");
+              }}
               onVoice={() => navigate("voice")}
             />
           )}
@@ -716,7 +727,13 @@ export default function App({ initialView = "home" }: { initialView?: InitialVie
               }}
             />
           )}
-          {view === "progress" && <ProgressView onStart={() => navigate("interview-setup")} />}
+          {view === "progress" && (
+            <ProgressView
+              onStart={() => navigate("interview-setup")}
+              initialReportId={initialReportId}
+              onInitialReportOpened={() => setInitialReportId(null)}
+            />
+          )}
           {view === "voice" && <VoiceView onStart={() => navigate("interview-setup")} />}
           {view === "settings" && <SettingsView />}
           {view === "admin-usage" && isAdmin && <AdminUsageView />}

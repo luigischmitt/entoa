@@ -1,8 +1,8 @@
-export async function requestPersistedReport(interviewId, azureSummary, locale, fetcher, endpoint) {
+export async function requestPersistedReport(interviewId, azureSummary, locale, fetcher, endpoint, options = {}) {
   const response = await fetcher(`${endpoint}/api/v1/thinking/report/interview/${encodeURIComponent(interviewId)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ locale, azureSummary }),
+    body: JSON.stringify({ locale, azureSummary, ...(options.regenerate ? { regenerate: true } : {}) }),
   });
   const body = await response.json().catch(() => null);
   if (!response.ok || body?.status !== "ready" || !body.report) {

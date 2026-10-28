@@ -92,8 +92,9 @@ const rateCopy = (name, oldValue, newValue) => {
 const formatNumber = (value) => value.toFixed(1).replace(/\.0$/, "").replace(".", ",");
 
 /** Compare this ready report with the newest previous completed report. */
-export function buildReportDeltas(current, currentAzure, records = [], currentInterviewId, currentAnswerCount = 0) {
-  const previous = records.filter((record) => record.id !== currentInterviewId && record.status === "completed" && analysisOf(record))
+export function buildReportDeltas(current, currentAzure, records = [], currentInterviewId, currentAnswerCount = 0, currentAnalysisVersion) {
+  const sameVersion = (record) => currentAnalysisVersion === undefined || currentAnalysisVersion === null || record.feedback?.analysisVersion === currentAnalysisVersion;
+  const previous = records.filter((record) => record.id !== currentInterviewId && record.status === "completed" && analysisOf(record) && sameVersion(record))
     .sort((a, b) => Date.parse(b.completedAt ?? b.createdAt) - Date.parse(a.completedAt ?? a.createdAt))[0];
   if (!previous) return [];
   const before = analysisOf(previous);

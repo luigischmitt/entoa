@@ -37,7 +37,22 @@ test("summarizes only persisted home information from the latest completed inter
   assert.equal(result.lastReportReady, true);
   assert.equal(result.lastTakeaway, "Você conectou a decisão técnica ao impacto.");
   assert.deepEqual(result.topPattern, { type: "Gramática", suggestion: "Use goes" });
+  assert.equal(result.lastInterviewId, "latest");
+  assert.equal(result.lastPriority, null);
   assert.equal("voiceFocus" in result, false);
+});
+
+test("uses the first non-empty priority focus of the latest interview", () => {
+  const latest = record("latest", "2026-02-10T10:00:00.000Z", {
+    priorities: [
+      { focus: "   " },
+      { focus: "  Responda primeiro com a decisão técnica.  " },
+      { focus: "Use the present perfect." },
+    ],
+  });
+  const result = buildHomeInsights([latest]);
+  assert.equal(result.lastInterviewId, "latest");
+  assert.equal(result.lastPriority, "Responda primeiro com a decisão técnica.");
 });
 
 test("keeps the first-practice state empty and does not manufacture voice data", () => {
@@ -46,6 +61,8 @@ test("keeps the first-practice state empty and does not manufacture voice data",
     lastInterviewAt: null,
     lastReportReady: false,
     lastTakeaway: null,
+    lastInterviewId: null,
+    lastPriority: null,
     topPattern: null,
   });
 });

@@ -246,7 +246,7 @@ describe("consolidation service", () => {
     expect(result.englishCommunication.patterns[0]?.why).toBe(why);
   });
 
-  it("returns the exact InterviewReport v2 shape with one small request", async () => {
+  it("returns the exact InterviewReport v3 shape with one small request", async () => {
     const { bodies, fetchImplementation } = capture(consolidationOutput);
     const result = await makeService(fetchImplementation).consolidate(consolidationInput);
     expect(bodies).toHaveLength(1);
@@ -264,7 +264,7 @@ describe("consolidation service", () => {
     expect(bodies[0].messages[0].content).toContain("Do not lower clarity because of garbled");
     expect(Object.keys(result).sort()).toEqual(["analysisVersion", "englishCommunication", "evidenceReview", "interviewerTakeaway", "model", "priorities", "technicalContent"]);
     expect(result.interviewerTakeaway).toEqual(consolidationOutput.interviewerTakeaway);
-    expect(result.analysisVersion).toBe("v2");
+    expect(result.analysisVersion).toBe("v3");
     expect(result.model).toBe(defaultThinkingModel);
     expect(result.technicalContent).toEqual({ summary: consolidationOutput.summary, strengths: [strength2], gaps: [gap4] });
     expect(result.englishCommunication).toEqual({ clarity: "MOSTLY_CLEAR", evidenceStatus: "LIMITED", patterns: [pattern2] });
@@ -398,7 +398,7 @@ describe("consolidation service", () => {
 
 describe("incremental report routes", () => {
   const turnResult = { ...analyses[0], model: defaultThinkingModel };
-  const consolidated = { technicalContent: { summary: "Resumo.", strengths: [], gaps: [] }, englishCommunication: { clarity: "CLEAR", evidenceStatus: "NO_PATTERN_FOUND", patterns: [] }, priorities: [], model: defaultThinkingModel, analysisVersion: "v2" };
+  const consolidated = { technicalContent: { summary: "Resumo.", strengths: [], gaps: [] }, englishCommunication: { clarity: "CLEAR", evidenceStatus: "NO_PATTERN_FOUND", patterns: [] }, priorities: [], model: defaultThinkingModel, analysisVersion: "v3" };
   const makeApp = () => {
     const reportService = { generate: vi.fn(), analyzeTurn: vi.fn(async () => turnResult), consolidate: vi.fn(async () => consolidated) };
     return { reportService, app: createApp({ speechConfig, reportService: reportService as never }) };

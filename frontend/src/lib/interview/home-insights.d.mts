@@ -5,6 +5,8 @@ export type HomeInsights = {
   lastInterviewAt: string | null;
   lastReportReady: boolean;
   lastTakeaway: string | null;
+  lastInterviewId: string | null;
+  lastPriority: string | null;
   topPattern: { type: string | null; suggestion: string } | null;
 };
 
