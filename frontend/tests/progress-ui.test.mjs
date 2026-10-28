@@ -19,9 +19,11 @@ test("Progress lets candidates navigate between available examples accessibly", 
 test("Progress keeps the prioritized study topics from the previous experience", async () => {
   const source = await readFile(new URL("src/app/components/progress/progress-content.tsx", root), "utf8");
   assert.match(source, /insights\.studyTopics\.slice\(0, 3\)/);
-  assert.match(source, /Exercício sugerido no relatório/);
-  assert.match(source, /Sugestão de exercício geral/);
   assert.match(source, /Seus focos atuais/);
+  assert.match(source, /<ol className="pg-prio-list">/);
+  assert.match(source, /data-primary=\{index === 0 \|\| undefined\}/);
+  assert.match(source, /className="pg-prio-tip">\{topic\.exercise\}/);
+  assert.doesNotMatch(source, /Outros focos|Observado nos relatórios|Exercício sugerido no relatório|Sugestão de exercício geral/);
 });
 
 test("Progress keeps revealed sections visible and restores the list position after closing a report", async () => {

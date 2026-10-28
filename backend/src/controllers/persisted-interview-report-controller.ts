@@ -1,5 +1,6 @@
 import type { RequestHandler } from "express";
 import type { GeneratePersistedReportInput } from "../thinking/persisted-interview-report.js";
+import { isAdmin } from "../routes/admin.routes.js";
 
 export type PersistedReportGenerator = {
   generate(token: string, interviewId: string, input: GeneratePersistedReportInput, ownerKey: string): Promise<unknown>;
@@ -26,7 +27,7 @@ function tokenFrom(request: Parameters<RequestHandler>[0]): string | null {
   return match?.[1] ?? null;
 }
 
-export function createPersistedInterviewReportController(generator: PersistedReportGenerator | null): RequestHandler {
+export function createPersistedInterviewReportController(generator: PersistedReportGenerator | null, adminUserIds = process.env.ADMIN_USER_IDS): RequestHandler {
   return async (request, response) => {
     if (!generator) {
       response.status(503).json({ error: { code: "REPORT_UNAVAILABLE", message: "The report service is unavailable right now." } });
@@ -55,6 +56,10 @@ export function createPersistedInterviewReportController(generator: PersistedRep
       const authenticatedUser = response.locals.authenticatedUser as { userId?: string } | undefined;
       if (!authenticatedUser?.userId) {
         response.status(401).json({ error: { code: "UNAUTHENTICATED", message: "Entre novamente para gerar este relatório." } });
+        return;
+      }
+      if (body.regenerate === true && !isAdmin(authenticatedUser.userId, adminUserIds)) {
+        response.status(403).json({ error: { code: "FORBIDDEN", message: "Acesso administrativo necessário." } });
         return;
       }
       const result = await generator.generate(token, interviewId, {

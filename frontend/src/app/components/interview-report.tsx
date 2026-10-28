@@ -64,9 +64,22 @@ function CapturedAnswers({ turns }: { turns: Turns }) {
 function SectionHead({ title, hint, screenOnlyHint = false }: { title: string; hint?: string; screenOnlyHint?: boolean }) {
   return (
     <header className="rp-sh">
-      <h2 className="rp-ph">{t(title)}</h2>
+      <h3 className="rp-ph">{t(title)}</h3>
       {hint && <p className={`rp-phint${screenOnlyHint ? " rp-noprint" : ""}`}>{t(hint)}</p>}
     </header>
+  );
+}
+
+/** A report part: a larger serif heading that groups related sections (Seu inglês, Conteúdo técnico). */
+function ReportPart({ title, hint, children, style }: { title: string; hint?: string; children: ReactNode; style?: CSSProperties }) {
+  return (
+    <section className="rp-part ds-item" style={style}>
+      <header className="rp-part-head">
+        <h2 className="rp-part-title">{t(title)}</h2>
+        {hint && <p className="rp-part-hint">{t(hint)}</p>}
+      </header>
+      <div className="rp-part-body">{children}</div>
+    </section>
   );
 }
 
@@ -131,138 +144,141 @@ function ReadyDocument({ model, jobItems, dateLabel }: { model: ReadyModel; jobI
           {model.coverageNotice && <p className="rp-pnote">{t(model.coverageNotice)}</p>}
         </section>
       )}
-      {model.strengths.length > 0 && (
-        <section className="rp-pblock ds-item" style={rise(1)}>
-          <SectionHead title="O que funcionou" hint="Pontos técnicos que você mostrou bem." />
-          <ul className="rp-good">
-            {model.strengths.map((item, index) => <li key={index}>{item.explanation}</li>)}
-          </ul>
-        </section>
-      )}
-      <section className="rp-pblock rp-pblock-long ds-item" style={rise(2)}>
-        <SectionHead title="Seus erros de inglês" hint="O que você disse e como fica natural em inglês." />
-        {errorRows.length > 0 ? (
-          <>
-            <div className="rp-errh" aria-hidden="true"><span>{t("Você disse")}</span><span>{t("O certo")}</span></div>
-            <ul className={`rp-errs${showAllErrors ? " is-all" : ""}`}>
-              {errorRows.map((row, index) => {
-                const meta = [row.note, refLabel(row.sequenceNumber === undefined ? null : reference(row.sequenceNumber))].filter(Boolean).join(" · ");
-                return (
-                  <li key={`${row.sequenceNumber}-${index}`} className={index >= maxVisibleErrors ? "rp-extra" : undefined}>
-                    <p lang="en" className="rp-said">
-                      {mergeChanged(row.said).map((part, partIndex) => part.changed ? <s key={partIndex}>{part.text}</s> : <span key={partIndex}>{part.text}</span>)}
-                    </p>
-                    <p lang="en" className="rp-right">
-                      {mergeChanged(row.right).map((part, partIndex) => part.changed ? <u key={partIndex}>{part.text}</u> : <span key={partIndex}>{part.text}</span>)}
-                    </p>
-                    {meta && <small>{meta}</small>}
-                  </li>
-                );
-              })}
-            </ul>
-            {errorRows.length > maxVisibleErrors && (
-              <button type="button" className="rp-inline-button rp-noprint" aria-expanded={showAllErrors} onClick={() => setShowAllErrors((value) => !value)}>
-                {showAllErrors ? t("Ver menos") : t("Ver todos os {n} erros", { n: errorRows.length })}
-              </button>
-            )}
-          </>
-        ) : (
-          <p className="rp-pnote">{t("Nenhum erro de inglês recorrente apareceu nesta entrevista.")}</p>
-        )}
-      </section>
-      <section className="rp-pblock ds-item" style={rise(3)}>
-        <SectionHead title="Notas da sua voz" hint="Como sua fala soou: ritmo, pausas e pronúncia." />
-        {hasVoice ? (
-          <>
-            <ul className="rp-voice">
-              {model.voiceNotes.map((note) => (
-                <li key={note.key} style={{ "--p": `${note.value ?? 0}%` } as CSSProperties}>
-                  <b>{note.value ?? "—"}</b>
-                  <span>{t(note.label)}</span>
-                  <small>{t(note.measure)}</small>
-                </li>
-              ))}
-            </ul>
-            <p className="rp-pnote">{t("De 0 a 100. A análise não avalia sotaque.")}</p>
-          </>
-        ) : (
-          <p className="rp-pnote">{t("Sem sinais de voz suficientes nesta entrevista.")}</p>
-        )}
-        {voiceFacts && (
-          <div className="rp-voice-detail">
-            <p className="rp-psub">{t("Ritmo da fala")}</p>
-            <p className="rp-vfacts">
-              {voiceFacts.wordsPerMinute} {t("palavras/min")} · {voiceFacts.pauseCount} {t("pausas")}
-              {voiceFacts.longestPauseMs >= 1_000 ? <> · {t("pausa mais longa de ")}{Math.round(voiceFacts.longestPauseMs / 100) / 10} {t("s")}</> : null}
-              {voiceFacts.fillerCount > 0 ? <> · {voiceFacts.fillerCount} {t("hesitações")}</> : null}
-            </p>
-            <p className="rp-vinsight">{voiceFacts.insights.map((item, index) => <span key={item.key}>{index > 0 ? " " : ""}{t(item.key, item.values)}</span>)}</p>
-          </div>
-        )}
-        {pronunciation.length > 0 && (
-          <div className="rp-voice-detail">
-            <p className="rp-psub">{t("Palavras para revisar a pronúncia")}</p>
-            <ul className="rp-words">
-              {pronunciation.map((item) => (
-                <li key={item.word}>
-                  <b lang="en">{item.word}</b>
-                  <span>{t(phonemeTip(item.worstPhoneme, item.word))}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </section>
-      <section className="rp-pblock rp-pblock-long ds-item" style={rise(4)}>
-          <SectionHead title="Suas lacunas técnicas" hint="O que um entrevistador esperava ouvir e como responder da próxima vez." />
-          {model.gaps.length > 0 ? (
-          <ul className="rp-gaps">
-            {model.gaps.map((gap, index) => (
-              <li key={`${gap.sequenceNumber}-${index}`}>
-                {gap.question && <p className="rp-gap-q"><span>{t("Pergunta {n}", { n: gap.ordinal ?? gap.sequenceNumber })}</span> <span lang="en">{gap.question}</span></p>}
-                <p className="rp-gap-miss">{gap.explanation}</p>
-                {gap.howToAnswer && <p className="rp-gap-how"><b>{t("Como responder:")}</b> {gap.howToAnswer}</p>}
-              </li>
-            ))}
-          </ul>
+      <ReportPart title="Seu inglês" hint="Como seu inglês soou para o entrevistador." style={rise(1)}>
+        <section className="rp-pblock rp-pblock-long">
+          <SectionHead title="Seus erros de inglês" hint="O que você disse e como fica natural em inglês." />
+          {errorRows.length > 0 ? (
+            <>
+              <div className="rp-errh" aria-hidden="true"><span>{t("Você disse")}</span><span>{t("O certo")}</span></div>
+              <ul className={`rp-errs${showAllErrors ? " is-all" : ""}`}>
+                {errorRows.map((row, index) => {
+                  const meta = [row.note, refLabel(row.sequenceNumber === undefined ? null : reference(row.sequenceNumber))].filter(Boolean).join(" · ");
+                  return (
+                    <li key={`${row.sequenceNumber}-${index}`} className={index >= maxVisibleErrors ? "rp-extra" : undefined}>
+                      <p lang="en" className="rp-said">
+                        {mergeChanged(row.said).map((part, partIndex) => part.changed ? <s key={partIndex}>{part.text}</s> : <span key={partIndex}>{part.text}</span>)}
+                      </p>
+                      <p lang="en" className="rp-right">
+                        {mergeChanged(row.right).map((part, partIndex) => part.changed ? <u key={partIndex}>{part.text}</u> : <span key={partIndex}>{part.text}</span>)}
+                      </p>
+                      {meta && <small>{meta}</small>}
+                    </li>
+                  );
+                })}
+              </ul>
+              {errorRows.length > maxVisibleErrors && (
+                <button type="button" className="rp-inline-button rp-noprint" aria-expanded={showAllErrors} onClick={() => setShowAllErrors((value) => !value)}>
+                  {showAllErrors ? t("Ver menos") : t("Ver todos os {n} erros", { n: errorRows.length })}
+                </button>
+              )}
+            </>
           ) : (
-            <p className="rp-pnote">{t("Nenhuma lacuna técnica relevante nesta entrevista.")}</p>
+            <p className="rp-pnote">{t("Nenhum erro de inglês recorrente apareceu nesta entrevista.")}</p>
           )}
         </section>
-      {jobItems.length > 0 && (
-        <section className="rp-pblock ds-item" style={rise(5)}>
-          <SectionHead title="Ligado à vaga" hint="Competências da vaga que a entrevista testou." />
-          <ul className="rp-job">
-            {jobItems.map((item) => (
-              <li key={item.competency} data-status={item.status}>
-                <b>{item.competency}</b>
-                <span>{t(jobStatusLabels[item.status])}</span>
-              </li>
-            ))}
-          </ul>
+        <section className="rp-pblock">
+          <SectionHead title="Notas da sua voz" hint="Como sua fala soou: ritmo, pausas e pronúncia." />
+          {hasVoice ? (
+            <>
+              <ul className="rp-voice">
+                {model.voiceNotes.map((note) => (
+                  <li key={note.key} style={{ "--p": `${note.value ?? 0}%` } as CSSProperties}>
+                    <b>{note.value ?? "—"}</b>
+                    <span>{t(note.label)}</span>
+                    <small>{t(note.measure)}</small>
+                  </li>
+                ))}
+              </ul>
+              <p className="rp-pnote">{t("De 0 a 100. A análise não avalia sotaque.")}</p>
+            </>
+          ) : (
+            <p className="rp-pnote">{t("Sem sinais de voz suficientes nesta entrevista.")}</p>
+          )}
+          {voiceFacts && (
+            <div className="rp-voice-detail">
+              <p className="rp-psub">{t("Ritmo da fala")}</p>
+              <p className="rp-vfacts">
+                {voiceFacts.wordsPerMinute} {t("palavras/min")} · {voiceFacts.pauseCount} {t("pausas")}
+                {voiceFacts.longestPauseMs >= 1_000 ? <> · {t("pausa mais longa de ")}{Math.round(voiceFacts.longestPauseMs / 100) / 10} {t("s")}</> : null}
+                {voiceFacts.fillerCount > 0 ? <> · {voiceFacts.fillerCount} {t("hesitações")}</> : null}
+              </p>
+              <p className="rp-vinsight">{voiceFacts.insights.map((item, index) => <span key={item.key}>{index > 0 ? " " : ""}{t(item.key, item.values)}</span>)}</p>
+            </div>
+          )}
+          {pronunciation.length > 0 && (
+            <div className="rp-voice-detail">
+              <p className="rp-psub">{t("Palavras para revisar a pronúncia")}</p>
+              <ul className="rp-words">
+                {pronunciation.map((item) => (
+                  <li key={item.word}>
+                    <b lang="en">{item.word}</b>
+                    <span>{t(phonemeTip(item.worstPhoneme, item.word))}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </section>
-      )}
-      {model.priorities.length > 0 && (
-        <section className="rp-pblock ds-item" style={rise(6)}>
-          <SectionHead title="Prioridades para praticar" hint="Por onde começar antes da próxima entrevista." />
-          <ol className="rp-prio">
-            {model.priorities.map((item, index) => {
-              const areaText = item.area === "english" ? t("Inglês") : t("Conteúdo técnico");
-              return (
-                <li key={index}>
-                  <b>{item.count !== null ? t(item.title) : item.title}</b>
-                  <span>
-                    {item.count !== null
-                      ? (item.count === 1 ? t("1 vez") : t("{n} vezes", { n: item.count }))
-                      : [areaText, refLabel(item.sequenceNumber === null ? null : reference(item.sequenceNumber))].filter(Boolean).join(" · ")}
-                  </span>
+      </ReportPart>
+      <ReportPart title="Conteúdo técnico" hint="O que suas respostas mostraram e o que faltou." style={rise(2)}>
+        {model.strengths.length > 0 && (
+          <section className="rp-pblock">
+            <SectionHead title="O que funcionou" hint="Pontos técnicos que você mostrou bem." />
+            <ul className="rp-good">
+              {model.strengths.map((item, index) => <li key={index}>{item.explanation}</li>)}
+            </ul>
+          </section>
+        )}
+        <section className="rp-pblock rp-pblock-long">
+            <SectionHead title="Suas lacunas técnicas" hint="O que um entrevistador esperava ouvir e como responder da próxima vez." />
+            {model.gaps.length > 0 ? (
+            <ul className="rp-gaps">
+              {model.gaps.map((gap, index) => (
+                <li key={`${gap.sequenceNumber}-${index}`}>
+                  {gap.question && <p className="rp-gap-q"><span>{t("Pergunta {n}", { n: gap.ordinal ?? gap.sequenceNumber })}</span> <span lang="en">{gap.question}</span></p>}
+                  <p className="rp-gap-miss">{gap.explanation}</p>
+                  {gap.howToAnswer && <p className="rp-gap-how"><b>{t("Como responder:")}</b> {gap.howToAnswer}</p>}
                 </li>
-              );
-            })}
-          </ol>
-        </section>
+              ))}
+            </ul>
+            ) : (
+              <p className="rp-pnote">{t("Nenhuma lacuna técnica relevante nesta entrevista.")}</p>
+            )}
+          </section>
+        {jobItems.length > 0 && (
+          <section className="rp-pblock">
+            <SectionHead title="Ligado à vaga" hint="Competências da vaga que a entrevista testou." />
+            <ul className="rp-job">
+              {jobItems.map((item) => (
+                <li key={item.competency} data-status={item.status}>
+                  <b>{item.competency}</b>
+                  <span>{t(jobStatusLabels[item.status])}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </ReportPart>
+      {model.priorities.length > 0 && (
+        <ReportPart title="Prioridades para praticar" hint="Por onde começar antes da próxima entrevista." style={rise(3)}>
+              <ol className="rp-prio">
+                {model.priorities.map((item, index) => {
+                  const areaText = item.area === "english" ? t("Inglês") : t("Conteúdo técnico");
+                  return (
+                    <li key={index}>
+                      <b>{item.count !== null ? t(item.title) : item.title}</b>
+                      <span>
+                        {item.count !== null
+                          ? (item.count === 1 ? t("1 vez") : t("{n} vezes", { n: item.count }))
+                          : [areaText, refLabel(item.sequenceNumber === null ? null : reference(item.sequenceNumber))].filter(Boolean).join(" · ")}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ol>
+        </ReportPart>
       )}
-      <footer className="rp-pfoot ds-item" style={rise(7)}>
+      <footer className="rp-pfoot ds-item" style={rise(4)}>
         {t("Entoa · Gerado a partir da sua entrevista simulada de {date}", { date: dateLabel })}
       </footer>
     </>

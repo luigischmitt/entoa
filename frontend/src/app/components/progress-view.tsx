@@ -34,10 +34,12 @@ export function ProgressView({
   onStart,
   initialReportId,
   onInitialReportOpened,
+  canRegenerateReports = false,
 }: {
   onStart?: () => void;
   initialReportId?: string | null;
   onInitialReportOpened?: () => void;
+  canRegenerateReports?: boolean;
 } = {}) {
   const { locale } = useLocale();
   const cachedRecords = readDashboardCache("progress") as ProgressRecord[] | undefined;
@@ -247,7 +249,7 @@ export function ProgressView({
                 historical
                 onRetry={() => { void generateHistoricalReport(selectedSession.id); }}
                 retrying={retryingSessionId === selectedSession.id}
-                canRegenerate={selectedSession.feedback?.status === "ready" && selectedSession.feedback?.analysisVersion !== currentReportAnalysisVersion}
+                canRegenerate={canRegenerateReports && selectedSession.feedback?.status === "ready" && selectedSession.feedback?.analysisVersion !== currentReportAnalysisVersion}
                 onRegenerate={() => { void generateHistoricalReport(selectedSession.id, { regenerate: true }); }}
               />
             </div>

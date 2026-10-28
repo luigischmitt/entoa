@@ -2,7 +2,7 @@
 
 
 import { getCurrentLocale, t } from "@/lib/locale";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { ArrowDownRight, ArrowRight, ArrowUpRight, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { minAnswersForProfile, minSessionsForTrends } from "@/lib/interview/progress-insights.mjs";
@@ -12,7 +12,6 @@ import type {
   ProgressInsights,
   ProgressRecord,
   ProgressSessionRow,
-  ProgressStudyTopic,
 } from "@/lib/interview/progress-insights.mjs";
 import { mergeVoiceSeries, voiceMetricSummary, voiceTrendCopy, voiceTrendMetrics, type VoiceTrendMetric } from "@/lib/interview/voice-trend.mjs";
 import { SlidingSegmented } from "@/components/ui/sliding-segmented";
@@ -173,8 +172,21 @@ function VoiceTrendView({ insights }: { insights: ProgressInsights }) {
   );
 }
 
+/** After switching views, bring the switch and the charts under it to the middle of the screen (top-aligned when taller). */
+function centerHeroStage(body: HTMLElement | null) {
+  const stageTop = (body?.previousElementSibling ?? body)?.getBoundingClientRect().top;
+  const bottom = body?.getBoundingClientRect().bottom;
+  if (stageTop === undefined || bottom === undefined) return;
+  const header = 80; // sticky top bar (4rem) plus breathing room
+  const room = window.innerHeight - header;
+  const offset = Math.max(0, (room - (bottom - stageTop)) / 2);
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  window.scrollTo({ top: window.scrollY + stageTop - header - offset, behavior: reduce ? "auto" : "smooth" });
+}
+
 export function ProgressHero({ insights }: { insights: ProgressInsights }) {
   const [view, setView] = useState<"profile" | "trend">("profile");
+  const bodyRef = useRef<HTMLDivElement>(null);
   return (
     <section className="pg-hero" aria-labelledby="pg-hero-title">
       <div className="pg-hero-head">
@@ -196,10 +208,14 @@ export function ProgressHero({ insights }: { insights: ProgressInsights }) {
         ariaLabel={t("O que mostrar")}
         options={[{ value: "profile", label: t("Perfil") }, { value: "trend", label: t("Evolução da voz") }]}
         value={view}
-        onChange={(value) => setView(value as "profile" | "trend")}
+        onChange={(value) => {
+          setView(value as "profile" | "trend");
+          // Wait for the new view to lay out so its real height is measured.
+          window.requestAnimationFrame(() => window.requestAnimationFrame(() => centerHeroStage(bodyRef.current)));
+        }}
         className="pg-view-switch grid-cols-2"
       />
-      <div className="pg-hero-body">{view === "profile" ? <ProfileView insights={insights} /> : <VoiceTrendView insights={insights} />}</div>
+      <div ref={bodyRef} className="pg-hero-body">{view === "profile" ? <ProfileView insights={insights} /> : <VoiceTrendView insights={insights} />}</div>
     </section>
   );
 }
@@ -345,25 +361,12 @@ export function EnglishPatterns({ insights }: { insights: ProgressInsights }) {
 
 /* ----------------------------------------------------------- Study topics */
 
-function TopicItem({ topic, primary = false }: { topic: ProgressStudyTopic; primary?: boolean }) {
-  const focus = topic.focuses[0];
-  return (
-    <li className={`pg-topic${primary ? " pg-topic-primary" : " pg-topic-secondary"}`}>
-      {primary && <span className="pg-topic-rank" aria-hidden="true">{topic.rank}</span>}
-      <div className="min-w-0">
-        <p className="pg-topic-kind">{primary ? t("Foco principal") : t("Outro foco")} · {t(topic.kind === "technical" ? "Conteúdo técnico" : "Inglês")} · {getCurrentLocale() === "en" ? plural(topic.sessionCount, "practice", "practices") : `em ${plural(topic.sessionCount, "prática", "práticas")}`}</p>
-        <h3 className="pg-topic-title">{t(topic.title)}</h3>
-        {primary && focus && <p className="pg-topic-evidence"><span>{t("Observado nos relatórios:")}</span> {focus}</p>}
-        <p className="pg-topic-source">{t(topic.exerciseSource === "report" ? "Exercício sugerido no relatório" : "Sugestão de exercício geral")}</p>
-        <p className="pg-topic-exercise">{topic.exercise}</p>
-      </div>
-    </li>
-  );
+function focusCountText(sessionCount: number) {
+  return getCurrentLocale() === "en" ? plural(sessionCount, "practice", "practices") : `em ${plural(sessionCount, "prática", "práticas")}`;
 }
 
 export function StudyTopics({ insights }: { insights: ProgressInsights }) {
   const topics = insights.studyTopics.slice(0, 3);
-  const [primary, ...others] = topics;
   return (
     <section aria-labelledby="pg-topics" className="pg-section">
       <div className="ds-sec-head">
@@ -371,19 +374,22 @@ export function StudyTopics({ insights }: { insights: ProgressInsights }) {
           <p className="ds-kicker">{t("Prioridades")}</p>
           <h2 id="pg-topics" className="ds-section-title">{t("Seus focos atuais")}</h2>
         </div>
-        <p className="ds-lead">{t("Focos priorizados pelo que aparece nos seus relatórios. Eles podem mudar quando novas práticas forem analisadas.")}</p>
+        <p className="ds-lead">{t("O que mais se repete nos seus relatórios, em ordem de prioridade.")}</p>
       </div>
       {topics.length === 0
         ? <p className="pg-note">{t("Seus focos aparecem depois que o primeiro relatório fica pronto.")}</p>
-        : <>
-          <ol className="pg-topics pg-topics-primary-list"><TopicItem key={primary.id} topic={primary} primary /></ol>
-          {others.length > 0 && <div className="pg-topics-others">
-            <h3 className="pg-topics-others-title">{t("Outros focos")}</h3>
-            <ol className="pg-topics">
-              {others.map((topic) => <TopicItem key={topic.id} topic={topic} />)}
-            </ol>
-          </div>}
-        </>}
+        : <ol className="pg-prio-list">
+          {topics.map((topic, index) => (
+            <li key={topic.id} className="pg-prio" data-primary={index === 0 || undefined}>
+              <span className="pg-prio-n" aria-hidden="true">{topic.rank}</span>
+              <div className="pg-prio-body">
+                <h3 className="pg-prio-title">{t(topic.title)}</h3>
+                <p className="pg-prio-tip">{topic.exercise}</p>
+                <p className="pg-prio-meta">{t(topic.kind === "technical" ? "Conteúdo técnico" : "Inglês")} · {focusCountText(topic.sessionCount)}</p>
+              </div>
+            </li>
+          ))}
+        </ol>}
     </section>
   );
 }
@@ -493,7 +499,7 @@ function PreviousInterviewDeltas({ records }: { records: ProgressRecord[] }) {
     <section className="ds-card pg-compare px-5 pb-5 pt-5 sm:px-6" aria-labelledby="pg-compare">
       <h2 id="pg-compare" className="ds-card-title">{t("Desde a entrevista anterior")}</h2>
       <ul className="pg-compare-list mt-3">
-        {deltas.map((delta) => <li key={delta.label} className="pg-compare-row" data-change={delta.change}>{t(delta.label)}</li>)}
+        {deltas.map((delta) => <li key={delta.label} className="pg-compare-row" data-change={delta.change}>{t(delta.template, { before: delta.before, after: delta.after })}</li>)}
       </ul>
     </section>
   );
