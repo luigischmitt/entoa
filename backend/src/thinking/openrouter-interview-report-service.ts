@@ -35,7 +35,7 @@ type OpenRouterResponse = { provider?: unknown; choices?: Array<{ finish_reason?
 
 const promptRules = {
   intro: "You write a practical final report for a technical job interview practice session conducted in English.",
-  technical: "Review each question and its answer as a separate pair. In technicalContent.strengths, state the relevant part the candidate actually answered; report at most 2 strengths per answer and 5 in total, one per distinct point. Recognize every concrete, well-explained technical decision, trade-off, metric, debugging step or outcome, not just tool mentions, and each must be a real demonstrated competency (a decision, a piece of reasoning, or a result), never \"mentioned technology X\", \"worked on several projects\", or a bare list of tools. Report technical gaps sparingly: at most 1 per answer and 4 in total, and ONLY material ones, meaning something a real interviewer for that role and seniority would consider important to answer THAT question well (missing core reasoning, a wrong concept, or no result or trade-off when the question asks for one). If the answer covered the question reasonably, return no gaps; empty gaps is the expected outcome for a good answer. Never list optional details the candidate simply did not mention (for example how an API was integrated, how data was separated, or how conflicts were avoided, when the question did not ask), nitpicks, generic \"could have mentioned X\" items, or gaps about things outside the question. Do not demand more detail, criteria, process steps, checks, metrics, rollback steps, or trade-offs unless the question explicitly asks for them. If a concrete action or decision addresses the topic, do not claim in the summary that the topic was unanswered. Cite the matching sequenceNumber and a short exact excerpt from that answer for every item. A gap is about missing explanation, not proof that the candidate lacks knowledge. Gaps must be about what the question asked: never report how something was integrated, implemented or built as a gap unless the question asked for it (for example, a question about which technologies were used does not ask how an API was integrated), and never build a priority on such a point. Never say something was not explained when the answer gives a reason, an action or a source for it, even a brief one (for example, reading books and testing on real images is a reason); at most suggest more depth. Never turn an English grammar, vocabulary, or phrasing error into a technical gap. Prefer the shortest clean sub-span as evidence: when an answer is noisy, cite only the clean part that carries the decision (for example \"substitute that for my mean of my values\"), never a stuttering or garbled stretch around it; a noisy answer can still hold a real, citeable decision such as imputing missing values with the mean. When the question asks how something was handled and the answer states a method with a well-known material limitation (for example, replacing values with the mean is sensitive to outliers), one gap may name that limitation, such as why the mean and not the median, or how the changed rows were flagged.",
+  technical: "Review each question and its answer as a separate pair. In technicalContent.strengths, state the relevant part the candidate actually answered; report at most 2 strengths per answer and 5 in total, one per distinct point. Recognize every concrete, well-explained technical decision, trade-off, metric, debugging step or outcome, not just tool mentions, and each must be a real demonstrated competency (a decision, a piece of reasoning, or a result), never \"mentioned technology X\", \"worked on several projects\", or a bare list of tools. Report every material technical gap, at most 2 per answer: something a real interviewer for that role and seniority would expect in order to answer THAT question well (missing core reasoning, a wrong concept, a vague claim with no concrete criterion, number, example or result when the question asks how, why, how you ensured, validated or measured something, or an answer that does not address what was asked). If the answer fully covered the question, return no gaps. Never list optional details the candidate simply did not mention (for example how an API was integrated, how data was separated, or how conflicts were avoided, when the question did not ask), nitpicks, generic \"could have mentioned X\" items, or gaps about things outside the question. Do not demand process steps, checks, rollback steps or trade-offs the question did not ask for; but when the question asks how something was ensured, validated, compared or decided, an answer without the concrete criterion or result is a material gap. For every gap also write howToAnswer: one sentence in the report locale saying concretely what a strong answer would add for this project, built only on what the candidate said (for example: Diga quais valores de GLCM você comparou e que diferença considerou aceitável). If a concrete action or decision addresses the topic, do not claim in the summary that the topic was unanswered. Cite the matching sequenceNumber and a short exact excerpt from that answer for every item. A gap is about missing explanation, not proof that the candidate lacks knowledge. Gaps must be about what the question asked: never report how something was integrated, implemented or built as a gap unless the question asked for it (for example, a question about which technologies were used does not ask how an API was integrated), and never build a priority on such a point. Never say something was not explained when the answer gives a reason, an action or a source for it, even a brief one (for example, reading books and testing on real images is a reason); at most suggest more depth. Never turn an English grammar, vocabulary, or phrasing error into a technical gap. Prefer the shortest clean sub-span as evidence: when an answer is noisy, cite only the clean part that carries the decision (for example \"substitute that for my mean of my values\"), never a stuttering or garbled stretch around it; a noisy answer can still hold a real, citeable decision such as imputing missing values with the mean. When the question asks how something was handled and the answer states a method with a well-known material limitation (for example, replacing values with the mean is sensitive to outliers), one gap may name that limitation, such as why the mean and not the median, or how the changed rows were flagged.",
   second: "Address the candidate directly as \"você\" in the second person, never as \"o candidato\", \"a pessoa\" or \"the candidate\". Every explanation, suggestion, focus, exercise and summary must be written entirely in Portuguese (only quoted excerpts and corrected examples are English); never write an English sentence in a Portuguese field.",
   factual: "Report only facts and actions stated in the answer. Do not classify a named technology, library, method, or acronym unless the answer provides enough context to support that classification. Do not infer mastery, correctness, ownership, impact, or expertise from merely naming a tool. When the answer does not establish a claim, describe only what was mentioned and omit the claim.",
   summary: "Make the technical summary concrete: name the technologies, decisions, actions, and outcomes the candidate actually described. Do not quote project, product or company names that look like speech-recognition mis-hearings (for example \"run shop\" or \"Russia\" for a project); describe the project generically instead (for example, \"um sistema com agente de IA no WhatsApp para fazendas\"). Do not say a topic went unanswered when the candidate gave a concrete action or decision that responds to it. Avoid generic summaries and avoid turning tool names into claims of proficiency.",
@@ -75,7 +75,7 @@ const systemPrompt = Object.values(promptRules).join(" ");
 const turnAnalysisPrompt = [
   "You analyze one answer from a technical job interview practice session conducted in English. A later step consolidates the per-answer analyses into the final report.",
   promptRules.technical, promptRules.factual, promptRules.language, promptRules.second, promptRules.audit, promptRules.patterns, promptRules.why, promptRules.patternTypes, promptRules.whisper, promptRules.nearEmpty, promptRules.noInfer, promptRules.concision, promptRules.untrusted,
-  "The user message holds exactly one question and answer pair. Return technicalStrengths (the technicalContent.strengths rules), technicalGaps (the technicalContent.gaps rules) and englishPatterns (the English patterns rules) for that pair only, citing its sequenceNumber. Return at most 2 strengths, 1 material gap and 5 English patterns, keeping the highest-impact ones. Report every clear English error a proficient listener would notice, one item per underlying pattern; do not stop at the first few. Empty arrays are valid when no clear error exists, but do not omit a clear error from a clean span merely because a different span may be a transcription artifact. Do not write a summary or priorities.",
+  "The user message holds exactly one question and answer pair. Return technicalStrengths (the technicalContent.strengths rules), technicalGaps (the technicalContent.gaps rules) and englishPatterns (the English patterns rules) for that pair only, citing its sequenceNumber. Return at most 2 strengths, 2 material gaps and 5 English patterns, keeping the highest-impact ones. Report every clear English error a proficient listener would notice, one item per underlying pattern; do not stop at the first few. Empty arrays are valid when no clear error exists, but do not omit a clear error from a clean span merely because a different span may be a transcription artifact. Do not write a summary or priorities.",
   promptRules.vacancy,
 ].join(" ");
 
@@ -233,13 +233,20 @@ function needsProviderRetry(content: unknown, finishReason: unknown): boolean {
 const directFetch: typeof fetch = (input, init) => fetch(input, init);
 
 /** Per-answer limits keep one call small; the consolidated report keeps only the most impactful items. */
-const turnLimits = { strengths: 2, gaps: 1, patterns: 5 } as const;
+const turnLimits = { strengths: 2, gaps: 2, patterns: 5 } as const;
 const reportLimits = { strengths: 5, gaps: 4, patterns: 3, priorities: 3 } as const;
+// The per-answer path keeps every material gap of a normal-length interview; the single-call report keeps reportLimits.gaps.
+const consolidatedGapLimit = 8;
 
 /** Per-answer items are asked to be short (one sentence of 8–18 words); the parsers still accept the wider report limits. */
 const turnTechnicalItemSchema = {
   ...technicalItemSchema,
   properties: { ...technicalItemSchema.properties, evidence: { type: "string", minLength: 1, maxLength: 120 }, explanation: { type: "string", minLength: 1, maxLength: 220 } },
+} as const;
+const turnGapItemSchema = {
+  ...turnTechnicalItemSchema,
+  properties: { ...turnTechnicalItemSchema.properties, howToAnswer: { type: ["string", "null"], maxLength: 240 } },
+  required: [...turnTechnicalItemSchema.required, "howToAnswer"],
 } as const;
 const turnPatternItemSchema = {
   ...patternItemSchema,
@@ -269,7 +276,7 @@ const turnAnalysisSchema = {
   type: "object", additionalProperties: false,
   properties: {
     technicalStrengths: { type: "array", maxItems: turnLimits.strengths, items: turnTechnicalItemSchema },
-    technicalGaps: { type: "array", maxItems: turnLimits.gaps, items: turnTechnicalItemSchema },
+    technicalGaps: { type: "array", maxItems: turnLimits.gaps, items: turnGapItemSchema },
     englishPatterns: { type: "array", maxItems: turnLimits.patterns, items: turnPatternItemSchema },
   }, required: ["technicalStrengths", "technicalGaps", "englishPatterns"],
 } as const;
@@ -479,14 +486,19 @@ function questionLookup(turns: InterviewReportInput["turns"]): QuestionLookup {
 }
 
 /** Shared by the full report, per-answer analysis and consolidation re-validation. */
+const howToAnswerLimit = 240;
+
 function validateTechnicalItems(items: unknown[], answerFor: AnswerLookup, counts: MutableEvidenceCounts, maxAccepted: number, kind: "strength" | "gap", questionFor?: QuestionLookup, jobDirection?: InterviewReportInput["jobDirection"], locale: ReportLocale = "pt-BR", limits: FieldLimits = fullReportFieldLimits): TechnicalItem[] {
   return items.flatMap((item) => {
     counts.candidates += 1;
-    if (!isRecord(item) || Object.keys(item).some((key) => !["sequenceNumber", "evidence", "explanation", "vacancyCompetency"].includes(key))) {
+    if (!isRecord(item) || Object.keys(item).some((key) => !["sequenceNumber", "evidence", "explanation", "vacancyCompetency", ...(kind === "gap" ? ["howToAnswer"] : [])].includes(key))) {
       counts.rejectionReasons.invalidFormat += 1; return [];
     }
     const answer = answerFor(item.sequenceNumber);
     if (!boundedString(item.evidence, 120)) { counts.rejectionReasons.invalidFormat += 1; return []; }
+    // Optional advice on a gap: dropped (not the gap) when it is missing or unusable.
+    const repairedHowToAnswer = kind === "gap" && typeof item.howToAnswer === "string" ? repairedField(item.howToAnswer, howToAnswerLimit) : null;
+    const howToAnswer = repairedHowToAnswer ? localizedField(normalizeFeedbackSentence(repairedHowToAnswer, howToAnswerLimit, 1), locale) : undefined;
     const evidence = answer ? resolveCanonicalEvidence(answer, item.evidence, 120) : undefined;
     const repairedExplanation = repairedField(item.explanation, limits.explanation);
     const explanation = localizedField(normalizeFeedbackSentence(repairedExplanation, limits.explanation, 1), locale);
@@ -500,7 +512,7 @@ function validateTechnicalItems(items: unknown[], answerFor: AnswerLookup, count
     if (kind === "gap" && isOffQuestionIntegrationItem(explanation, questionFor?.(item.sequenceNumber))) { counts.rejectionReasons.mismatch += 1; return []; }
     if (counts.accepted >= maxAccepted) { counts.rejectionReasons.limit += 1; return []; }
     counts.accepted += 1;
-    return [{ sequenceNumber: item.sequenceNumber as number, evidence, explanation, ...(vacancyCompetency ? { vacancyCompetency } : {}) }];
+    return [{ sequenceNumber: item.sequenceNumber as number, evidence, explanation, ...(vacancyCompetency ? { vacancyCompetency } : {}), ...(howToAnswer ? { howToAnswer } : {}) }];
   });
 }
 
@@ -786,7 +798,7 @@ function revalidateTurnAnalyses(input: InterviewReportConsolidationInput) {
   }
   // Interleave by rank so the cap keeps each answer's best item instead of only the first answers.
   const strengths = capInterleaved(strengthsByTurn, counts.technicalStrengths, reportLimits.strengths);
-  const gaps = removeConflictingTechnicalGaps(strengths, capInterleaved(gapsByTurn, counts.technicalGaps, reportLimits.gaps), counts.technicalGaps);
+  const gaps = removeConflictingTechnicalGaps(strengths, capInterleaved(gapsByTurn, counts.technicalGaps, consolidatedGapLimit), counts.technicalGaps);
   const patterns = dedupePatterns(interleave(patternsByTurn), counts.englishPatterns, Infinity);
   return { counts, strengths, gaps, patterns };
 }

@@ -45,7 +45,6 @@ const maxStrengths = 4;
 const maxPronunciationWords = 6;
 const pronunciationScoreLimit = 70;
 /** Answers longer than this are clamped on screen (to four lines) until the reader asks for the full text. */
-const longAnswerChars = 280;
 const seniorityLabels: Record<string, string> = { junior: "Júnior", "mid-level": "Pleno", senior: "Sênior" };
 const jobStatusLabels: Record<JobCoverageItem["status"], string> = {
   shown: "Citado nas respostas",
@@ -71,43 +70,59 @@ function DeltaRow({ label, change, index }: { label: string; change?: string; in
   );
 }
 
-/** One answer on the paper: the question, the full answer, what worked, what to improve, and a pointer to the error list. */
-function ReportAnswer({ answer }: { answer: ReadyAnswer }) {
-  const [expanded, setExpanded] = useState(false);
-  const { turn, ordinal, findings } = answer;
-  const long = turn.answer.length > longAnswerChars;
-  const hasNotes = findings.strengths.length > 0 || findings.gaps.length > 0;
+/** Section title plus one plain line saying what the section holds, so the paper reads without guessing. */
+function SectionHead({ title, hint, screenOnlyHint = false }: { title: string; hint?: string; screenOnlyHint?: boolean }) {
   return (
-    <div className="rp-answer">
-      <p className="rp-psub">{t("Pergunta {n}", { n: ordinal })}</p>
-      <p className="rp-answer-question" lang="en">{turn.question}</p>
-      <p className="rp-psub">{t("Sua resposta")}</p>
-      <p lang="en" className={`rp-answer-text${long && !expanded ? " is-clamped" : ""}`}>{turn.answer}</p>
-      {long && (
-        <button type="button" className="rp-inline-button rp-noprint" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
-          {t(expanded ? "Recolher resposta" : "Ver resposta completa")}
-        </button>
-      )}
-      {hasNotes ? (
-        <div className="rp-answer-cols">
-          {findings.strengths.length > 0 && (
-            <div className="rp-answer-col">
-              <p className="rp-psub">{t("O que funcionou")}</p>
-              {findings.strengths.map((item, index) => <p key={index}>{item.explanation}</p>)}
-            </div>
-          )}
-          {findings.gaps.length > 0 && (
-            <div className="rp-answer-col">
-              <p className="rp-psub">{t("Como melhorar")}</p>
-              {findings.gaps.map((item, index) => <p key={index}>{item.explanation}</p>)}
-            </div>
-          )}
+    <header className="rp-sh">
+      <h2 className="rp-ph">{t(title)}</h2>
+      {hint && <p className={`rp-phint${screenOnlyHint ? " rp-noprint" : ""}`}>{t(hint)}</p>}
+    </header>
+  );
+}
+
+function countLabel(count: number, one: string, many: string) {
+  return count === 1 ? t(one) : t(many, { n: count });
+}
+
+/**
+ * One answer as a single row: the question and what was found in it. The answer and its notes open on demand, so the
+ * paper (and the PDF, where rows stay closed) is an index of the interview rather than the whole transcript.
+ */
+function ReportAnswer({ answer }: { answer: ReadyAnswer }) {
+  const { turn, ordinal, findings } = answer;
+  const counts = [
+    findings.patterns.length > 0 ? countLabel(findings.patterns.length, "1 erro de inglês", "{n} erros de inglês") : null,
+    findings.gaps.length > 0 ? countLabel(findings.gaps.length, "1 lacuna técnica", "{n} lacunas técnicas") : null,
+    findings.strengths.length > 0 ? countLabel(findings.strengths.length, "1 ponto forte", "{n} pontos fortes") : null,
+  ].filter(Boolean);
+  return (
+    <details className="rp-answer">
+      <summary>
+        <span className="rp-answer-n">{ordinal}</span>
+        <span className="rp-answer-head">
+          <span className="rp-answer-question" lang="en">{turn.question}</span>
+          <span className="rp-answer-counts">{counts.length > 0 ? counts.join(" · ") : t("Sem observações nesta resposta")}</span>
+        </span>
+      </summary>
+      <div className="rp-answer-body">
+        <div className="rp-answer-quote">
+          <p className="rp-psub">{t("Sua resposta")}</p>
+          <p lang="en" className="rp-answer-text">{turn.answer}</p>
         </div>
-      ) : (
-        <p className="rp-pnote">{t("Sem observações de conteúdo nesta resposta.")}</p>
-      )}
-      {findings.patterns.length > 0 && <p className="rp-pnote">{t("Erros de inglês nesta resposta: {k}", { k: findings.patterns.length })}</p>}
-    </div>
+        {findings.strengths.length > 0 && (
+          <div className="rp-answer-col">
+            <p className="rp-psub">{t("O que funcionou")}</p>
+            {findings.strengths.map((item, index) => <p key={index}>{item.explanation}</p>)}
+          </div>
+        )}
+        {findings.gaps.length > 0 && (
+          <div className="rp-answer-col is-improve">
+            <p className="rp-psub">{t("O que faltou")}</p>
+            {findings.gaps.map((item, index) => <p key={index}>{item.explanation}</p>)}
+          </div>
+        )}
+      </div>
+    </details>
   );
 }
 
@@ -143,6 +158,7 @@ function buildReadyModel(result: InterviewReportResult, turns: Turns, azureSumma
     summary: reportSummaryText(result),
     coverageNotice: analysisCoverageNotice(result.analysisCoverage, reference),
     strengths: technical.strengths.slice(0, maxStrengths),
+    gaps: (technical.gaps as InterviewReportResult["technicalContent"]["gaps"]).map((gap) => ({ ...gap, ordinal: reference(gap.sequenceNumber), question: turns.find((turn) => turn.sequenceNumber === gap.sequenceNumber)?.question ?? null })),
     answers,
     errorRows: buildErrorRows(allPatterns),
     voiceNotes: buildVoiceNotes(azureSummary),
@@ -168,14 +184,14 @@ function ReadyDocument({ model, jobItems, dateLabel, turnsLoading }: { model: Re
     <>
       {(model.summary || model.coverageNotice) && (
         <section className="rp-pblock ds-item" style={rise(0)}>
-          <h2 className="rp-ph">{t("Resumo da entrevista")}</h2>
+          <SectionHead title="Resumo da entrevista" />
           {model.summary && <p className="rp-psummary">{model.summary}</p>}
           {model.coverageNotice && <p className="rp-pnote">{t(model.coverageNotice)}</p>}
         </section>
       )}
       {model.strengths.length > 0 && (
         <section className="rp-pblock ds-item" style={rise(1)}>
-          <h2 className="rp-ph">{t("O que funcionou")}</h2>
+          <SectionHead title="O que funcionou" hint="Pontos técnicos que você mostrou bem." />
           <ul className="rp-good">
             {model.strengths.map((item, index) => <li key={index}>{item.explanation}</li>)}
           </ul>
@@ -183,7 +199,7 @@ function ReadyDocument({ model, jobItems, dateLabel, turnsLoading }: { model: Re
       )}
       {jobItems.length > 0 && (
         <section className="rp-pblock ds-item" style={rise(2)}>
-          <h2 className="rp-ph">{t("Ligado à vaga")}</h2>
+          <SectionHead title="Ligado à vaga" hint="Competências da vaga que a entrevista testou." />
           <ul className="rp-job">
             {jobItems.map((item) => (
               <li key={item.competency} data-status={item.status}>
@@ -195,7 +211,7 @@ function ReadyDocument({ model, jobItems, dateLabel, turnsLoading }: { model: Re
         </section>
       )}
       <section className="rp-pblock rp-pblock-long ds-item" style={rise(3)}>
-        <h2 className="rp-ph">{t("Seus erros")}</h2>
+        <SectionHead title="Seus erros de inglês" hint="O que você disse e como fica natural em inglês." />
         {errorRows.length > 0 ? (
           <>
             <div className="rp-errh" aria-hidden="true"><span>{t("Você disse")}</span><span>{t("O certo")}</span></div>
@@ -225,18 +241,22 @@ function ReadyDocument({ model, jobItems, dateLabel, turnsLoading }: { model: Re
           <p className="rp-pnote">{t("Nenhum erro de inglês recorrente apareceu nesta entrevista.")}</p>
         )}
       </section>
-      <section className="rp-pblock rp-pblock-long ds-item" style={rise(4)}>
-        <h2 className="rp-ph">{t("Resposta por resposta")}</h2>
-        {model.answers.length > 0 ? (
-          <div className="rp-answers">
-            {model.answers.map((answer) => <ReportAnswer key={answer.turn.sequenceNumber} answer={answer} />)}
-          </div>
-        ) : !turnsLoading ? (
-          <p className="rp-pnote">{t("As perguntas e respostas desta entrevista não estão disponíveis.")}</p>
-        ) : null}
-      </section>
+      {model.gaps.length > 0 && (
+        <section className="rp-pblock rp-pblock-long ds-item" style={rise(4)}>
+          <SectionHead title="Suas lacunas técnicas" hint="O que um entrevistador esperava ouvir e como responder da próxima vez." />
+          <ul className="rp-gaps">
+            {model.gaps.map((gap, index) => (
+              <li key={`${gap.sequenceNumber}-${index}`}>
+                {gap.question && <p className="rp-gap-q"><span>{t("Pergunta {n}", { n: gap.ordinal ?? gap.sequenceNumber })}</span> <span lang="en">{gap.question}</span></p>}
+                <p className="rp-gap-miss">{gap.explanation}</p>
+                {gap.howToAnswer && <p className="rp-gap-how"><b>{t("Como responder:")}</b> {gap.howToAnswer}</p>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <section className="rp-pblock ds-item" style={rise(5)}>
-        <h2 className="rp-ph">{t("Notas da sua voz")}</h2>
+        <SectionHead title="Notas da sua voz" hint="Como sua fala soou: ritmo, pausas e pronúncia." />
         {hasVoice ? (
           <>
             <ul className="rp-voice">
@@ -280,7 +300,7 @@ function ReadyDocument({ model, jobItems, dateLabel, turnsLoading }: { model: Re
       </section>
       {model.priorities.length > 0 && (
         <section className="rp-pblock ds-item" style={rise(6)}>
-          <h2 className="rp-ph">{t("Prioridades para praticar")}</h2>
+          <SectionHead title="Prioridades para praticar" hint="Por onde começar antes da próxima entrevista." />
           <ol className="rp-prio">
             {model.priorities.map((item, index) => {
               const areaText = item.area === "english" ? t("Inglês") : t("Conteúdo técnico");
@@ -300,11 +320,21 @@ function ReadyDocument({ model, jobItems, dateLabel, turnsLoading }: { model: Re
       )}
       {model.deltas.length > 0 && (
         <section className="rp-pblock ds-item" style={rise(7)}>
-          <h2 className="rp-ph">{t("Desde a última entrevista")}</h2>
+          <SectionHead title="Desde a última entrevista" />
           {model.deltas.map((delta, index) => <DeltaRow key={delta.label} label={t(delta.label)} change={delta.change} index={index} />)}
         </section>
       )}
-      <footer className="rp-pfoot ds-item" style={rise(8)}>
+      <section className="rp-pblock rp-pblock-long ds-item" style={rise(8)}>
+        <SectionHead title="Resposta por resposta" hint="Abra uma pergunta para ver sua resposta e o que foi apontado nela." screenOnlyHint />
+        {model.answers.length > 0 ? (
+          <div className="rp-answers">
+            {model.answers.map((answer) => <ReportAnswer key={answer.turn.sequenceNumber} answer={answer} />)}
+          </div>
+        ) : !turnsLoading ? (
+          <p className="rp-pnote">{t("As perguntas e respostas desta entrevista não estão disponíveis.")}</p>
+        ) : null}
+      </section>
+      <footer className="rp-pfoot ds-item" style={rise(9)}>
         {t("Entoa · Gerado a partir da sua entrevista simulada de {date}", { date: dateLabel })}
       </footer>
     </>

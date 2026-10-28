@@ -31,7 +31,7 @@ export type InterviewReport = {
   technicalContent: {
     summary: string;
     strengths: Array<{ sequenceNumber: number; evidence: string; explanation: string; vacancyCompetency?: string }>;
-    gaps: Array<{ sequenceNumber: number; evidence: string; explanation: string; vacancyCompetency?: string }>;
+    gaps: Array<{ sequenceNumber: number; evidence: string; explanation: string; vacancyCompetency?: string; howToAnswer?: string }>;
   };
   overview?: { technical?: string; english?: string };
   interviewerTakeaway?: { remember: string; concern: string };

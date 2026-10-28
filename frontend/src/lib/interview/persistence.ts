@@ -162,9 +162,19 @@ export async function updateInterviewStatus(
 ): Promise<PersistenceResult<InterviewSession>> {
   const auth = await authenticatedClient();
   if (!auth.ok) return auth;
-  const { data, error } = await auth.value.client
+  // The status is synced again whenever the interview screen re-syncs (for example when a report is regenerated);
+  // completed_at keeps the first end time so the session duration does not grow with each sync.
+  const first = await auth.value.client
     .from("interviews")
     .update({ status, completed_at: new Date().toISOString() })
+    .eq("id", interviewId)
+    .is("completed_at", null)
+    .select(sessionColumns)
+    .maybeSingle();
+  if (first.error) return failure(first.error);
+  const { data, error } = first.data ? first : await auth.value.client
+    .from("interviews")
+    .update({ status })
     .eq("id", interviewId)
     .select(sessionColumns)
     .single();
