@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mainVerb, questionRepetition, questionStems, repeatsAskedTopic, repeatsRecentQuestion } from "../src/thinking/question-repetition.js";
+import { mainVerb, questionRepetition, questionStems, repeatsAskedTopic, repeatsRecentQuestion, followUpRepetition } from "../src/thinking/question-repetition.js";
 
 const frontBack = "How did you integrate the front end with the back end in that project?";
 const supabase = "How did you integrate Supabase into your application?";
@@ -55,5 +55,26 @@ describe("repeatsAskedTopic", () => {
   it("does not flag a genuinely different question on the same project", () => {
     expect(repeatsAskedTopic("Which GLCM features changed most after you tuned the generator?", "How did you validate the synthetic images?")).toBe(false);
     expect(repeatsAskedTopic("What trade-off did you make when choosing Supabase?", frontBack)).toBe(false);
+  });
+});
+
+describe("followUpRepetition", () => {
+  const metrics = "What specific metrics did you use to evaluate the syntactic quality of the images?";
+  const fidelity = "How did you ensure the texture and anatomical fidelity in the synthetic lung CT images?";
+
+  it("flags a follow-up that asks again for what an earlier question asked", () => {
+    expect(followUpRepetition("Which specific metrics did you use to compare the return of the values?", fidelity, [metrics, fidelity])).toBe("shared_lead");
+  });
+
+  it("allows a follow-up on a different detail of the same project", () => {
+    expect(followUpRepetition("Which GLCM feature changed most between synthetic and real images?", fidelity, [metrics, fidelity])).toBeNull();
+    expect(followUpRepetition("How did you decide the noise power spectrum was close enough?", fidelity, [metrics, fidelity])).toBeNull();
+  });
+});
+
+describe("followUpRepetition list questions", () => {
+  it("does not flag a list question about a different thing", () => {
+    expect(followUpRepetition("What tools did you use to profile the queries?", "How did you speed up the API?", ["What metrics did you use to track latency?"])).toBeNull();
+    expect(followUpRepetition("How did you use the metrics to pick a model?", "How did you validate it?", ["What metrics did you use to evaluate the images?"])).toBeNull();
   });
 });

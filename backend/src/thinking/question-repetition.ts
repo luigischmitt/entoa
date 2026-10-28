@@ -114,10 +114,15 @@ export const sameQuestion = (left: string, right: string): boolean => {
 };
 
 // questionRepetition reports shared_verb before shared_lead, so the lead is checked on its own here.
-const sharesLead = (candidate: string, earlier: string): boolean => {
+const sharesLead = (candidate: string, earlier: string, words = leadWords): boolean => {
   const a = questionStems(candidate); const b = questionStems(earlier);
-  return a.length >= leadWords && b.length >= leadWords && a.slice(0, leadWords).every((word, index) => word === b[index]);
+  return a.length >= words && b.length >= words && a.slice(0, words).every((word, index) => word === b[index]);
 };
+
+// A "what/which X did you use" question asks for a list of X; its first two stems ("metric use") name that list. A
+// follow-up asking for the same list as an earlier question asks for something already answered, whatever follows.
+const asksForList = (question: string): boolean => /^\s*(?:what|which)\b/iu.test(question);
+const asksSameList = (candidate: string, earlier: string): boolean => asksForList(candidate) && asksForList(earlier) && sharesLead(candidate, earlier, 2);
 
 /**
  * Repetition rule for a follow-up: it digs into the CURRENT question, so sharing its main verb is natural. It may not
@@ -126,5 +131,7 @@ const sharesLead = (candidate: string, earlier: string): boolean => {
 export function followUpRepetition(candidate: string, currentQuestion: string, askedQuestions: readonly string[] = []): RepetitionReason | "same_question" | null {
   if (sameQuestion(candidate, currentQuestion)) return "same_question";
   const previous = askedQuestions.filter((asked) => !sameQuestion(asked, currentQuestion));
-  return repeatsRecentQuestion(candidate, previous, false) ?? (sharesLead(candidate, currentQuestion) ? "shared_lead" : null);
+  return repeatsRecentQuestion(candidate, previous, false)
+    ?? (previous.some((asked) => asksSameList(candidate, asked)) ? "shared_lead" : null)
+    ?? (sharesLead(candidate, currentQuestion) ? "shared_lead" : null);
 }
