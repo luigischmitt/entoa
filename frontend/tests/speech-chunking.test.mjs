@@ -153,15 +153,15 @@ function harness({ failText = null } = {}) {
   return { log, pending, audios, aborted, options };
 }
 
-test("only chunk 1 is requested first; the rest start once it arrives, and the next audio is preloaded", async () => {
+test("all chunks are requested together, in order, and the next audio is preloaded", async () => {
   const { log, pending, audios, options } = harness();
   const playback = playInterviewerSegments([chunkA, chunkB, chunkC], options);
   await flush();
-  assert.deepEqual(log, [`fetch:${chunkA}`], "chunk 1 is synthesized alone");
+  assert.deepEqual(log, [`fetch:${chunkA}`, `fetch:${chunkB}`, `fetch:${chunkC}`], "no chunk waits for chunk 1");
 
   pending.get(chunkA)();
   await flush();
-  assert.deepEqual(log.slice(1), [`fetch:${chunkB}`, `fetch:${chunkC}`, `caption:${chunkA}`, `play:blob:${chunkA.length}`], "the rest start together once chunk 1 arrived");
+  assert.deepEqual(log.slice(3), [`caption:${chunkA}`, `play:blob:${chunkA.length}`], "chunk 1 plays as soon as it arrives");
   assert.equal(audios.length, 1);
 
   pending.get(chunkB)();
@@ -179,27 +179,20 @@ test("only chunk 1 is requested first; the rest start once it arrives, and the n
   assert.deepEqual(log.filter((entry) => entry.startsWith("play:")), [chunkA, chunkB, chunkC].map((text) => `play:blob:${text.length}`));
 });
 
-test("after chunk 1 arrives at most three chunk requests are in flight; a finished one releases the next", async () => {
+test("at most six chunk requests are in flight; a finished one releases the next", async () => {
   const { log, pending, options } = harness();
-  const sentences = [
-    "One sentence that is surely long enough.", "Two sentences that are surely long enough, and then some more words.",
-    "Three sentences that are surely long enough, and then some more words.", "Four sentences that are surely long enough, and then some more words.",
-    "Five sentences that are surely long enough, and then some more words.",
-  ];
+  const sentences = ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight"]
+    .map((word) => `${word} sentences that are surely long enough, and then some more words.`);
   const chunks = groupInterviewerSentences(sentences).map((chunk) => chunk.text);
-  assert.ok(chunks.length >= 5);
+  assert.ok(chunks.length >= 8);
   playInterviewerSegments(sentences, options);
   await flush();
   const fetches = () => log.filter((entry) => entry.startsWith("fetch:")).map((entry) => entry.slice(6));
-  assert.deepEqual(fetches(), chunks.slice(0, 1), "only chunk 1 first");
-  pending.get(chunks[0])();
-  await flush();
-  assert.deepEqual(fetches(), chunks.slice(0, 4), "chunk 1 plus three more in flight");
+  assert.deepEqual(fetches(), chunks.slice(0, 6), "six in flight from the start");
   pending.get(chunks[3])();
   await flush();
-  assert.deepEqual(fetches(), chunks.slice(0, 5), "any completion frees a slot, in order");
-  pending.get(chunks[1])();
-  pending.get(chunks[2])();
+  assert.deepEqual(fetches(), chunks.slice(0, 7), "any completion frees a slot, in order");
+  for (const text of chunks.slice(0, 7)) pending.get(text)?.();
   await flush();
   assert.deepEqual(fetches(), chunks, "every chunk is eventually requested");
 });
@@ -208,7 +201,7 @@ test("playback order is preserved when later chunks resolve first", async () => 
   const { log, pending, audios, options } = harness();
   const playback = playInterviewerSegments([chunkA, chunkB, chunkC], options);
   await flush();
-  assert.deepEqual(log, [`fetch:${chunkA}`]);
+  assert.deepEqual(log, [`fetch:${chunkA}`, `fetch:${chunkB}`, `fetch:${chunkC}`]);
   pending.get(chunkA)();
   await flush();
   pending.get(chunkC)();
@@ -232,10 +225,9 @@ test("a split first sentence plays as separate requests but is captioned as the 
   const tail = "because I want to hear about your work.";
   const playback = playInterviewerSegments([sentence], options);
   await flush();
-  assert.deepEqual(log, [`fetch:${head}`]);
+  assert.deepEqual(log, [`fetch:${head}`, `fetch:${tail}`], "head and tail are requested together");
   pending.get(head)();
   await flush();
-  assert.ok(log.includes(`fetch:${tail}`), "the tail is requested once the head arrived");
   assert.ok(log.includes(`caption:${sentence}`));
   audios[0].emit("ended");
   await flush();
@@ -313,7 +305,7 @@ test("prewarm and playback share the same chunks, including a split first senten
   clearRetainedSpeechBlobs();
 });
 
-test("prewarm requests chunk 1 alone, then the rest three at a time", async () => {
+test("prewarm requests every chunk together", async () => {
   clearRetainedSpeechBlobs();
   const { log, pending, options } = harness();
   const sentences = [
@@ -323,10 +315,7 @@ test("prewarm requests chunk 1 alone, then the rest three at a time", async () =
   const chunks = groupInterviewerSentences(sentences).map((chunk) => chunk.text);
   const prewarm = prewarmInterviewerSpeech(sentences, { ...options, retainMs: 5_000 });
   await flush();
-  assert.deepEqual(log, [`fetch:${chunks[0]}`]);
-  pending.get(chunks[0])();
-  await flush();
-  assert.equal(log.length, 4, "three more start once chunk 1 arrived");
+  assert.deepEqual(log, chunks.map((text) => `fetch:${text}`));
   for (const text of chunks) pending.get(text)?.();
   assert.equal(await prewarm.promise, true);
   clearRetainedSpeechBlobs();

@@ -450,8 +450,9 @@ const firstChunkGrowthMaximum = 100;
 export const laterChunkPartMinimum = 25;
 // The final chunk reports it is ending once at most this much of it remains (or at its start when it is shorter).
 export const finalChunkLeadMs = 3_000;
-// All chunks of an utterance are requested up front, at most this many in flight at once (Kokoro runs on 4 vCPU).
-export const maxConcurrentChunkRequests = 3;
+// All chunks of an utterance are requested together, at most this many in flight at once. The hosted voice spends ~5-10 s
+// per request whatever the text length and parallel requests do not slow each other, so waiting is what costs time.
+export const maxConcurrentChunkRequests = 6;
 
 const clauseBoundaries = [", ", "; ", " — ", ": "];
 const conjunctionBoundaries = [" because ", " so ", " and ", " but ", " which ", " when ", " while ", " where ", " that ", " to "];
@@ -565,26 +566,25 @@ export function groupInterviewerSentences(segments) {
 }
 
 /**
- * Requests chunk 0 alone first; once it has settled the rest start in order, at most `maxConcurrentChunkRequests` in
- * flight, a finished request letting the next pending chunk start. Leases dedupe against prewarmed blobs.
+ * Requests the chunks together, in order, at most `maxConcurrentChunkRequests` in flight, a finished request letting the
+ * next pending chunk start. Leases dedupe against prewarmed blobs.
  */
 function requestChunks(chunks, options) {
   let active = 0;
   let next = 0;
   let stopped = false;
   const entries = chunks.map((chunk) => {
-    const entry = { chunk, lease: null, settled: false };
+    const entry = { chunk, lease: null };
     entry.promise = new Promise((resolve, reject) => { entry.resolve = resolve; entry.reject = reject; });
     entry.promise.catch(() => {});
     return entry;
   });
   const pump = () => {
-    // Chunk 0 is synthesized alone so it never shares Kokoro's CPU; the rest start together once it has arrived.
-    while (!stopped && active < maxConcurrentChunkRequests && next < entries.length && (next === 0 || entries[0].settled)) {
+    while (!stopped && active < maxConcurrentChunkRequests && next < entries.length) {
       const entry = entries[next++];
       active += 1;
       entry.lease = acquireSpeechBlob(options, entry.chunk.text);
-      entry.lease.promise.then(entry.resolve, (error) => { stopped = true; entry.reject(error); }).then(() => { entry.settled = true; active -= 1; pump(); });
+      entry.lease.promise.then(entry.resolve, (error) => { stopped = true; entry.reject(error); }).then(() => { active -= 1; pump(); });
       if (next === 1) options.onSynthesisStarted?.();
     }
   };
@@ -600,8 +600,8 @@ function requestChunks(chunks, options) {
 
 
 /**
- * Plays an utterance chunk by chunk (see `groupInterviewerSentences`). Chunk 1 is requested alone first; once it has
- * arrived the remaining chunks are requested together (at most `maxConcurrentChunkRequests` at once), chunk 1 starts as soon as it arrives and the next chunk is decoded ahead
+ * Plays an utterance chunk by chunk (see `groupInterviewerSentences`). All chunks are requested together (at most
+ * `maxConcurrentChunkRequests` at once), chunk 1 starts as soon as it arrives and the next chunk is decoded ahead
  * (preloaded Audio) so it starts the moment the current one ends. Playback order never depends on arrival order. A failed
  * chunk ends playback as "unavailable" and the caller keeps the text visible; cancelling aborts pending requests.
  */
