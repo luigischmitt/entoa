@@ -133,6 +133,15 @@ describe("OpenRouter Whisper final request", () => {
       expect(fetcher).toHaveBeenCalledOnce();
     });
 
+    it("exposes the numeric HTTP status on rejected responses without response text", async () => {
+      const bad = vi.fn<typeof fetch>(async () => new Response("secret upstream detail", { status: 400 }));
+      const error = await make(bad).service.transcribe(audio(), "whisper-large-v3-turbo").catch((caught) => caught);
+      expect(error).toMatchObject({ name: "TranscriptionUnavailableError", providerStatus: "rejected", attempts: 1, httpStatus: 400 });
+      expect(error.message).not.toContain("secret");
+      const unavailable = vi.fn<typeof fetch>(async () => new Response("", { status: 503 }));
+      await expect(make(unavailable).service.transcribe(audio(), "whisper-large-v3-turbo")).rejects.toMatchObject({ httpStatus: 503 });
+    });
+
     it("does not retry 4xx and caps 429 plus 5xx at three HTTP attempts", async () => {
       const rejected = vi.fn<typeof fetch>(async () => new Response("no", { status: 401 }));
       await expect(make(rejected).service.transcribe(audio(), "whisper-large-v3-turbo")).rejects.toMatchObject({ providerStatus: "rejected", attempts: 1 });

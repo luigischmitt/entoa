@@ -15,6 +15,7 @@ import { AnswerCompletionError, type AnswerCompletionService, type CandidateComp
 import { aggregateAzureBlockScores, alignSegmentTimingToTranscript, createAzureAlignedBlocks, mapAzureBlockReferencesToReviewed, materializeAzureBlock, type AzureAudioBlock } from "./azure-aligned-blocks.js";
 import { buildAnswerPhrases, calculateDeliveryMetrics, createPhraseClips } from "./answer-voice-detail.js";
 import type { TranscriptReviewService } from "./transcript-review-service.js";
+import { defaultRetainedAnswerAudio, type RetainedAnswerAudio } from "./retained-answer-audio.js";
 
 type ClientMessage =
   | { type: "start"; accessToken?: unknown; version: 2; sampleRate: number; channels: 1; encoding: "s16le"; speechThreshold: number; captions?: unknown; question?: unknown; plannedQuestion?: unknown; contextAnswers?: unknown; transcriptionEngine?: unknown }
@@ -172,14 +173,19 @@ function safeTranscriptionErrorCode(error: unknown): string {
   return "TRANSCRIPTION_FAILED";
 }
 
-/** Fixed category and attempt count only; never the error message, cause, or any provider content. */
+/** Fixed category, attempt count and HTTP status only; never the error message, cause, or any provider content. */
 function safeFailureDetails(error: unknown): Record<string, string | number> {
   if (!(error instanceof TranscriptionUnavailableError)) return {};
+  const httpStatus = (error as { httpStatus?: unknown }).httpStatus;
   return {
     ...(error.providerStatus ? { providerStatus: error.providerStatus } : {}),
     ...(error.attempts ? { attempts: error.attempts } : {}),
+    ...(typeof httpStatus === "number" ? { httpStatus } : {}),
   };
 }
+
+/** Failures whose answer audio is kept for a browser retry instead of being discarded. */
+const retainableFailureCodes = new Set(["UPSTREAM_REJECTED", "UPSTREAM_UNAVAILABLE", "UPSTREAM_RATE_LIMITED", "TRANSCRIPTION_FAILED"]);
 
 type AzureBlockResult = {
   assessment: PronunciationAssessment | null;
@@ -331,6 +337,7 @@ export function attachTranscriptionWebSocket(
   limits: StreamingLimits = defaultStreamingLimits,
   streaming: StreamingOptions | null = null,
   authentication: { verifier: AccessTokenVerifier | null; startTimeoutMs?: number } = { verifier: null },
+  retainedAnswers: RetainedAnswerAudio = defaultRetainedAnswerAudio,
 ): void {
   const accessTokenVerifier = authentication.verifier;
   const authStartTimeoutMs = authentication.startTimeoutMs ?? 10_000;
@@ -895,9 +902,24 @@ export function attachTranscriptionWebSocket(
       } else closeNow();
     };
 
+    // Keeps a copy of the answer audio for a browser retry. Runs before the session is cancelled (which zero-fills its chunks)
+    // and never throws: a retention problem must not change the existing failure path.
+    const retainFailedAnswer = (code: string): string | null => {
+      if (!retainableFailureCodes.has(code) || !sessionId || authenticatedUserId === null) return null;
+      try {
+        const session = sessions.get(sessionId);
+        if (!session || session.bytes <= 0 || !session.vad.hasSpeech) return null;
+        const wav = Buffer.from(sessions.toWav(sessionId));
+        return retainedAnswers.put(authenticatedUserId, { wav, question: whisperQuestion ?? null, durationMs: Math.round(session.bytes / (pcmSampleRate * 2) * 1_000) });
+      } catch {
+        return null;
+      }
+    };
+
     const fail = (code: string, message: string, closeCode = 1011, failureDetails: Record<string, string | number> = {}) => {
       if (finishing) return;
-      logStreamDiagnostic({ status: "failed", code, ...failureDetails, durationMs: retainedSession?.bytes ? Math.round(retainedSession.bytes / (pcmSampleRate * 2) * 1_000) : 0 });
+      const retryToken = retainFailedAnswer(code);
+      logStreamDiagnostic({ status: "failed", code, ...failureDetails, retainedForRetry: retryToken !== null, durationMs: retainedSession?.bytes ? Math.round(retainedSession.bytes / (pcmSampleRate * 2) * 1_000) : 0 });
       finishing = true;
       if (silenceGraceTimer !== null) clearTimeout(silenceGraceTimer);
       silenceGraceTimer = null;
@@ -911,7 +933,7 @@ export function attachTranscriptionWebSocket(
       }
       sessionId = null;
       retainedSession = null;
-      send(socket, { type: "error", code, message });
+      send(socket, retryToken ? { type: "error", code, message, retryToken } : { type: "error", code, message });
       if (socket.readyState === WebSocket.OPEN) socket.close(closeCode, "Transcription failed");
     };
 
@@ -1098,6 +1120,8 @@ export function attachTranscriptionWebSocket(
 
     // Nothing but an authenticated `start` is processed until the access token is verified.
     let authenticated = accessTokenVerifier === null;
+    // Same identity the HTTP middleware uses when authentication is disabled; known only after verification.
+    let authenticatedUserId: string | null = accessTokenVerifier === null ? "local-development" : null;
     let authenticating = false;
     let authTimer: ReturnType<typeof setTimeout> | null = null;
     const rejectAuth = (error: AuthError | null) => {
@@ -1129,10 +1153,11 @@ export function attachTranscriptionWebSocket(
         }
         authenticating = true;
         const token = typeof candidate.accessToken === "string" ? candidate.accessToken : null;
-        accessTokenVerifier!.verify(token).then(() => {
+        accessTokenVerifier!.verify(token).then((user) => {
           authenticating = false;
           if (socket.readyState !== WebSocket.OPEN || finishing) return;
           authenticated = true;
+          authenticatedUserId = user.userId;
           if (authTimer !== null) clearTimeout(authTimer);
           authTimer = null;
           handleMessage(data, isBinary);

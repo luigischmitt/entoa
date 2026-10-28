@@ -105,11 +105,11 @@ export class OpenRouterWhisperTranscriptionService implements TranscriptionServi
             console.warn("OpenRouter rejected the Whisper prompt field; continuing without it.");
             continue;
           }
-          throw unavailable("OpenRouter returned HTTP 400.", "rejected");
+          throw new TranscriptionUnavailableError("OpenRouter returned HTTP 400.", { providerStatus: "rejected", attempts, httpStatus: response.status });
         }
         if (!response.ok) {
           const category: TranscriptionFailureCategory = response.status === 429 ? "429" : response.status >= 500 ? "5xx" : "rejected";
-          throw unavailable(response.status === 429 ? "OpenRouter returned HTTP 429 after retries." : `OpenRouter returned HTTP ${response.status}.`, category);
+          throw new TranscriptionUnavailableError(response.status === 429 ? "OpenRouter returned HTTP 429 after retries." : `OpenRouter returned HTTP ${response.status}.`, { providerStatus: category, attempts, httpStatus: response.status });
         }
         let result: OpenRouterResponse;
         try {
@@ -171,7 +171,7 @@ export class OpenRouterWhisperTranscriptionService implements TranscriptionServi
         body: form,
         signal: requestSignal,
       });
-      if (!response.ok) throw new TranscriptionUnavailableError(`OpenRouter returned HTTP ${response.status}.`);
+      if (!response.ok) throw new TranscriptionUnavailableError(`OpenRouter returned HTTP ${response.status}.`, { httpStatus: response.status });
       const result = await response.json() as OpenRouterResponse;
       return { segments: parseWhisperSegments(result.segments, wavDurationSeconds(audio)) };
     } catch (error) {
