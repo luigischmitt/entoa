@@ -5,7 +5,7 @@
 
 export const maxClarificationsPerQuestion = 2;
 /** Repeated questions are spoken a bit slower (Kokoro/OpenRouter speech accept a `speed` parameter). */
-export const repeatSpeechSpeed = 0.9;
+export const repeatSpeechSpeed = 0.85;
 export const repeatLeadIn = "Sure.";
 export const rephraseLeadIn = "Let me put it another way.";
 /** Neutral bridge when the candidate keeps asking: never blames the candidate. */

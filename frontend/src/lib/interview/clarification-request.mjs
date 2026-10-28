@@ -15,11 +15,15 @@ const leadIn = "(?:(?:can|could|would|will|may) (?:you|i)(?: please| kindly| may
 const lead = `(?:${leadIn} )?(?:please |por favor )?`;
 const repeatVerb = "(?:repeat|repeating|repit|repeet|repet|repeate|repeats|ripeat|ripit|repete|repita|repetir)";
 const thing = "(?:that|it|this|the question|the last question|your question|the question for me|what you said|what you just said|the last part|the sentence|the last sentence|that question|the first part|everything|the whole question|a pergunta|essa pergunta|isso)";
-const againTail = "(?:again|one more time|once more|one more|please|for me|slowly|more slowly|slower|a little slower|a bit slower|de novo|novamente|mais uma vez|uma vez mais|por favor|pra mim|para mim|devagar|mais devagar)";
+// "slower", "more slowly", "a bit slower" and the common learner form "more slower".
+const slow = "(?:(?:a little bit|a little|a bit|bit|more|much|even|mais|um pouco mais) )?(?:slower|slowly|slow|slowier|slowlier|devagar)";
+const againTail = `(?:again|one more time|once more|one more|please|for me|${slow}|de novo|novamente|mais uma vez|uma vez mais|por favor|pra mim|para mim)`;
 
 const repeatPatterns = [
   new RegExp(`^${lead}${repeatVerb}(?: ${thing})?(?: ${againTail})*$`, "u"),
-  new RegExp(`^${lead}(?:say|tell|ask|read|play|go over|run|falar|dizer|perguntar|ler)(?: me)?(?: ${thing})? (?:again|one more time|once more|one more|more slowly|slower|a little slower|de novo|novamente|mais uma vez)(?: please)?$`, "u"),
+  new RegExp(`^${lead}(?:say|tell|ask|read|play|go over|run|falar|dizer|perguntar|ler)(?: me)?(?: ${thing})?(?: (?:again|one more time|once more|one more|${slow}|de novo|novamente|mais uma vez))+(?: please)?$`, "u"),
+  // "Can you speak more slowly?" / "Talk slower, please": the question again, slower.
+  new RegExp(`^${lead}(?:speak|talk|go|fala|falar)(?: ${slow})+(?: please| for me| por favor)?$`, "u"),
   // Exact short phrases (what a person says when they just did not catch it).
   /^(?:one more time|once more|again|come again(?: please)?|pardon(?: me)?|beg your pardon|i beg your pardon|what|what was that|what was it|what was the question|what is the question|what was your question|what did you say|what did you ask|what did you just say|say what|huh|excuse me|sorry|sorry what|what sorry|wait what|i missed that|i missed the question|i missed what you said|i (?:did not|didn t|could not|couldn t) (?:catch|hear)(?: that| you| the question| what you said| it)?|i can t hear(?: you| very well)?|the question again(?: please)?|the last question again|question again|sorry about that|de novo|novamente|mais uma vez|como|como disse|como foi|o que|o que foi|o que voce disse|o que voce falou|o que foi que voce disse|perdao|desculpa|desculpe|nao ouvi(?: direito| a pergunta| o que voce disse)?|nao escutei(?: direito| a pergunta)?|a pergunta de novo(?: por favor)?)$/u,
 ];
@@ -46,12 +50,16 @@ const notATerm = /^(?:that|this|it|them|those|these|what|better|more|again|me|is
 const term = "([a-z0-9][a-z0-9 .+#/-]{0,38})";
 
 const definePatterns = [
-  new RegExp(`^what (?:does|do|is|s) ${term} (?:mean|stand for|refer to)$`, "u"),
+  new RegExp(`^what (?:does|do|is|s) ${term} (?:mean|means|meaning|stand for|refer to)$`, "u"),
+  // Literal Portuguese forms: "what means X?", "what X means?", "what is the meaning of the word X?".
+  new RegExp(`^what (?:means|mean|is meaning|s meaning) (?:the word |the term )?${term}$`, "u"),
+  new RegExp(`^what ${term} (?:means|mean)$`, "u"),
+  new RegExp(`^what (?:is|s) the (?:meaning|definition) of the (?:word|term|expression) ${term}$`, "u"),
   new RegExp(`^what do you mean (?:by|with) ${term}$`, "u"),
   new RegExp(`^what (?:is|s) meant by ${term}$`, "u"),
   new RegExp(`^what (?:is|s) the (?:meaning|definition) of ${term}$`, "u"),
   new RegExp(`^${lead}(?:define|explain|describe|clarify|tell me)(?: what)? ${term}(?: is| means| mean)?$`, "u"),
-  new RegExp(`^(?:i )?(?:do not|don t|dont) (?:know|understand|get) (?:what|the (?:word|term|meaning of)|the word|the term) ${term}(?: means| mean| is)?$`, "u"),
+  new RegExp(`^(?:i )?(?:do not|don t|dont) (?:know|understand|get) (?:what(?: is| s| are| does)?|the (?:word|term|meaning of)|the word|the term) ${term}(?: means| mean| is)?$`, "u"),
   new RegExp(`^(?:i )?(?:do not|don t|dont) (?:know|understand|get) ${term} (?:means|mean)$`, "u"),
   new RegExp(`^i (?:m|am) not familiar with ${term}$`, "u"),
   new RegExp(`^what (?:is|s|are) (?:an? |the )?${term}$`, "u"),
@@ -62,7 +70,7 @@ const definePatterns = [
 ];
 
 /** Phrases that start or end an utterance without changing what it asks. */
-const leadingFiller = /^(?:i m sorry|im sorry|i am sorry|sorry|um|uh|uhm|hmm|hm|ah|oh|eh|er|okay|ok|so|well|yes|yeah|hi|hello|hey|excuse me|thank you|thanks|sure|desculpa|desculpe|ola|oi|entao|bom|olha|ai|ne|e|mas|bem|ta|certo|tudo bem)\s+/u;
+const leadingFiller = /^(?:i m sorry|im sorry|i am sorry|sorry|um|uh|uhm|hmm|hm|ah|oh|eh|er|okay|ok|so|well|yes|yeah|hi|hello|hey|excuse me|thank you|thanks|sure|but|and|desculpa|desculpe|ola|oi|entao|bom|olha|ai|ne|e|mas|bem|ta|certo|tudo bem)\s+/u;
 const trailingFiller = /\s+(?:please|thanks|thank you|sorry|ok|okay|por favor|obrigado|obrigada|valeu|desculpa|desculpe)$/u;
 
 function stripFillers(text) {
@@ -91,24 +99,47 @@ function classifyCore(core) {
 
 const priority = { repeat: 1, rephrase: 2, define: 3 };
 
+const trailingTermQuestion = /(?:^| )what (?:is|s|are|does|do|means|mean) (?:an? |the )?([a-z0-9][a-z0-9 .+#/-]{0,38}?)(?: means| mean)?$/u;
+const stem = (word) => word.replace(/(?:es|s)$/u, "");
+
+/**
+ * "...performance bottlenecks, what is bottlenecks?": a short utterance that ENDS by asking what a word of the
+ * question means is a definition request even after an echo of the question. Only words the interviewer actually
+ * said qualify, so "what is the impact" in an answer about something else never does.
+ */
+function asksForQuestionTerm(core, question) {
+  if (typeof question !== "string" || !question) return false;
+  const match = core.match(trailingTermQuestion);
+  const subject = match?.[1];
+  if (!subject || notATerm.test(subject) || subject.split(" ").length > 3) return false;
+  const questionStems = new Set(normalize(question).split(" ").filter(Boolean).map(stem));
+  return subject.split(" ").every((word) => questionStems.has(stem(word)));
+}
+
 /**
  * Returns "repeat" | "rephrase" | "define" when the whole utterance is a request to hear the question again, to
  * have it said another way, or to explain a word; otherwise null. A real answer (long, or with any other content)
- * returns null. When several sentences are requests, the strongest kind wins (define > rephrase > repeat).
+ * returns null. When several sentences are requests, the strongest kind wins (define > rephrase > repeat). With the
+ * `question` the candidate is answering, an utterance that ends asking what one of its words means is also "define".
  */
-export function detectClarificationRequest(transcript) {
+export function detectClarificationRequest(transcript, question = null) {
   if (typeof transcript !== "string") return null;
   const words = normalize(transcript).split(" ").filter(Boolean);
   if (words.length === 0 || words.length > maxClarificationWords) return null;
   const sentences = transcript.split(/(?<=[.?!,;])\s+/u).map((sentence) => stripFillers(normalize(sentence))).filter(Boolean);
-  const wholeKind = classifyCore(stripFillers(normalize(transcript)));
+  const wholeCore = stripFillers(normalize(transcript));
+  const wholeKind = classifyCore(wholeCore);
   if (wholeKind) return wholeKind;
   let best = null;
   for (const sentence of sentences) {
     const kind = classifyCore(sentence);
     // Anything that is not a clarification request makes the utterance an answer (fillers were already removed).
-    if (!kind) return null;
+    if (!kind) {
+      best = null;
+      break;
+    }
     if (best === null || priority[kind] > priority[best]) best = kind;
   }
-  return best;
+  if (best) return best;
+  return asksForQuestionTerm(wholeCore, question) ? "define" : null;
 }

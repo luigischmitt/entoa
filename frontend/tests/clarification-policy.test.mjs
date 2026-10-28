@@ -8,7 +8,7 @@ const question = "Tell me about a difficult technical decision you made.";
 
 test("composes the spoken turn for each clarification outcome", () => {
   assert.deepEqual(composeClarificationTurn({ decision: "REPEAT", question }), { acknowledgement: "Sure.", question, base: question, speed: repeatSpeechSpeed });
-  assert.equal(repeatSpeechSpeed, 0.9);
+  assert.equal(repeatSpeechSpeed, 0.85);
   const rephrased = composeClarificationTurn({ decision: "REPHRASE", clarificationText: "What was a hard technical choice you made?", question });
   assert.deepEqual(rephrased, { acknowledgement: "Let me put it another way.", question: "What was a hard technical choice you made?", base: "What was a hard technical choice you made?", speed: 1 });
   const defined = composeClarificationTurn({ decision: "DEFINE", clarificationText: "Scalability means how well a system handles more users or data", question });

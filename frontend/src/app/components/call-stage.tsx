@@ -4,10 +4,12 @@
 import { t } from "@/lib/locale";
 import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import Image from "next/image";
-import { Captions, CaptionsOff, Info, LoaderCircle, Mic, MicOff, PhoneOff, SkipForward, TriangleAlert, User, Video, VideoOff, X } from "lucide-react";
+import { Captions, CaptionsOff, Info, LoaderCircle, Mic, MicOff, Minus, PhoneOff, Plus, SkipForward, TriangleAlert, User, Video, VideoOff, X } from "lucide-react";
 
 import { levelToIntensity, smoothIntensity } from "@/lib/interview/mic-level-visual.mjs";
 import { stopMediaStreamTracks } from "@/lib/interview/session-policy.mjs";
+import { formatInterviewerSpeechSpeed, MAX_INTERVIEWER_SPEECH_SPEED, MIN_INTERVIEWER_SPEECH_SPEED, stepInterviewerSpeechSpeed } from "@/lib/interview/interviewer-speech-speed.mjs";
+import { useLocale } from "@/lib/locale";
 import { ToucanAvatar } from "@/components/interview/toucan/toucan-avatar";
 import type { SpeechFeed, ToucanState } from "@/components/interview/toucan/toucan-engine.mjs";
 
@@ -282,6 +284,9 @@ export function CallDock(props: {
   skipDisabled: boolean;
   onSkip: () => void;
   onEnd: () => void;
+  /** Interviewer voice speed; null hides the control (voice off). */
+  speechSpeed?: number | null;
+  onSpeechSpeed?: (speed: number) => void;
 }) {
   const toastsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -320,6 +325,7 @@ export function CallDock(props: {
         <button type="button" className="mt-btn" data-off={!props.captionsOn ? "true" : undefined} data-tip={captionsTip} aria-label={captionsTip} aria-pressed={props.captionsOn} disabled={props.captionsForced} onClick={props.onCaptions}>
           {props.captionsOn ? <Captions className="size-5" aria-hidden="true" /> : <CaptionsOff className="size-5" aria-hidden="true" />}
         </button>
+        {typeof props.speechSpeed === "number" && props.onSpeechSpeed && <SpeechSpeedControl speed={props.speechSpeed} onChange={props.onSpeechSpeed} />}
         <button type="button" className="mt-btn" data-off={!props.cameraOn ? "true" : undefined} data-tip={props.cameraOn ? cameraLabel : props.cameraState === "requesting" ? cameraLabel : t("Ligar câmera (prévia local, não é enviada nem salva)")} aria-label={cameraLabel} aria-pressed={props.cameraOn} disabled={props.cameraDisabled} onClick={props.onCamera}>
           {props.cameraState === "requesting" ? <LoaderCircle className="size-5 motion-safe:animate-spin" aria-hidden="true" /> : props.cameraOn ? <Video className="size-5" aria-hidden="true" /> : <VideoOff className="size-5" aria-hidden="true" />}
         </button>
@@ -331,6 +337,47 @@ export function CallDock(props: {
           <span>{t("Encerrar")}</span>
         </button>
       </div>
+    </div>
+  );
+}
+
+/** Call-bar button with the interviewer's speed; opens a small stepper. A change applies from the next line spoken. */
+function SpeechSpeedControl({ speed, onChange }: { speed: number; onChange: (speed: number) => void }) {
+  const { locale } = useLocale();
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: PointerEvent) => { if (!rootRef.current?.contains(event.target as Node)) setOpen(false); };
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  const value = formatInterviewerSpeechSpeed(speed, locale);
+  const label = `${t("Velocidade da voz do entrevistador: ")}${value}`;
+  return (
+    <div className="mt-speed" ref={rootRef}>
+      <button type="button" className="mt-btn mt-btn-speed" data-tip={open ? undefined : t("Velocidade da voz")} aria-label={label} aria-expanded={open} aria-controls="mt-speed-pop" onClick={() => setOpen((value) => !value)}>
+        <span aria-hidden="true">{value}</span>
+      </button>
+      {open && (
+        <div className="mt-speed-pop" id="mt-speed-pop" role="group" aria-label={t("Velocidade da voz")}>
+          <div className="mt-speed-row">
+            <button type="button" className="mt-speed-step" aria-label={t("Mais devagar")} disabled={speed <= MIN_INTERVIEWER_SPEECH_SPEED} onClick={() => onChange(stepInterviewerSpeechSpeed(speed, -1))}>
+              <Minus className="size-4" aria-hidden="true" />
+            </button>
+            <output className="mt-speed-value" aria-live="polite">{value}</output>
+            <button type="button" className="mt-speed-step" aria-label={t("Mais rápido")} disabled={speed >= MAX_INTERVIEWER_SPEECH_SPEED} onClick={() => onChange(stepInterviewerSpeechSpeed(speed, 1))}>
+              <Plus className="size-4" aria-hidden="true" />
+            </button>
+          </div>
+          <p className="mt-speed-hint">{t("Vale a partir da próxima fala.")}</p>
+        </div>
+      )}
     </div>
   );
 }
