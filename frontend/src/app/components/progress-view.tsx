@@ -227,7 +227,7 @@ export function ProgressView({
       ) : (
         <>
           <div hidden={!!selectedSession}>
-            <ProgressContent insights={insights} onOpenReport={openHistoricalReport} records={records} />
+            <ProgressContent insights={insights} onOpenReport={openHistoricalReport} />
           </div>
           {selectedSession && historicalConfig && (
             <div className="mt-8 lg:mt-10">

@@ -7,10 +7,6 @@
 .pg-error { border-radius: var(--ds-r-card); background: var(--ds-error-tint); color: var(--ds-error); }
 
 /* ---- Comparison with the previous interview ---- */
-.pg-compare-list { display: grid; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
-.pg-compare-row { color: var(--ds-text-2); font-size: 0.875rem; line-height: 1.5; }
-.pg-compare-row[data-change="better"] { color: var(--ds-green-deep); }
-.pg-compare-row[data-change="worse"] { color: var(--ds-warning); }
 
 /* ---- Empty state: first practice ---- */
 .pg-first { max-width: 36rem; padding: clamp(1.5rem, 3vw, 2.25rem); }
