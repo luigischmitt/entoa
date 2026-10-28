@@ -55,6 +55,7 @@ import { createCandidateStatusWait, shouldWaitForCandidateStatus } from "@/lib/i
 import { MAX_SPECULATIVE_REVISIONS, adoptSpeechEpoch, canUseCurrentEpochCandidate, discardCoveredFollowUps, finalEpochCandidateStatus, mayReplaceActiveCandidate, recordCandidateStatus, waitForFirstChunk, waitForPreparedTurnAudio } from "@/lib/interview/speculative-epoch.mjs";
 import { reportAudioDiagnostic } from "@/lib/interview/audio-diagnostics";
 import { useLocale, t } from "@/lib/locale";
+import { resolveInterviewerSpeechSpeed, storeInterviewerSpeechSpeed } from "@/lib/interview/interviewer-speech-speed.mjs";
 
 type AssessmentEntry = { questionLabel: string; sequenceNumber: number; round?: number; state: VoiceAssessmentState };
 /** Monotonic clock for latency budgets (kept outside the component so handlers may read it). */
@@ -124,6 +125,8 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
   const [acknowledgement, setAcknowledgement] = useState<string | null>(null);
   // What the interviewer says after a clarification request; the question itself (id, prompt, report pairing) never changes.
   const [spokenTurn, setSpokenTurn] = useState<ClarificationTurn | null>(null);
+  // Everything the candidate heard for this question (a rephrase may use other words): the terms they may ask about.
+  const heardQuestion = () => (spokenTurn ? `${question.prompt} ${spokenTurn.question}` : question.prompt);
   const [clarifyRound, setClarifyRound] = useState(0);
   const [excludedAssessments, setExcludedAssessments] = useState<ReadonlySet<string>>(() => new Set());
   // After reload any in-progress capture is gone, so repeat the saved active question before recording again.
@@ -172,7 +175,13 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
   // Receives each interviewer audio chunk (decoded for the avatar's beak lip-sync); it never touches playback.
   const speechFeed = useMemo(() => createSpeechFeed(), []);
   // The instant "Okay." / "Got it." (pre-synthesized, played from memory when the answer is considered finished).
-  const interviewerSpeechSpeed = config.speechSpeed ?? 1;
+  // Adjustable from the call bar: every line synthesized after a change uses the new speed (saved for the next interviews too).
+  const [interviewerSpeechSpeed, setInterviewerSpeechSpeed] = useState(() => resolveInterviewerSpeechSpeed(config.speechSpeed ?? 1));
+  const changeInterviewerSpeechSpeed = useCallback((speed: number) => {
+    const next = resolveInterviewerSpeechSpeed(speed);
+    setInterviewerSpeechSpeed(next);
+    storeInterviewerSpeechSpeed(window.localStorage, next);
+  }, []);
   const [acknowledgements] = useState(() => createInterviewerAcknowledgements(speechFeed.push, config.voice, interviewerSpeechSpeed));
   const [acknowledgementPlaying, setAcknowledgementPlaying] = useState(false);
   const acknowledgedTurnRef = useRef<string | null>(null);
@@ -555,7 +564,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
     ])];
     const nextPlan = selectNextPlannedQuestion({ questions, askedQuestionIds: askedPlannedQuestionIdsRef.current, elapsedSeconds: elapsedSecondsRef.current, durationMinutes });
     return {
-      config,
+      config: { ...config, speechSpeed: interviewerSpeechSpeed },
       currentQuestion: question.prompt,
       transcript: answer,
       nextFixedQuestion: nextPlan.question?.prompt ?? null,
@@ -608,7 +617,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
   /** While the candidate answers: if this answer will be the last one, prepare the short reaction (and its audio) the interviewer says before closing. */
   const maybePrepareClosingReaction = (answer: string) => {
     if (!isLastAnswerExpected({ elapsedSeconds: elapsedSecondsRef.current, durationMinutes })) return;
-    if (detectClarificationRequest(answer) !== null) return;
+    if (detectClarificationRequest(answer, heardQuestion()) !== null) return;
     const turn = micTurnIdRef.current;
     // The fallback reaction + each closing line, ready in case the model has no reaction (once per answer window).
     if (config.playInterviewerAudio && !closingFallbackPrewarmRef.current) {
@@ -645,7 +654,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
     },
     audio: config.playInterviewerAudio,
     pickWord: () => pickAcknowledgement({ recent: recentAcknowledgementsRef.current }),
-    fallbackReaction: detectClarificationRequest(answer) === null ? closingFallback : null,
+    fallbackReaction: detectClarificationRequest(answer, heardQuestion()) === null ? closingFallback : null,
     onSource: (source) => {
       if (source === "fallback") rememberClosingFallback(closingFallback);
       reportAudioDiagnostic({ kind: "closing_reaction", reactionSource: source });
@@ -702,7 +711,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
     if (answer) maybePrepareClosingReaction(answer);
     if (!answer || timeLimitReached || !hasTimeForNextQuestion(elapsedSecondsRef.current, durationMinutes)) return;
     // A request to repeat or explain is not an answer: nothing to prepare.
-    if (detectClarificationRequest(answer) !== null) return;
+    if (detectClarificationRequest(answer, heardQuestion()) !== null) return;
     const turns = appendInterviewReportPair(reportTurnsRef.current, {
       questionSequenceNumber,
       candidateSequenceNumber: questionSequenceNumber + 1,
@@ -867,7 +876,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
     const abortController = new AbortController();
     decisionAbortRef.current = abortController;
     // "Can you repeat the question?" and similar are not answers: they are never reported, analyzed or persisted.
-    const clarificationHint = detectClarificationRequest(savedAnswer);
+    const clarificationHint = detectClarificationRequest(savedAnswer, heardQuestion());
     const candidateSequenceNumber = questionSequenceNumber + 1;
     const submittedTurns = appendInterviewReportPair(reportTurnsRef.current, {
       questionSequenceNumber,
@@ -1556,6 +1565,8 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
         skipDisabled={!canSkip}
         onSkip={skipQuestion}
         onEnd={() => setEndOpen(true)}
+        speechSpeed={config.playInterviewerAudio ? interviewerSpeechSpeed : null}
+        onSpeechSpeed={changeInterviewerSpeechSpeed}
       />
     );
   };

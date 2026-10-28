@@ -24,7 +24,7 @@ import { getFixedInterviewQuestions } from "@/lib/interview/questions";
 import { composeContextualOpening } from "@/lib/interview/speech-playback.mjs";
 import { storeRoomHandoff } from "@/lib/interview/room-handoff.mjs";
 import { readStoredInterviewerVoice, storeInterviewerVoice } from "@/lib/interview/voice-picker.mjs";
-import { readStoredInterviewerSpeechSpeed, storeInterviewerSpeechSpeed } from "@/lib/interview/interviewer-speech-speed.mjs";
+import { formatInterviewerSpeechSpeed, INTERVIEWER_SPEECH_SPEED_STEP, MAX_INTERVIEWER_SPEECH_SPEED, MIN_INTERVIEWER_SPEECH_SPEED, readStoredInterviewerSpeechSpeed, storeInterviewerSpeechSpeed } from "@/lib/interview/interviewer-speech-speed.mjs";
 import { DEFAULT_INTERVIEWER_VOICE } from "@/lib/interview/voices.mjs";
 import { readStoredInterviewerCharacter, storeInterviewerCharacter } from "@/lib/interview/interviewer-character-preference.mjs";
 import { readDashboardCache } from "@/lib/dashboard-data-cache.mjs";
@@ -560,16 +560,22 @@ function SettingsView() {
               <VoicePicker value={voice} onChange={chooseVoice} speed={speechSpeed} />
               <div className="mt-5">
                 <p id="interviewer-speech-speed" className="ds-label">{t("Velocidade da fala")}</p>
-                <SlidingSegmented
-                  name="interviewer-speech-speed"
-                  ariaLabel={t("Velocidade da fala")}
-                  ariaDescribedBy="interviewer-speech-speed-help"
-                  className="mt-2 grid-cols-4"
-                  options={[{ value: "0.8", label: "0,8×" }, { value: "0.9", label: "0,9×" }, { value: "1", label: "1×" }, { value: "1.1", label: "1,1×" }]}
-                  value={String(speechSpeed)}
-                  onChange={chooseSpeechSpeed}
-                />
-                <p id="interviewer-speech-speed-help" className="ds-small mt-2">{t("Diminua se a voz parecer rápida demais.")}</p>
+                <div className="shl-speed mt-2">
+                  <input
+                    type="range"
+                    className="shl-speed-range"
+                    min={MIN_INTERVIEWER_SPEECH_SPEED}
+                    max={MAX_INTERVIEWER_SPEECH_SPEED}
+                    step={INTERVIEWER_SPEECH_SPEED_STEP}
+                    value={speechSpeed}
+                    aria-labelledby="interviewer-speech-speed"
+                    aria-describedby="interviewer-speech-speed-help"
+                    aria-valuetext={formatInterviewerSpeechSpeed(speechSpeed, locale)}
+                    onChange={(event) => chooseSpeechSpeed(event.target.value)}
+                  />
+                  <output className="shl-speed-value">{formatInterviewerSpeechSpeed(speechSpeed, locale)}</output>
+                </div>
+                <p id="interviewer-speech-speed-help" className="ds-small mt-2">{t("Diminua se a voz parecer rápida demais. Você também pode mudar durante a entrevista.")}</p>
               </div>
             </div>
           </div>

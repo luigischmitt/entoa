@@ -49,3 +49,21 @@ test("ignores non-string input", () => {
   assert.equal(detectClarificationRequest(undefined), null);
   assert.equal(detectClarificationRequest(null), null);
 });
+
+test("real requests from interviews: slower repeats and literal Portuguese word questions", () => {
+  for (const text of ["Can you repeat more slower?", "Can you repeat it a bit slower, please?", "Could you speak more slowly?", "Say it again slower", "Repeat please"]) {
+    assert.equal(detectClarificationRequest(text), "repeat", text);
+  }
+  for (const text of ["Sorry, but I don't know what is index database.", "What means scalability?", "What scalability means?", "What does idempotency means?", "What is the meaning of the word throughput?", "I don't understand the word latency"]) {
+    assert.equal(detectClarificationRequest(text), "define", text);
+  }
+});
+
+test("an echo of the question ending in 'what is <term>' is a definition request only for the question's own words", () => {
+  const question = "How would you profile and resolve performance bottlenecks in a backend service?";
+  assert.equal(detectClarificationRequest("Profile and resolve performance bottlenecks what is bottlenecks", question), "define");
+  assert.equal(detectClarificationRequest("Profile and resolve performance bottlenecks what is bottleneck?", question), "define");
+  assert.equal(detectClarificationRequest("I used caching and it worked, what is the result", question), null);
+  assert.equal(detectClarificationRequest("I improved the queue, what is latency", question), null);
+  assert.equal(detectClarificationRequest("Profile and resolve performance bottlenecks what is bottlenecks"), null);
+});

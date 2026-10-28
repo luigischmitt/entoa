@@ -270,6 +270,20 @@
   .mt-btn-end span { display: none; }
 }
 
+/* Interviewer speed: the button shows the value; the stepper opens above the bar. */
+.mt-speed { position: relative; display: inline-flex; }
+.mt-btn-speed { font-size: 0.8125rem; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.mt-speed-pop { position: absolute; bottom: calc(100% + 14px); left: 50%; translate: -50% 0; z-index: 2; display: flex; width: max-content; flex-direction: column; align-items: center; gap: 6px; border-radius: 18px; background: var(--ds-surface); padding: 10px 12px 9px; box-shadow: 0 0 0 1px var(--mt-dock-line), var(--ds-shadow-dock); animation: mt-speed-in 160ms var(--ease-out); }
+@keyframes mt-speed-in { from { opacity: 0; transform: translateY(4px); } }
+.mt-speed-row { display: flex; align-items: center; gap: 6px; }
+.mt-speed-step { display: inline-flex; width: 40px; height: 40px; align-items: center; justify-content: center; border-radius: 9999px; background: var(--mt-btn); color: var(--mt-text); transition: background-color var(--ds-dur-fast) ease, transform var(--ds-dur-press) var(--ease-out); }
+.mt-speed-step:active:not(:disabled) { transform: scale(0.94); }
+.mt-speed-step:disabled { opacity: 0.35; cursor: not-allowed; }
+@media (hover: hover) and (pointer: fine) { .mt-speed-step:hover:not(:disabled) { background: var(--mt-btn-hover); } }
+.mt-speed-value { min-width: 4.25rem; text-align: center; font-size: 1.125rem; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--mt-text); }
+.mt-speed-hint { font-size: 0.75rem; color: var(--mt-muted); }
+@media (prefers-reduced-motion: reduce) { .mt-speed-pop { animation: none; } }
+
 /* Tooltips (hover/keyboard only; every control also has an aria-label). */
 @media (hover: hover) and (pointer: fine) {
   .mt-btn[data-tip]::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 12px); left: 50%; translate: -50% 0; width: max-content; max-width: 16rem; border-radius: 8px; background: var(--mt-tooltip-bg); padding: 5px 9px; font-size: 0.75rem; font-weight: 500; line-height: 1.3; color: var(--ds-caption-text); opacity: 0; pointer-events: none; transition: opacity var(--ds-dur-fast) ease; white-space: normal; text-align: center; }
