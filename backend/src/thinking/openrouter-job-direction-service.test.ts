@@ -53,18 +53,31 @@ describe("OpenRouter job direction service", () => {
     const jsonSchema = (requestBody?.response_format as { json_schema: { schema: { required: string[]; properties: Record<string, { enum?: string[] }> } } }).json_schema.schema;
     expect(jsonSchema.required).toContain("suggestedFocus");
     expect(jsonSchema.required).toContain("tailoredQuestions");
-    expect(jsonSchema.properties.suggestedFocus?.enum).toEqual(["technical-depth", "communication", "behavioral", "mixed"]);
+    expect(jsonSchema.properties.suggestedFocus?.enum).toEqual(["technical-depth", "mixed"]);
     const log = JSON.parse(String(info.mock.calls[0]?.[0]));
     expect(log).toMatchObject({ event: "interview_job_direction_timing", promptTokens: 310, completionTokens: 88, costUsd: 0.00005, cachedTokens: 120 });
     expect(JSON.stringify(log)).not.toContain(input.jobDescription);
   });
 
+  it("omits temperature for Anthropic and keeps it for other models", async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    const fetcher = async (_url: string | URL | Request, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return providerResponse(direction);
+    };
+    for (const model of ["anthropic/claude-haiku-5.5", "vendor/model"]) {
+      await new OpenRouterJobDirectionService({ key: "k", model, timeoutMs: 1_000, fetchImplementation: fetcher as typeof fetch }).analyze(input);
+    }
+    expect(bodies[0]).not.toHaveProperty("temperature");
+    expect(bodies[1]).toHaveProperty("temperature", 0);
+  });
+
   it("normalizes a Portuguese title with seniority and strips placeholder context", async () => {
     const service = new OpenRouterJobDirectionService({
       key: "test-key", model: "mistral/test", timeoutMs: 1_000,
-      fetchImplementation: async () => providerResponse({ ...direction, targetRole: "Analista de Dados Sênior", suggestedSeniority: "senior", productTeamContext: "Plataforma de analytics para varejo. Não informado", suggestedFocus: "communication" }),
+      fetchImplementation: async () => providerResponse({ ...direction, targetRole: "Analista de Dados Sênior", suggestedSeniority: "staff", productTeamContext: "Plataforma de analytics para varejo. Não informado", suggestedFocus: "communication" }),
     });
-    await expect(service.analyze(input)).resolves.toMatchObject({ targetRole: "Data Analyst", suggestedSeniority: "senior", productTeamContext: "Plataforma de analytics para varejo.", suggestedFocus: "communication" });
+    await expect(service.analyze(input)).resolves.toMatchObject({ targetRole: "Data Analyst", suggestedSeniority: "senior", productTeamContext: "Plataforma de analytics para varejo.", suggestedFocus: "mixed" });
   });
 
   it("falls back to the setup focus when the provider omits the focus, and rejects titles that are only seniority", async () => {

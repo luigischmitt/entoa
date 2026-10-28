@@ -13,7 +13,7 @@ test("keeps a saved session focus available to the historical report config", as
 
   assert.match(types, /targetRole: string;\s*focus: string \| null;/);
   assert.match(persistence, /focus: session\.focus,/);
-  assert.match(progressView, /focus: selectedSession\.focus \?\? "mixed",/);
+  assert.match(progressView, /focus: normalizeFocus\(selectedSession\.focus\),/);
 });
 
 test("makes every saved interview recoverable from history and returns from the top of reports", async () => {

@@ -92,6 +92,25 @@ describe("resume direction validation", () => {
     });
   });
 
+  it("normalizes legacy seniority and focus values and accepts the background_path dimension", () => {
+    const legacy = { ...providerResult, suggestedSeniority: "staff", suggestedFocus: "behavioral", tailoredQuestions: providerResult.tailoredQuestions.map((question, index) => index === 0 ? { ...question, dimension: "background_path" } : question) };
+    expect(parseResumeDirection(JSON.stringify(legacy), { resumeText, pageCount: 2 })).toMatchObject({ suggestedSeniority: "senior", suggestedFocus: "mixed" });
+    expect(resumeQuestionDimensions).toContain("background_path");
+  });
+
+  it("omits temperature for Anthropic and keeps it for other models", async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    const fetcher = async (_url: string | URL | Request, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(providerResult) } }] }), { status: 200 });
+    };
+    for (const model of ["anthropic/claude-haiku-5.5", "vendor/model"]) {
+      await new OpenRouterResumeDirectionService({ key: "k", model, timeoutMs: 1_000, fetchImplementation: fetcher as typeof fetch }).analyze({ resumeText, pageCount: 2 });
+    }
+    expect(bodies[0]).not.toHaveProperty("temperature");
+    expect(bodies[1]).toHaveProperty("temperature", 0);
+  });
+
   it("accepts one short resume experience when questions explore distinct dimensions", () => {
     const shortResume = "Backend Engineer. Built a payments platform with Node.js and PostgreSQL.";
     const result = parseResumeDirection(JSON.stringify(providerResult), { resumeText: shortResume, pageCount: 1 });
@@ -208,12 +227,12 @@ describe("resume direction validation", () => {
 });
 
 describe("OpenRouter resume direction service", () => {
-  it("uses a dedicated 30-second default and honors its dedicated environment override", () => {
-    expect(defaultResumeDirectionTimeoutMs).toBe(30_000);
-    expect(loadThinkingConfig({}).resumeDirectionTimeoutMs).toBe(30_000);
+  it("uses a dedicated 35-second default and honors its dedicated environment override", () => {
+    expect(defaultResumeDirectionTimeoutMs).toBe(35_000);
+    expect(loadThinkingConfig({}).resumeDirectionTimeoutMs).toBe(35_000);
     expect(loadThinkingConfig({ INTERVIEW_RESUME_DIRECTION_TIMEOUT_MS: "26000" }).resumeDirectionTimeoutMs).toBe(26_000);
-    expect(() => loadThinkingConfig({ INTERVIEW_RESUME_DIRECTION_TIMEOUT_MS: "24000" })).toThrow(/between 25000 and 30000/iu);
-    expect(() => loadThinkingConfig({ INTERVIEW_RESUME_DIRECTION_TIMEOUT_MS: "31000" })).toThrow(/between 25000 and 30000/iu);
+    expect(() => loadThinkingConfig({ INTERVIEW_RESUME_DIRECTION_TIMEOUT_MS: "24000" })).toThrow(/between 25000 and 60000/iu);
+    expect(() => loadThinkingConfig({ INTERVIEW_RESUME_DIRECTION_TIMEOUT_MS: "61000" })).toThrow(/between 25000 and 60000/iu);
   });
 
   it("uses strict structured output, denies retention, and logs aggregates only", async () => {
@@ -329,7 +348,7 @@ describe("OpenRouter resume direction service", () => {
       });
       vi.stubGlobal("fetch", fetchImplementation);
       try {
-        const service = new OpenRouterResumeDirectionService({ key: "k", model: "m", timeoutMs: 2_000, hedgeAfterMs: 100 });
+        const service = new OpenRouterResumeDirectionService({ key: "k", model: "mistralai/mistral-small-3.2-24b-instruct", timeoutMs: 2_000, hedgeAfterMs: 100 });
         const started = Date.now();
         await expect(service.analyze({ resumeText, pageCount: 2 })).resolves.toMatchObject({ tailoredQuestions: expect.any(Array) });
         expect(Date.now() - started).toBeGreaterThanOrEqual(95);

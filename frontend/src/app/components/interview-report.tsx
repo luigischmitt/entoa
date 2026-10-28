@@ -9,6 +9,7 @@ import type { AzureMetricSummary } from "@/lib/interview/report-metrics.mjs";
 import type { InterviewConfig } from "@/lib/interview/types";
 import type { ProgressRecord } from "@/lib/interview/progress-insights.mjs";
 import { RESUME_PRACTICE_LABEL } from "@/lib/interview/resume-neutral.mjs";
+import { normalizeFocus, normalizeSeniority } from "@/lib/interview/interview-normalization.mjs";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { findingsForAnswer } from "@/lib/interview/report-response.mjs";
 import { analysisCoverageNotice, displayInterviewerTakeaway, displayTechnicalFindings, phonemeTip } from "@/lib/interview/report-presentation.mjs";
@@ -45,7 +46,7 @@ const maxStrengths = 3;
 const maxPronunciationWords = 6;
 const pronunciationScoreLimit = 70;
 /** Answers longer than this are clamped on screen (to four lines) until the reader asks for the full text. */
-const seniorityLabels: Record<string, string> = { junior: "Júnior", "mid-level": "Pleno", senior: "Sênior" };
+const seniorityLabels: Record<string, string> = { intern: "Estágio", junior: "Júnior", "mid-level": "Pleno", senior: "Sênior" };
 const jobStatusLabels: Record<JobCoverageItem["status"], string> = {
   shown: "Citado nas respostas",
   partial: "Citado, com lacunas",
@@ -404,13 +405,10 @@ export function InterviewReport({ config, elapsed, totalClock, answerCount, pers
     }
   };
   const dateLabel = formatReportDate(reportDate, getCurrentLocale() === "en" ? "en" : "pt-BR");
-  const seniorityLabel = config.seniority === "staff" ? "Staff / Lead" : seniorityLabels[config.seniority] ? t(seniorityLabels[config.seniority]) : null;
+  const seniorityLabel = t(seniorityLabels[normalizeSeniority(config.seniority)]);
   const defaultTitle = `${role}${seniorityLabel && !isResume ? ` · ${seniorityLabel}` : ""}`;
   const shownTitle = displayTitle || defaultTitle;
-  const focusLabel = config.focus === "technical-depth" ? t("Profundidade técnica")
-    : config.focus === "communication" ? t("Comunicação e clareza")
-      : config.focus === "behavioral" ? t("Respostas comportamentais")
-        : t("Prática equilibrada");
+  const focusLabel = t(normalizeFocus(config.focus) === "technical-depth" ? "Técnica" : "Equilibrada");
   const duration = historical ? elapsed : `${elapsed} / ${totalClock}`;
   const readyModel = useMemo(
     () => reportState.result ? buildReadyModel(reportState.result, loadedTurns, azureSummary) : null,

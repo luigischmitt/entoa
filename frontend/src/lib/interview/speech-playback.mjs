@@ -8,7 +8,7 @@ export function composeOpeningUtterance(introduction, firstQuestion) {
 }
 
 export function composeContextualOpening(config, firstQuestion) {
-  const seniorityLabels = { junior: "junior", "mid-level": "mid-level", senior: "senior", staff: "staff-level" };
+  const seniorityLabels = { intern: "intern", junior: "junior", "mid-level": "mid-level", senior: "senior" };
   const minutes = Number.parseInt(config.duration, 10) || 5;
   // Resume practice has no target job: no role, seniority or focus is spoken.
   if (isResumePractice(config)) return `Hi, I'm Tuk, and I'll be your interviewer today. We have about ${minutes} minutes for a practice interview based on your resume. ${firstQuestion.trim()}`;

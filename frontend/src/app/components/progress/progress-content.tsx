@@ -14,6 +14,7 @@ import type {
 } from "@/lib/interview/progress-insights.mjs";
 import { mergeVoiceSeries, voiceMetricSummary, voiceTrendCopy, voiceTrendMetrics, type VoiceTrendMetric } from "@/lib/interview/voice-trend.mjs";
 import { SlidingSegmented } from "@/components/ui/sliding-segmented";
+import { normalizeSeniority } from "@/lib/interview/interview-normalization.mjs";
 import { CountUp } from "@/components/ui/count-up";
 import { MetricSwatch, VoiceTrendChart } from "../charts/voice-trend-chart";
 import { ProfileRadar, type RadarItem } from "../charts/profile-radar";
@@ -41,10 +42,11 @@ function plural(count: number, one: string, many: string) {
 }
 
 function seniorityLabel(value: string | null | undefined) {
-  if (value === "junior") return t("Júnior");
-  if (value === "mid-level") return t("Pleno");
-  if (value === "senior") return t("Sênior");
-  return value === "staff" ? "Staff / Lead" : value ?? "";
+  const normalized = normalizeSeniority(value);
+  if (normalized === "intern") return t("Estágio");
+  if (normalized === "junior") return t("Júnior");
+  if (normalized === "mid-level") return t("Pleno");
+  return t("Sênior");
 }
 
 /* ------------------------------------------------------------------- Hero */

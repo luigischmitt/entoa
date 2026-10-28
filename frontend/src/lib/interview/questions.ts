@@ -10,7 +10,7 @@ export function getFixedInterviewQuestions(config: InterviewConfig, learnerProfi
   // A role typed in Portuguese is never spliced into an English sentence ("strong fit for Analista de Dados").
   // Resume practice has no target job: bank questions never name the inferred role.
   const spokenRole = isResumePractice(config) ? "this kind of work" : roleForSpeech(role);
-  const questions = getQuestionBankForRole(config.role, config.seniority).map((question) => ({ ...question, prompt: question.prompt.replace("{role}", spokenRole) }));
+  const questions = getQuestionBankForRole(config.role, config.seniority, config.focus).map((question) => ({ ...question, prompt: question.prompt.replace("{role}", spokenRole) }));
   const direction = config.jobDirection;
   if (questions[0] && isValidJobDirection(direction)
     && direction.targetRole.trim() === role.trim()
@@ -28,22 +28,32 @@ export function getFixedInterviewQuestions(config: InterviewConfig, learnerProfi
   return personalizeTechnicalQuestions(questions, learnerProfile, { seniority: config.seniority });
 }
 
-// Bank order: [introduction, t1, t2, ownership, t3, conflict, t4, ...]. Tailored questions take the first technical slots.
-const tailoredSlots = [1, 2, 3, 4, 5, 6, 7, 8];
+const maxTailoredQuestions = 8;
 
+/**
+ * Tailored job/resume questions replace bank technical questions (up to eight, even when the focus has fewer technical
+ * slots) and run immediately after the introduction, so a short interview is mostly about this job or resume. The
+ * remaining bank questions keep their order after them, and the list keeps its length.
+ */
 function applyTailoredQuestions(questions: InterviewQuestion[], tailored: string[] | undefined, prefix: "job" | "resume"): InterviewQuestion[] {
   const used = new Set(questions.map((question) => question.prompt.trim().toLowerCase()));
-  const slots = tailoredSlots;
-  let slot = 0;
-  (tailored ?? []).forEach((prompt) => {
+  const picked: InterviewQuestion[] = [];
+  for (const prompt of tailored ?? []) {
     const key = prompt.trim().toLowerCase();
-    if (slot >= slots.length || used.has(key)) return;
-    questions[slots[slot]] = { id: `${prefix}-${slot + 1}`, prompt: prompt.trim(), cue: "Give a concrete example from your experience with this." };
+    if (picked.length >= maxTailoredQuestions || !key || used.has(key)) continue;
+    picked.push({ id: `${prefix}-${picked.length + 1}`, prompt: prompt.trim(), cue: "Give a concrete example from your experience with this.", kind: "technical" });
     used.add(key);
-    slot += 1;
-  });
-  // In a short interview, keep all source-specific questions immediately after the introduction.
-  // Questions from the role bank retain their relative order after the tailored block.
-  const tailoredPrefix = `${prefix}-`;
-  return [questions[0], ...questions.slice(1).filter((question) => question.id.startsWith(tailoredPrefix)), ...questions.slice(1).filter((question) => !question.id.startsWith(tailoredPrefix))];
+  }
+  if (picked.length === 0) return questions;
+  const [introduction, ...rest] = questions;
+  const closing = rest.at(-1);
+  const middle = rest.slice(0, -1);
+  // Drop bank technical questions first (the tailored ones replace them), then the last ones, to keep the length.
+  let technicalToDrop = picked.length;
+  const kept = middle.filter((question) => {
+    if (question.kind !== "technical" || technicalToDrop === 0) return true;
+    technicalToDrop -= 1;
+    return false;
+  }).slice(0, Math.max(0, middle.length - picked.length));
+  return [introduction, ...picked, ...kept, ...(closing ? [closing] : [])];
 }

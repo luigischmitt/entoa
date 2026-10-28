@@ -36,7 +36,7 @@ export interface ThinkingService {
 
 export type JobDirection = {
   targetRole: string;
-  suggestedSeniority: "junior" | "mid-level" | "senior" | "staff";
+  suggestedSeniority: "intern" | "junior" | "mid-level" | "senior";
   mainInterviewEmphasis: string;
   priorityCompetencies: string[];
   productTeamContext: string;
@@ -46,7 +46,7 @@ export type JobDirection = {
 
 export type ApprovedJobDirection = JobDirection;
 
-export type JobFocus = "technical-depth" | "communication" | "behavioral" | "mixed";
+export type JobFocus = "technical-depth" | "mixed";
 
 /** Analysis result: the direction snapshot plus the practice focus used only to fill the setup (never persisted in the snapshot). */
 export type JobDirectionAnalysis = JobDirection & { suggestedFocus: JobFocus };

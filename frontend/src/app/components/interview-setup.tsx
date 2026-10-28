@@ -26,19 +26,21 @@ import { SlidingSegmented } from "@/components/ui/sliding-segmented";
 import "./interview-setup.css";
 import { defaultInterviewConfig } from "../interview-config";
 import { interviewDurationOptions } from "@/lib/interview/session-policy.mjs";
+import { normalizeFocus, normalizeSeniority } from "@/lib/interview/interview-normalization.mjs";
+import { clearSetupDraft, readSetupDraft, writeSetupDraft, type SetupDraft } from "@/lib/interview/setup-draft.mjs";
+import { getLocalSessionUserId } from "@/lib/auth/browser-session";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const seniorityLabels: Record<InterviewConfig["seniority"], string> = {
+  intern: "Estágio",
   junior: "Júnior",
   "mid-level": "Pleno",
   senior: "Sênior",
-  staff: "Staff / Lead",
 };
 
 const focusLabels: Record<InterviewConfig["focus"], string> = {
-  "technical-depth": "Profundidade técnica",
-  communication: "Comunicação e clareza",
-  behavioral: "Respostas comportamentais",
-  mixed: "Prática equilibrada",
+  mixed: "Equilibrada",
+  "technical-depth": "Técnica",
 };
 
 const subscribeNever = () => () => {};
@@ -69,6 +71,9 @@ export function InterviewSetup({
   const [parkedJobSetup, setParkedJobSetup] = useState<ParkedAutomaticSetup | undefined>(undefined);
   const [parkedResumeSetup, setParkedResumeSetup] = useState<ParkedAutomaticSetup | undefined>(undefined);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [resumeFileName, setResumeFileName] = useState("");
+  const [draftUserId, setDraftUserId] = useState<string | null>(null);
+  const [draftReady, setDraftReady] = useState(false);
   const [resumeDirectionStatus, setResumeDirectionStatus] = useState<"idle" | "loading" | "error">("idle");
   const [resumeDirectionError, setResumeDirectionError] = useState("");
   const resumeInputRef = useRef<HTMLInputElement>(null);
@@ -82,6 +87,56 @@ export function InterviewSetup({
   const { copied, copy } = useCopyPageLink();
   const roomOptionsRef = useRef<HTMLElement>(null);
   const micTestRef = useRef<MicrophoneTestHandle>(null);
+  const draftSnapshotRef = useRef<SetupDraft | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void getLocalSessionUserId(getSupabaseBrowserClient()).then((userId) => {
+      if (!active) return;
+      setDraftUserId(userId);
+      if (userId) {
+        const draft = readSetupDraft(window.localStorage, userId);
+        if (draft) {
+          setSetupMode(draft.mode);
+          setJobDescription(draft.job?.text ?? "");
+          setResumeFileName(draft.resume?.fileName ?? "");
+          const jobSetup = draft.job?.direction ? { direction: draft.job.direction, focus: normalizeFocus(draft.job.focus) } : undefined;
+          const resumeSetup = draft.resume ? { direction: draft.resume.direction, focus: normalizeFocus(draft.resume.focus) } : undefined;
+          setParkedJobSetup(draft.mode === "auto" ? undefined : jobSetup);
+          setParkedResumeSetup(draft.mode === "resume" ? undefined : resumeSetup);
+          const activeSetup = draft.mode === "auto" ? jobSetup : draft.mode === "resume" ? resumeSetup : undefined;
+          if (activeSetup) setConfig((current) => ({ ...current, role: activeSetup.direction.targetRole, seniority: normalizeSeniority(activeSetup.direction.suggestedSeniority), focus: activeSetup.focus, jobDirection: activeSetup.direction, interviewSource: draft.mode === "auto" ? "job" : "resume" }));
+          else if (draft.mode === "manual" && jobSetup) setConfig((current) => ({ ...current, role: jobSetup.direction.targetRole, seniority: normalizeSeniority(jobSetup.direction.suggestedSeniority), focus: jobSetup.focus, interviewSource: "manual" }));
+        }
+      }
+      setDraftReady(true);
+    }).catch(() => { if (active) setDraftReady(true); });
+    return () => { active = false; };
+  }, []);
+
+  const jobDirectionForDraft = setupMode === "auto" ? config.jobDirection : parkedJobSetup?.direction;
+  const jobFocusForDraft = setupMode === "auto" ? config.focus : parkedJobSetup?.focus;
+  const resumeDirectionForDraft = setupMode === "resume" ? config.jobDirection : parkedResumeSetup?.direction;
+  const resumeFocusForDraft = setupMode === "resume" ? config.focus : parkedResumeSetup?.focus;
+  useEffect(() => {
+    draftSnapshotRef.current = draftReady && draftUserId ? {
+      version: 1, savedAt: 0, userId: draftUserId, mode: setupMode,
+      job: jobDescription.trim() ? { text: jobDescription, direction: jobDirectionForDraft ?? null, focus: jobFocusForDraft ?? config.focus } : null,
+      resume: resumeFileName && resumeDirectionForDraft ? { fileName: resumeFileName, direction: resumeDirectionForDraft, focus: resumeFocusForDraft ?? config.focus } : null,
+    } : null;
+  }, [draftReady, draftUserId, setupMode, jobDescription, jobDirectionForDraft, jobFocusForDraft, resumeDirectionForDraft, resumeFocusForDraft, resumeFileName, config.focus]);
+
+  useEffect(() => () => {
+    if (draftSnapshotRef.current) writeSetupDraft(window.localStorage, draftSnapshotRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (!draftReady || !draftUserId) return;
+    const timeout = window.setTimeout(() => {
+      if (draftSnapshotRef.current) writeSetupDraft(window.localStorage, draftSnapshotRef.current);
+    }, jobDescription ? 400 : 0);
+    return () => window.clearTimeout(timeout);
+  }, [draftReady, draftUserId, setupMode, jobDescription, config, parkedJobSetup, parkedResumeSetup, resumeFileName]);
   const autoBlocked = setupModeBlocksStart(setupMode, config.jobDirection)
     || (setupMode !== "manual" && !!config.jobDirection && !isValidJobDirection(config.jobDirection));
   const voiceBlocked = voiceBlocksInterviewStart(config.playInterviewerAudio, voiceReadiness);
@@ -141,7 +196,7 @@ export function InterviewSetup({
       if (field === "seniority") {
         return {
           ...current,
-          seniority: value,
+          seniority: value as InterviewConfig["seniority"],
           ...(jobDirection ? { jobDirection: { ...jobDirection, suggestedSeniority: value as JobSeniority } } : {}),
         };
       }
@@ -250,8 +305,8 @@ export function InterviewSetup({
       return {
         ...base,
         role: restored.direction.targetRole,
-        seniority: restored.direction.suggestedSeniority,
-        focus: restored.focus,
+        seniority: normalizeSeniority(restored.direction.suggestedSeniority),
+        focus: normalizeFocus(restored.focus),
         jobDirection: restored.direction,
         interviewSource: mode === "auto" ? "job" : "resume",
       };
@@ -265,11 +320,13 @@ export function InterviewSetup({
   };
 
   const clearAnalysis = () => {
+    clearSetupDraft(window.localStorage, setupMode === "resume" ? "resume" : "job");
     setConfig((current) => ({ ...current, jobDirection: undefined }));
     if (setupMode === "resume") {
       resumeAnalysisGenerationRef.current += 1;
       setParkedResumeSetup(undefined);
       setResumeFile(null);
+      setResumeFileName("");
       if (resumeInputRef.current) resumeInputRef.current.value = "";
       setResumeDirectionError("");
       setResumeDirectionStatus("idle");
@@ -285,11 +342,13 @@ export function InterviewSetup({
   };
 
   const chooseResumeFile = (file: File | null) => {
+    clearSetupDraft(window.localStorage, "resume");
     resumeAnalysisGenerationRef.current += 1;
     setResumeDirectionStatus("idle");
     setResumeDirectionError("");
     setJobDirectionValidationError("");
     setResumeFile(file);
+    setResumeFileName(file?.name ?? "");
     setConfig((current) => ({ ...current, jobDirection: undefined, interviewSource: "resume" }));
     setParkedResumeSetup(undefined);
     if (!file) return;
@@ -478,7 +537,11 @@ export function InterviewSetup({
                       className="textarea ds-field mt-2 min-h-40 w-full resize-y rounded-2xl text-sm leading-6"
                       value={jobDescription}
                       maxLength={jobDescriptionMaxLength}
-                      onChange={(event) => setJobDescription(event.target.value)}
+                      onChange={(event) => {
+                        const text = event.target.value;
+                        setJobDescription(text);
+                        if (!text.trim()) clearSetupDraft(window.localStorage, "job");
+                      }}
                       placeholder={t("Cole aqui a descrição da vaga…")}
                       aria-describedby="job-description-help job-description-count"
                     />
@@ -532,7 +595,7 @@ export function InterviewSetup({
                           aria-describedby="resume-file-help"
                         />
                         <p id="resume-file-help" className="ds-small">
-                          {resumeFile ? `${resumeFile.name} · ${(resumeFile.size / 1024 / 1024).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} MB` : t("Nenhum arquivo selecionado.")}
+                          {resumeFile ? `${resumeFile.name} · ${(resumeFile.size / 1024 / 1024).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} MB` : resumeFileName || t("Nenhum arquivo selecionado.")}
                         </p>
                         <div className="flex flex-wrap items-center gap-2">
                           <button

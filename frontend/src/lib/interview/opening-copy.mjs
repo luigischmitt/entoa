@@ -34,8 +34,6 @@ export function describeRoleForSpeech(role, seniorityLabel) {
 // Only the focus areas that read naturally as a clause; "mixed" (balanced practice) and unknown values add nothing.
 const focusPhrases = {
   "technical-depth": "technical depth",
-  communication: "clear communication",
-  behavioral: "behavioral questions",
 };
 
 /** ", with a focus on technical depth" for the known focus areas; an empty string for mixed or unknown values. */

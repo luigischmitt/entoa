@@ -1,4 +1,4 @@
-export type JobSeniority = "junior" | "mid-level" | "senior" | "staff";
+export type JobSeniority = "intern" | "junior" | "mid-level" | "senior";
 
 export type JobDirection = {
   targetRole: string;
@@ -20,7 +20,7 @@ export class JobDirectionRequestError extends Error {
   readonly code: string;
   readonly status: number;
 }
-export type JobFocus = "technical-depth" | "communication" | "behavioral" | "mixed";
+export type JobFocus = "technical-depth" | "mixed";
 export type JobDirectionAnalysis = JobDirection & { suggestedFocus?: JobFocus };
 export type SetupMode = "manual" | "auto" | "resume";
 type SetupConfig = { role: string; seniority: string; focus: string; jobDirection?: JobDirection };

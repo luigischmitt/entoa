@@ -2,6 +2,7 @@ import { normalizeDeviceId } from "./mic-device.mjs";
 import { isValidJobDirection } from "./job-direction.mjs";
 import { INTERVIEWER_VOICES } from "./voices.mjs";
 import { resolveInterviewerSpeechSpeed } from "./interviewer-speech-speed.mjs";
+import { normalizeFocus, normalizeSeniority } from "./interview-normalization.mjs";
 
 /**
  * Hand-off of the interview configuration from the setup (inside the app shell) to the dedicated interview route.
@@ -35,8 +36,8 @@ export function parseRoomHandoff(raw, now = Date.now()) {
   const microphoneDeviceId = normalizeDeviceId(config.microphoneDeviceId);
   const jobDirection = isValidJobDirection(config.jobDirection)
     && config.jobDirection.targetRole === config.role
-    && config.jobDirection.suggestedSeniority === config.seniority
-    ? config.jobDirection
+    && normalizeSeniority(config.jobDirection.suggestedSeniority) === normalizeSeniority(config.seniority)
+    ? { ...config.jobDirection, suggestedSeniority: normalizeSeniority(config.jobDirection.suggestedSeniority) }
     : undefined;
   const interviewSource = config.interviewSource === "resume" && jobDirection?.tailoredQuestions?.length
     ? "resume"
@@ -45,8 +46,8 @@ export function parseRoomHandoff(raw, now = Date.now()) {
       : "manual";
   return {
     role: config.role,
-    seniority: config.seniority,
-    focus: config.focus,
+    seniority: normalizeSeniority(config.seniority),
+    focus: normalizeFocus(config.focus),
     duration: config.duration,
     questionCount: config.questionCount,
     playInterviewerAudio: config.playInterviewerAudio,

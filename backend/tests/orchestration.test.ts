@@ -574,9 +574,14 @@ describe("POST /api/v1/thinking/next-turn", () => {
     expect(JSON.stringify(fakeService.decide.mock.calls.at(-1)?.[0])).not.toContain("PRIVATE_RAW_JOB_DESCRIPTION_SENTINEL");
 
     fakeService.decide.mockClear();
+    const legacyStaff = await request(app).post("/api/v1/thinking/next-turn").send({ ...input, roleContext: { ...input.roleContext, seniority: "staff" }, jobDirection: { ...approvedDirection, suggestedSeniority: "staff" } });
+    expect(legacyStaff.status).toBe(200);
+    expect(fakeService.decide).toHaveBeenCalledWith(expect.objectContaining({ jobDirection: { ...approvedDirection, suggestedSeniority: "senior" } }));
+
+    fakeService.decide.mockClear();
     const cases = [
       { ...approvedDirection, targetRole: "Frontend Engineer" },
-      { ...approvedDirection, suggestedSeniority: "staff" },
+      { ...approvedDirection, suggestedSeniority: "principal" },
       { ...approvedDirection, priorityCompetencies: Array.from({ length: 6 }, () => "API reliability") },
       { ...approvedDirection, productTeamContext: "?".repeat(281) },
       { ...approvedDirection, rawJobDescription: "private source description" },

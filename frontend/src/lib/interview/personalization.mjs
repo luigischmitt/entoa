@@ -1,4 +1,5 @@
 import { getQuestionBankForRole, technicalQuestionAlternates, technicalQuestionTopicIds } from "./question-bank.mjs";
+import { normalizeSeniority } from "./interview-normalization.mjs";
 
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const validText = (value) => typeof value === "string" && value.trim().length > 0;
@@ -10,7 +11,7 @@ function analysisOf(record) {
 
 function roleMatches(recordRole, targetRole) {
   if (!validText(recordRole) || !validText(targetRole)) return true;
-  return getQuestionBankForRole(recordRole) === getQuestionBankForRole(targetRole);
+  return getQuestionBankForRole(recordRole).map(({ id }) => id).join("|") === getQuestionBankForRole(targetRole).map(({ id }) => id).join("|");
 }
 
 /**
@@ -47,7 +48,7 @@ export function buildLearnerQuestionProfile(records, targetRole) {
 
 /** Apply up to two fixed, authored alternate phrasings to canonical technical questions. */
 export function personalizeTechnicalQuestions(questions, profile, options = {}) {
-  if (!Array.isArray(questions) || !Array.isArray(profile) || options.seniority === "junior") return questions;
+  if (!Array.isArray(questions) || !Array.isArray(profile) || ["junior", "intern"].includes(normalizeSeniority(options.seniority))) return questions;
   const eligible = new Set(profile.filter((item) => item?.sessionCount > 0 && validText(item.topicId)).map((item) => item.topicId));
   const selected = new Set();
   let substitutions = 0;

@@ -58,6 +58,8 @@ describe("thinking configuration", () => {
     expect(loadThinkingConfig({} as NodeJS.ProcessEnv)).toEqual({
       openRouterApiKey: null,
       model: defaultThinkingModel,
+      interviewDirectionModel: "anthropic/claude-haiku-5.5",
+      jobDirectionTimeoutMs: 25_000,
       reportModel: defaultInterviewReportModel,
       reportReasoningEffort: "medium",
       timeoutMs: defaultThinkingTimeoutMs,
@@ -77,6 +79,7 @@ describe("thinking configuration", () => {
     expect(loadThinkingConfig({
       OPENROUTER_API_KEY: "  secret  ",
       INTERVIEW_REASONING_MODEL: "  vendor/model  ",
+      INTERVIEW_DIRECTION_MODEL: " vendor/haiku ",
       INTERVIEW_REASONING_TIMEOUT_MS: "4500",
       INTERVIEW_ORCHESTRATION_TIMEOUT_MS: "6000",
       INTERVIEW_REPORT_TIMEOUT_MS: "45000",
@@ -84,6 +87,8 @@ describe("thinking configuration", () => {
     } as NodeJS.ProcessEnv)).toEqual({
       openRouterApiKey: "secret",
       model: "vendor/model",
+      interviewDirectionModel: "vendor/haiku",
+      jobDirectionTimeoutMs: 25_000,
       reportModel: defaultInterviewReportModel,
       reportReasoningEffort: "medium",
       timeoutMs: 4_500,

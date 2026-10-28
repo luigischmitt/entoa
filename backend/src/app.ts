@@ -102,8 +102,8 @@ export function createApp({ speechConfig, speechProvider, transcriptionConfig, t
     ? createSupabaseReportPersistence({ supabaseUrl: authConfig.supabaseUrl, publishableKey: authConfig.publishableKey })
     : persistedReportPersistence;
   const persistedReportGenerator = createPersistedInterviewReportService(resolvedReportService, resolvedPersistedReportPersistence);
-  const resolvedJobDirectionService = jobDirectionService === undefined ? createJobDirectionService(resolvedThinkingConfig) : jobDirectionService;
-  const resolvedResumeDirectionService = resumeDirectionService === undefined ? createResumeDirectionService({ ...resolvedThinkingConfig, timeoutMs: resolvedThinkingConfig.resumeDirectionTimeoutMs ?? resolvedThinkingConfig.timeoutMs, hedgeAfterMs: resolvedThinkingConfig.resumeDirectionHedgeAfterMs }) : resumeDirectionService;
+  const resolvedJobDirectionService = jobDirectionService === undefined ? createJobDirectionService({ ...resolvedThinkingConfig, model: resolvedThinkingConfig.interviewDirectionModel ?? "anthropic/claude-haiku-5.5", timeoutMs: resolvedThinkingConfig.jobDirectionTimeoutMs ?? 25_000 }) : jobDirectionService;
+  const resolvedResumeDirectionService = resumeDirectionService === undefined ? createResumeDirectionService({ ...resolvedThinkingConfig, model: resolvedThinkingConfig.interviewDirectionModel ?? "anthropic/claude-haiku-5.5", timeoutMs: resolvedThinkingConfig.resumeDirectionTimeoutMs ?? resolvedThinkingConfig.timeoutMs, hedgeAfterMs: resolvedThinkingConfig.resumeDirectionHedgeAfterMs }) : resumeDirectionService;
   const resolvedJobDirectionUserLimit = jobDirectionUserLimit ?? new JobDirectionUserLimit();
   const speculativeModel = speculativeAnalysisModel();
   const resolvedShortReplyService = shortReplyService === undefined ? createShortReplyService(resolvedThinkingConfig.openRouterApiKey ?? undefined, speculativeModel) : shortReplyService;
