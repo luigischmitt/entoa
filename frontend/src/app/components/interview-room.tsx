@@ -37,7 +37,8 @@ import "./interview-room.css";
 import { createSpeechFeed, toucanStateFor } from "@/components/interview/toucan/toucan-engine.mjs";
 import { CallDock, CandidateTile, InterviewerTile, Toast, useCandidateCamera, useMicLevelMeter } from "./call-stage";
 import { waitForPendingAssessments } from "@/lib/interview/assessment-report-wait.mjs";
-import { canAutoSubmitVoiceTranscript, canSkipVoiceQuestion, createOnceGate, finalTranscriptForSubmission, hasTimeForNextQuestion } from "@/lib/interview/session-policy.mjs";
+import { canAutoSubmitVoiceTranscript, canSkipVoiceQuestion, createOnceGate, finalTranscriptForSubmission, hasTimeForNextQuestion, minimumSecondsForNextQuestion } from "@/lib/interview/session-policy.mjs";
+import { canAskAnotherFollowUp } from "@/lib/interview/follow-up-policy.mjs";
 import { useInterviewSession } from "../hooks/use-interview-session";
 import { createInterviewerAcknowledgements, prewarmFixedInterviewerUtterance, prewarmFollowUpUtterance, prewarmInterviewerClosing, prewarmInterviewerUtterance, useSpeechPlayback, useSpeechWarmup, type SpeechTimingEvent } from "../hooks/use-speech-playback";
 import { isAcknowledgeableAnswer, pickAcknowledgement, stripLeadingAcknowledgement } from "@/lib/interview/acknowledgement.mjs";
@@ -124,7 +125,9 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
   const [currentIndex, setCurrentIndex] = useState(resumeCheckpoint?.snapshot.currentIndex ?? 0);
   const [question, setQuestion] = useState<InterviewQuestion>(() => resumeCheckpoint?.snapshot.activeQuestion ?? questions[0]);
   const [questionSequenceNumber, setQuestionSequenceNumber] = useState(resumeCheckpoint?.snapshot.questionSequenceNumber ?? 1);
-  const [followUpUsed, setFollowUpUsed] = useState(resumeCheckpoint?.snapshot.followUpUsed ?? false);
+  const [followUpsAsked, setFollowUpsAsked] = useState(resumeCheckpoint?.snapshot.followUpsAsked ?? (resumeCheckpoint?.snapshot.followUpUsed ? 1 : 0));
+  const [threadQuestions, setThreadQuestions] = useState<string[]>(resumeCheckpoint?.snapshot.threadQuestions ?? []);
+  const [recentFollowUpKinds, setRecentFollowUpKinds] = useState<string[]>(resumeCheckpoint?.snapshot.recentFollowUpKinds ?? []);
   const [acknowledgement, setAcknowledgement] = useState<string | null>(null);
   // What the interviewer says after a clarification request; the question itself (id, prompt, report pairing) never changes.
   const [spokenTurn, setSpokenTurn] = useState<ClarificationTurn | null>(null);
@@ -249,11 +252,18 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
   const stableQuestionCaption = phase === "introducing" || phase === "closing" ? currentUtterance : spokenTurn?.question ?? question.prompt;
   const persistenceQuestion = { ...question, prompt: currentUtterance };
   const { elapsed, seconds, remaining, timeLimitReached } = useInterviewSession(phase, durationMinutes, resumeCheckpoint?.snapshot.elapsedSeconds ?? 0);
+  const followUpUsedFor = (answer: string) => !canAskAnotherFollowUp({
+    followUpsAsked,
+    lastFollowUpAnswer: answer,
+    hasTimeAfterNext: hasTimeForNextQuestion(elapsedSecondsRef.current + minimumSecondsForNextQuestion, durationMinutes),
+  });
   const checkpointSnapshot = {
     activeQuestion: question,
     currentIndex,
     questionSequenceNumber,
-    followUpUsed,
+    followUpsAsked,
+    threadQuestions,
+    recentFollowUpKinds,
     elapsedSeconds: seconds,
     turns: reportTurns,
     askedQuestionIds: askedQuestionIdsSnapshot,
@@ -285,7 +295,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
   };
   useEffect(() => { resetInterviewVoiceSource(); }, []);
   useEffect(() => { elapsedSecondsRef.current = seconds; }, [seconds]);
-  useEffect(() => { setAskedQuestionIdsSnapshot([...askedPlannedQuestionIdsRef.current]); }, [currentIndex, followUpUsed, question.id]);
+  useEffect(() => { setAskedQuestionIdsSnapshot([...askedPlannedQuestionIdsRef.current]); }, [currentIndex, followUpsAsked, question.id]);
   useEffect(() => { voiceAssessmentsRef.current = voiceAssessments; }, [voiceAssessments]);
   useEffect(() => { excludedAssessmentsRef.current = excludedAssessments; }, [excludedAssessments]);
   useEffect(() => {
@@ -572,7 +582,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
       transcript: answer,
       nextFixedQuestion: nextPlan.question?.prompt ?? null,
       remainingFixedQuestions: nextPlan.remaining.map((plannedQuestion) => plannedQuestion.prompt),
-      followUpUsed,
+      followUpUsed: followUpUsedFor(answer),
       askedQuestions,
       recentAcknowledgements: recentAcknowledgementsRef.current,
       previousAnswers: buildPreviousAnswers(pairInterviewTurns(turns)),
@@ -724,6 +734,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
     const input = buildDecisionInput(turns, answer);
     if (speculativeCallsRef.current.turn !== micTurnIdRef.current) speculativeCallsRef.current = { turn: micTurnIdRef.current, count: 0, revision: 0, applied: 0 };
     // After the one follow-up, analyses only refresh coverage and the bridge of the planned handoff: a few are enough.
+    const followUpUsed = followUpUsedFor(answer);
     if (speculativeCallsRef.current.count >= (followUpUsed ? MAX_POST_FOLLOW_UP_ANALYSES : MAX_SPECULATIVE_REVISIONS) || revision < 1 || revision > MAX_SPECULATIVE_REVISIONS || revision <= speculativeCallsRef.current.revision) return;
     speculativeCallsRef.current.count += 1;
     speculativeCallsRef.current.revision = revision;
@@ -746,6 +757,8 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
           currentQuestion: question.prompt,
           snapshot: answer,
           followUpUsed,
+          ...(threadQuestions.length ? { threadQuestions } : {}),
+          ...(recentFollowUpKinds.length ? { recentFollowUpKinds } : {}),
           askedQuestions: input.askedQuestions,
           firstFixedQuestion: planned[0].prompt,
           secondFixedQuestion: planned[1]?.prompt ?? null,
@@ -799,7 +812,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
             setFollowUpCandidateUpdate({ type: "follow-up-candidate", turnId: speculativeTurnIdRef.current, revision, speechEpoch, question: speculative.analysis.followUpQuestion!.trim(), anchor: speculative.analysis.followUpAnchor!.trim() });
           }
           // Its own one-sentence bridge (validated against this follow-up) restates the detail it asks about.
-          decision = { decision: "FOLLOW_UP", followUpQuestion: speculative.analysis.followUpQuestion!.trim(), nextQuestion: null, acknowledgement: speculative.analysis.followUpBridge?.trim() || null };
+          decision = { decision: "FOLLOW_UP", followUpQuestion: speculative.analysis.followUpQuestion!.trim(), nextQuestion: null, acknowledgement: speculative.analysis.followUpBridge?.trim() || null, followUpKind: speculative.analysis.followUpKind ?? null } as TurnDecision;
         }
         else {
           // No follow-up (model NONE or backend-rejected): the active candidate and its retained preparations stay; only a
@@ -912,6 +925,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
     setAnswerError(null);
     setSpeechMessage(null);
 
+    const followUpUsed = followUpUsedFor(savedAnswer);
     const lastQuestion = finishAfter || timeLimitReached || !hasTimeForNextQuestion(elapsedSecondsRef.current, durationMinutes);
     let shortReply: ShortReply | null = null;
     if (clarificationHint === null && !lastQuestion && isShortUtterance(savedAnswer)) {
@@ -1260,7 +1274,12 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
       if (turn.acknowledgement) recentAcknowledgementsRef.current = [...recentAcknowledgementsRef.current, turn.acknowledgement].slice(-5);
       setAcknowledgement(organicNextAcknowledgement(turn.acknowledgement, savedAnswer));
       setSpokenTurn(null);
-      setQuestion({ ...question, id: `${question.id}-follow-up`, prompt: turn.followUpQuestion, cue: "Uma pergunta curta para aprofundar sua resposta." });
+      const nextFollowUpCount = followUpsAsked + 1;
+      setQuestion({ ...question, id: `${question.id}-follow-up-${nextFollowUpCount}`, prompt: turn.followUpQuestion, cue: "Uma pergunta curta para aprofundar sua resposta." });
+      setThreadQuestions((items) => [...items, turn.followUpQuestion]);
+      setFollowUpsAsked(nextFollowUpCount);
+      const followUpKind = "followUpKind" in turn ? turn.followUpKind : null;
+      if (followUpKind) setRecentFollowUpKinds((items) => [...items, followUpKind].slice(-4));
       postFollowUpFixedSelectionRef.current = selectedPlannedQuestionId ? {
         questionId: selectedPlannedQuestionId,
         prompt: preparedTurn?.nextPlannedQuestionPrompt ?? null,
@@ -1270,7 +1289,6 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
         cancelAudio: preparedTurn?.cancelFixedQuestionAudio ?? null,
         skippedQuestionIds: skippedPlannedQuestionIds,
       } : null;
-      setFollowUpUsed(true);
       setQuestionSequenceNumber((sequence) => sequence + 2);
       transitionPhase("speaking");
     } else {
@@ -1291,7 +1309,8 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
       askedPlannedQuestionIdsRef.current.add(selectedQuestion.id);
       setCurrentIndex(questions.findIndex((candidate) => candidate.id === selectedQuestion.id));
       setQuestion({ ...selectedQuestion, prompt: nextQuestion });
-      setFollowUpUsed(false);
+      setFollowUpsAsked(0);
+      setThreadQuestions([]);
       setQuestionSequenceNumber((sequence) => sequence + 2);
       transitionPhase("speaking");
     }
@@ -1359,7 +1378,8 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
       askedPlannedQuestionIdsRef.current.add(nextPlan.question.id);
       setCurrentIndex(nextPlan.index);
       setQuestion({ ...nextPlan.question, prompt: skippedTurn.question });
-      setFollowUpUsed(false);
+      setFollowUpsAsked(0);
+      setThreadQuestions([]);
       setQuestionSequenceNumber((sequence) => sequence + 1);
       transitionPhase("speaking");
     }, 350);
@@ -1483,7 +1503,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
   const focusLabel = t(normalizeFocus(config.focus) === "technical-depth" ? "Técnica" : "Equilibrada");
   const persistenceLabel = persistenceState === "saved" ? "Sessão salva na conta" : persistenceState === "local" ? "Sessão salva neste navegador; sincronização pendente" : persistenceState === "unsafe" ? "Sessão ainda não salva" : "Salvando sessão na conta…";
   const capturedReportTurns = pairInterviewTurns(reportTurns);
-  const isOpeningQuestion = currentIndex === 0 && questionSequenceNumber === 1 && !followUpUsed;
+  const isOpeningQuestion = currentIndex === 0 && questionSequenceNumber === 1 && followUpsAsked === 0;
   const interviewerFallbackText = phase === "introducing" && isOpeningQuestion ? openingUtterance : currentUtterance;
   const currentActiveSegment = activeSegment && speechSegments.includes(activeSegment) ? activeSegment : null;
   const interviewerCaption = resolveInterviewerCaption({

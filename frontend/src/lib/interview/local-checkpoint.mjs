@@ -47,11 +47,14 @@ function safeConfig(config) {
 
 function validSnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== "object") return false;
-  const { activeQuestion, currentIndex, questionSequenceNumber, followUpUsed, elapsedSeconds, turns, askedQuestionIds } = snapshot;
+  const { activeQuestion, currentIndex, questionSequenceNumber, elapsedSeconds, turns, askedQuestionIds } = snapshot;
   return activeQuestion && typeof activeQuestion.id === "string" && typeof activeQuestion.prompt === "string"
     && typeof activeQuestion.cue === "string" && Number.isSafeInteger(currentIndex) && currentIndex >= 0
     && Number.isSafeInteger(questionSequenceNumber) && questionSequenceNumber > 0
-    && typeof followUpUsed === "boolean" && Number.isFinite(elapsedSeconds) && elapsedSeconds >= 0
+    && (Number.isSafeInteger(snapshot.followUpsAsked) && snapshot.followUpsAsked >= 0 || typeof snapshot.followUpUsed === "boolean")
+    && (snapshot.threadQuestions === undefined || Array.isArray(snapshot.threadQuestions) && snapshot.threadQuestions.every((item) => typeof item === "string"))
+    && (snapshot.recentFollowUpKinds === undefined || Array.isArray(snapshot.recentFollowUpKinds) && snapshot.recentFollowUpKinds.every((item) => typeof item === "string"))
+    && Number.isFinite(elapsedSeconds) && elapsedSeconds >= 0
     && Array.isArray(turns) && turns.length <= 100
     && turns.every((turn) => Number.isSafeInteger(turn.sequenceNumber) && turn.sequenceNumber > 0
       && (turn.speaker === "interviewer" || turn.speaker === "candidate")

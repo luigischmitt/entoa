@@ -42,12 +42,17 @@ describe("speculative analysis abort classification", () => {
 
   it("sends previousCandidate to the model so KEEP is possible", async () => {
     const previousCandidate = { question: "How did Kafka help?", anchor: "Kafka" };
-    const content = { revision: 2, followUpAction: "KEEP", followUpQuestion: previousCandidate.question, followUpAnchor: previousCandidate.anchor, fixedAction: "FIXED_KEEP", adaptedFixedQuestion: null, fixedEvidenceAnchor: null, secondFixedAction: "FIXED_KEEP", adaptedSecondFixedQuestion: null, secondFixedEvidenceAnchor: null, bridge: null, followUpBridge: null };
-    const fetcher = vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(content) } }] }), { status: 200 }));
+    const fetcher = vi.fn(async (_url: unknown, init?: RequestInit) => {
+      const request = JSON.parse(String(init?.body));
+      const content = request.response_format.json_schema.name === "interview_follow_up"
+        ? { action: "KEEP", reaction: "You said Kafka helped.", question: previousCandidate.question, kind: "how", anchor: previousCandidate.anchor }
+        : { revision: 2, fixedAction: "FIXED_KEEP", adaptedFixedQuestion: null, fixedEvidenceAnchor: null, secondFixedAction: "FIXED_KEEP", adaptedSecondFixedQuestion: null, secondFixedEvidenceAnchor: null, bridge: null };
+      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(content) } }] }), { status: 200 });
+    });
     const result = await new SpeculativeTurnAnalysisService({ apiKey: "key", model: "model", timeoutMs: 500 }, fetcher as unknown as typeof fetch).analyze({ ...input, previousCandidate });
     expect(result).toMatchObject({ followUpAction: "KEEP", followUpQuestion: previousCandidate.question });
     const body = JSON.parse(String((fetcher.mock.calls as unknown as Array<[string, RequestInit]>)[0]?.[1]?.body));
     expect(JSON.parse(body.messages[1].content).previousCandidate).toEqual(previousCandidate);
-    expect(body.response_format.json_schema.schema.properties.followUpAction.enum).toContain("KEEP");
+    expect(fetcher.mock.calls.map((call) => JSON.parse(String((call[1] as RequestInit).body)).response_format.json_schema.name)).toContain("interview_follow_up");
   });
 });

@@ -1,0 +1,1 @@
+export function speculativeRequestPayload<T extends Record<string, unknown>>(input: T & { threadQuestions?: string[]; recentFollowUpKinds?: string[] }): T & { threadQuestions?: string[]; recentFollowUpKinds?: string[] };
