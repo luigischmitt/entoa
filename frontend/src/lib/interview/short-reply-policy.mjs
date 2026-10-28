@@ -1,6 +1,6 @@
 export const maxShortReplyWords = 25;
 
-const actions = new Set(["ANSWER", "REPEAT", "REPHRASE", "DEFINE", "MOVE_ON"]);
+const actions = new Set(["ANSWER", "REPEAT", "REPHRASE", "DEFINE", "MOVE_ON", "END", "ASIDE"]);
 
 export function isShortUtterance(text) {
   return typeof text === "string" && text.trim().length > 0 && text.trim().split(/\s+/u).length <= maxShortReplyWords;
@@ -13,8 +13,16 @@ export function parseShortReplyResponse(value) {
   return { action: value.action, say: value.say, question: value.question };
 }
 
-export function shortReplyDecision(reply, nextFixedQuestion) {
+export function isEndRequest(reply) {
+  return reply?.action === "END";
+}
+
+export function shortReplyDecision(reply, nextFixedQuestion, currentQuestion) {
   if (!reply || typeof reply !== "object") return null;
+  if (reply.action === "END") return null;
+  if (reply.action === "ASIDE") return typeof reply.say === "string" && reply.say.trim() && typeof currentQuestion === "string" && currentQuestion.endsWith("?")
+    ? { decision: "REPHRASE", followUpQuestion: null, nextQuestion: null, acknowledgement: null, clarificationText: currentQuestion, clarification: "model", leadIn: reply.say }
+    : null;
   if (reply.action === "REPEAT") return { decision: "REPEAT", followUpQuestion: null, nextQuestion: null, acknowledgement: null, clarificationText: null, clarification: "model", leadIn: reply.say ?? null };
   if (reply.action === "REPHRASE") return typeof reply.question === "string" && reply.question.trim() ? { decision: "REPHRASE", followUpQuestion: null, nextQuestion: null, acknowledgement: null, clarificationText: reply.question, clarification: "model", leadIn: reply.say ?? null } : null;
   if (reply.action === "DEFINE") return typeof reply.say === "string" && reply.say.trim() ? { decision: "DEFINE", followUpQuestion: null, nextQuestion: null, acknowledgement: null, clarificationText: reply.say, clarification: "model", leadIn: null } : null;

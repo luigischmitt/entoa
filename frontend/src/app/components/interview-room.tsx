@@ -12,7 +12,7 @@ import type { ProgressRecord } from "@/lib/interview/progress-insights.mjs";
 import { buildPreviousAnswers, decideNextTurn, isClarificationTurn, type TurnDecision } from "@/lib/interview/orchestration";
 import { pickFixedHandoffTransition, repeatTurnDecision } from "@/lib/interview/orchestration-policy.mjs";
 import { detectClarificationRequest } from "@/lib/interview/clarification-request.mjs";
-import { isShortUtterance, shortReplyDecision, type ShortReply } from "@/lib/interview/short-reply-policy.mjs";
+import { isEndRequest, isShortUtterance, shortReplyDecision, type ShortReply } from "@/lib/interview/short-reply-policy.mjs";
 import { requestShortReply } from "@/lib/interview/short-reply";
 import { assessmentContextKey, canClarifyAgain, composeClarificationTurn, planTurnAfterDecision, type ClarificationTurn } from "@/lib/interview/clarification-policy.mjs";
 import { plannedQuestionType, resolveFixedPromptForAudio, resolveMonotonicFixedAction, resolveSpeculativeFixedSelection, selectNextPlannedQuestion, selectNextPlannedQuestions, shouldUseMonotonicFixedFallback } from "@/lib/interview/question-scheduling.mjs";
@@ -934,8 +934,18 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
       const nextFixed = lastQuestion ? null : selectNextPlannedQuestion({ questions, askedQuestionIds: askedPlannedQuestionIdsRef.current, elapsedSeconds: elapsedSecondsRef.current, durationMinutes }).question;
       shortReply = await requestShortReply({ currentQuestion: heardQuestion(), transcript: savedAnswer, nextQuestionAvailable: Boolean(nextFixed), signal: abortController.signal });
       if (leftRef.current || !mountedRef.current || generation !== generationRef.current || abortController.signal.aborted) return;
+      if (isEndRequest(shortReply)) {
+        console.info(JSON.stringify({ event: "interview_short_reply_end" }));
+        finishFixedPreparation("closing");
+        excludeClarificationAssessment();
+        const closed = await closeAfterAnswer(null, true, generation, "ended");
+        if (!closed) return;
+        submitInFlightRef.current = false;
+        return;
+      }
       if (shortReply?.action === "REPEAT") clarificationHint = "repeat";
       else if (shortReply?.action === "REPHRASE") clarificationHint = "rephrase";
+      else if (shortReply?.action === "ASIDE") clarificationHint = "rephrase";
       else if (shortReply?.action === "DEFINE") clarificationHint = "define";
       // The detector already knows it is a request: a model "answer" or "move on" never overrides it.
       else if (clarificationHint !== null) shortReply = null;
@@ -1000,7 +1010,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
     let finalAnalysisWait: { waitMs: number; arrived: boolean } | null = null;
     // Set when submit waited for the verdict the backend was still computing when the answer completed.
     let candidateStatusWait: { waitMs: number; arrived: boolean } | null = null;
-    const replyDecision = shortReply ? shortReplyDecision(shortReply, decisionInput.nextFixedQuestion) : null;
+    const replyDecision = shortReply ? shortReplyDecision(shortReply, decisionInput.nextFixedQuestion, spokenTurn?.base ?? question.prompt) : null;
     if (replyDecision) {
       nextTurnPreparation.abort();
       finishFixedPreparation("discarded");

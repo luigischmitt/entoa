@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isShortUtterance, parseShortReplyResponse, shortReplyDecision } from "../src/lib/interview/short-reply-policy.mjs";
+import { isEndRequest, isShortUtterance, parseShortReplyResponse, shortReplyDecision } from "../src/lib/interview/short-reply-policy.mjs";
 
 test("isShortUtterance accepts one through 25 words", () => {
   assert.equal(isShortUtterance("hello"), true);
@@ -11,7 +11,7 @@ test("isShortUtterance accepts one through 25 words", () => {
 });
 
 test("parseShortReplyResponse validates enabled response shapes", () => {
-  for (const action of ["ANSWER", "REPEAT", "REPHRASE", "DEFINE", "MOVE_ON"]) {
+  for (const action of ["ANSWER", "REPEAT", "REPHRASE", "DEFINE", "MOVE_ON", "END", "ASIDE"]) {
     assert.deepEqual(parseShortReplyResponse({ enabled: true, action, say: "Lead in", question: "Simpler?" }), action === "ANSWER" ? { action: "ANSWER", say: null, question: null } : { action, say: "Lead in", question: "Simpler?" });
   }
   assert.equal(parseShortReplyResponse({ enabled: false, action: "ANSWER", say: null, question: null }), null);
@@ -25,6 +25,11 @@ test("shortReplyDecision maps valid actions and rejects unusable ones", () => {
   assert.deepEqual(shortReplyDecision(reply("REPHRASE", "Sure", "What did you build?"), "Next?"), { decision: "REPHRASE", followUpQuestion: null, nextQuestion: null, acknowledgement: null, clarificationText: "What did you build?", clarification: "model", leadIn: "Sure" });
   assert.deepEqual(shortReplyDecision(reply("DEFINE", "Latency means delay."), null), { decision: "DEFINE", followUpQuestion: null, nextQuestion: null, acknowledgement: null, clarificationText: "Latency means delay.", clarification: "model", leadIn: null });
   assert.deepEqual(shortReplyDecision(reply("MOVE_ON", "No problem."), "Next?"), { decision: "NEXT", followUpQuestion: null, nextQuestion: "Next?", acknowledgement: "No problem." });
+  assert.deepEqual(shortReplyDecision(reply("ASIDE", "I am an AI assistant."), "Next?", "What did you build?"), { decision: "REPHRASE", followUpQuestion: null, nextQuestion: null, acknowledgement: null, clarificationText: "What did you build?", clarification: "model", leadIn: "I am an AI assistant." });
+  assert.equal(shortReplyDecision(reply("ASIDE", "I am an AI assistant."), "Next?", "Tell me about your work."), null);
+  assert.equal(shortReplyDecision(reply("END", "Thanks for the interview."), "Next?", "Question?"), null);
+  assert.equal(isEndRequest(reply("END")), true);
+  assert.equal(isEndRequest(reply("ASIDE")), false);
   assert.equal(shortReplyDecision(reply("ANSWER"), "Next?"), null);
   assert.equal(shortReplyDecision(reply("REPHRASE", null, null), "Next?"), null);
   assert.equal(shortReplyDecision(reply("DEFINE", null), "Next?"), null);
