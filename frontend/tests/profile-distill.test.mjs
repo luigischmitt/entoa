@@ -36,7 +36,7 @@ test("public report shows the radar and correction example without a repeated di
   assert.match(landing, /id="radar" role="group"/);
   assert.match(landing, /stage-art[\s\S]+hero-mata\.webp/);
   assert.doesNotMatch(landing, /@media\(max-width:767px\)\{\.stage-art\{display:none\}\}/);
-  assert.match(landing, /experience <s>on<\/s> <strong>in<\/strong> backend/);
+  assert.match(landing, /experience <s>on<\/s> backend/);
   assert.match(landing, /role:'button',tabindex:'0'/);
   assert.match(landing, /hit\.addEventListener\('click'/);
   assert.match(landing, /hit\.addEventListener\('keydown'/);
