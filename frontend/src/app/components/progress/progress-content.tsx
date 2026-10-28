@@ -10,12 +10,10 @@ import type {
   PatternType,
   ProgressCommonError,
   ProgressInsights,
-  ProgressRecord,
   ProgressSessionRow,
 } from "@/lib/interview/progress-insights.mjs";
 import { mergeVoiceSeries, voiceMetricSummary, voiceTrendCopy, voiceTrendMetrics, type VoiceTrendMetric } from "@/lib/interview/voice-trend.mjs";
 import { SlidingSegmented } from "@/components/ui/sliding-segmented";
-import { buildReportDeltas } from "@/lib/interview/report-presentation.mjs";
 import { CountUp } from "@/components/ui/count-up";
 import { MetricSwatch, VoiceTrendChart } from "../charts/voice-trend-chart";
 import { ProfileRadar, type RadarItem } from "../charts/profile-radar";
@@ -485,30 +483,9 @@ export function SessionHistory({ sessions, onOpenReport }: { sessions: ProgressS
 
 /* ------------------------------------------------------------------- Page */
 
-/** Compares the latest ready report with the previous one analysed by the same version. */
-function PreviousInterviewDeltas({ records }: { records: ProgressRecord[] }) {
-  const deltas = useMemo(() => {
-    const latest = records
-      .filter((record) => record.status === "completed" && record.feedback?.status === "ready" && record.feedback.analysis && typeof record.feedback.analysis === "object")
-      .sort((a, b) => Date.parse(b.completedAt ?? b.createdAt) - Date.parse(a.completedAt ?? a.createdAt))[0];
-    if (!latest?.feedback) return [];
-    return buildReportDeltas(latest.feedback.analysis, latest.feedback.azureSummary ?? {}, records, latest.id, latest.answerCount ?? 0, latest.feedback.analysisVersion);
-  }, [records]);
-  if (deltas.length === 0) return null;
-  return (
-    <section className="ds-card pg-compare px-5 pb-5 pt-5 sm:px-6" aria-labelledby="pg-compare">
-      <h2 id="pg-compare" className="ds-card-title">{t("Desde a entrevista anterior")}</h2>
-      <ul className="pg-compare-list mt-3">
-        {deltas.map((delta) => <li key={delta.label} className="pg-compare-row" data-change={delta.change}>{t(delta.template, { before: delta.before, after: delta.after })}</li>)}
-      </ul>
-    </section>
-  );
-}
-
-export function ProgressContent({ insights, records = [], onOpenReport }: { insights: ProgressInsights; records?: ProgressRecord[]; onOpenReport?: (sessionId: string) => void }) {
+export function ProgressContent({ insights, onOpenReport }: { insights: ProgressInsights; onOpenReport?: (sessionId: string) => void }) {
   return (
     <div className="pg-page mt-8 lg:mt-10">
-      <PreviousInterviewDeltas records={records} />
       <ProgressHero insights={insights} />
       <EnglishPatterns insights={insights} />
       <div className="pg-split">

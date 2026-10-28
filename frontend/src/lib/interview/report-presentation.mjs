@@ -22,11 +22,6 @@ export function diffReportWords(original, revised) {
   return { original: oldParts, revised: newParts };
 }
 
-const metric = (value) => Number.isFinite(value) ? value : null;
-const average = (values) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
-const analysisOf = (record) => record?.feedback?.status === "ready" && record.feedback.analysis && typeof record.feedback.analysis === "object" ? record.feedback.analysis : null;
-const answersOf = (record) => record?.feedback?.azureSummary?.answers ?? [];
-
 /** A report explanation must look like a finished sentence before we show it. */
 export function isCompleteSentence(value) {
   if (typeof value !== "string") return false;
@@ -82,50 +77,6 @@ export function analysisCoverageNotice(coverage, ordinalForSequence = (sequenceN
   if (missing.length === 1) return `Não conseguimos analisar a resposta ${missing[0]}. Os pontos abaixo cobrem as outras respostas.`;
   if (missing.length > 1) return `Não conseguimos analisar as respostas ${missing.join(" e ")}. Os pontos abaixo cobrem as outras respostas.`;
   return "Nem todas as respostas puderam ser analisadas. Os pontos abaixo cobrem as outras respostas.";
-}
-
-const rateCopy = (name, oldValue, newValue) => {
-  const same = Math.abs(oldValue - newValue) < 0.05;
-  const direction = same ? `${name} iguais` : newValue < oldValue ? `Menos ${name.toLocaleLowerCase()}` : `Mais ${name.toLocaleLowerCase()}`;
-  return withTemplate(same ? `${direction}: {after}` : `${direction}: {before} → {after}`, formatNumber(oldValue), formatNumber(newValue), same ? "same" : newValue < oldValue ? "better" : "worse");
-};
-/** `template` is the translatable source text (locale keys); `label` is it filled in, in Portuguese. */
-const withTemplate = (template, before, after, change) => ({ template, label: template.replace("{before}", before).replace("{after}", after), before, after, change });
-const formatNumber = (value) => value.toFixed(1).replace(/\.0$/, "").replace(".", ",");
-
-/** Compare this ready report with the newest previous completed report. */
-export function buildReportDeltas(current, currentAzure, records = [], currentInterviewId, currentAnswerCount = 0, currentAnalysisVersion) {
-  const sameVersion = (record) => currentAnalysisVersion === undefined || currentAnalysisVersion === null || record.feedback?.analysisVersion === currentAnalysisVersion;
-  const previous = records.filter((record) => record.id !== currentInterviewId && record.status === "completed" && analysisOf(record) && sameVersion(record))
-    .sort((a, b) => Date.parse(b.completedAt ?? b.createdAt) - Date.parse(a.completedAt ?? a.createdAt))[0];
-  if (!previous) return [];
-  const before = analysisOf(previous);
-  if (hasIncompleteAnalysisCoverage(current) || hasIncompleteAnalysisCoverage(before)) return [];
-  const countPatterns = (analysis) => analysis.turns?.reduce((sum, turn) => sum + (turn.englishPatterns?.length ?? 0), 0) ?? analysis.englishCommunication?.patterns?.length ?? 0;
-  const countGaps = (analysis) => analysis.turns?.reduce((sum, turn) => sum + (turn.technicalGaps?.length ?? 0), 0) ?? analysis.technicalContent?.gaps?.length ?? 0;
-  const currentAnswersCount = Math.max(1, currentAnswerCount);
-  const previousAnswersCount = Math.max(1, previous.answerCount ?? 0);
-  const deltas = [];
-  const addRate = (label, oldValue, newValue) => {
-    if (!Number.isFinite(oldValue) || !Number.isFinite(newValue)) return;
-    deltas.push(rateCopy(label, oldValue, newValue));
-  };
-  addRate("Erros de inglês por resposta", countPatterns(before) / previousAnswersCount, countPatterns(current) / currentAnswersCount);
-  addRate("Lacunas técnicas por resposta", countGaps(before) / previousAnswersCount, countGaps(current) / currentAnswersCount);
-  const oldWpm = average(answersOf(previous).map((answer) => metric(answer.delivery?.wordsPerMinute)).filter((value) => value !== null));
-  const newWpm = average((currentAzure.answers ?? []).map((answer) => metric(answer.delivery?.wordsPerMinute)).filter((value) => value !== null));
-  const oldAccuracy = previous.feedback?.azureSummary?.accuracy?.mean;
-  const newAccuracy = currentAzure.accuracy?.mean;
-  if (oldWpm !== null && newWpm !== null && Math.abs(newWpm - oldWpm) >= 5) {
-    const direction = newWpm > oldWpm ? "Fala mais rápida" : "Fala mais pausada";
-    deltas.push(withTemplate(`${direction}: {before} → {after} palavras por minuto`, String(Math.round(oldWpm)), String(Math.round(newWpm)), "same"));
-  }
-  if (Number.isFinite(oldAccuracy) && Number.isFinite(newAccuracy)) {
-    const same = Math.abs(newAccuracy - oldAccuracy) < 1;
-    const direction = same ? "Precisão da pronúncia igual" : newAccuracy > oldAccuracy ? "Precisão da pronúncia maior" : "Precisão da pronúncia menor";
-    deltas.push(withTemplate(same ? `${direction}: {after}` : `${direction}: {before} → {after}`, `${Math.round(oldAccuracy)}%`, `${Math.round(newAccuracy)}%`, same ? "same" : newAccuracy > oldAccuracy ? "better" : "worse"));
-  }
-  return deltas;
 }
 
 const phonemeTips = [
