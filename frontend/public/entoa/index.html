@@ -247,8 +247,8 @@ main{overflow-x:clip}
 .pp-good{list-style:none;margin:0;padding:0;display:grid;gap:.35rem}
 .pp-good li{display:flex;gap:.55rem;align-items:baseline;font-size:.9rem;line-height:1.4}
 .pp-good li::before{content:"";width:6px;height:6px;flex:none;border-radius:2px;background:var(--green);transform:translateY(-1px)}
-.dp-page .pp-prio{grid-template-columns:repeat(4,minmax(0,1fr))}
-@media(max-width:640px){.dp-page .pp-prio{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.dp-page .pp-prio{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-width:640px){.dp-page .pp-prio{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:640px){.pp-job{grid-template-columns:minmax(0,1fr)}}
 .dp-page .pp-title{font-size:1.45rem}
 .dp-b{opacity:0;transform:translateY(8px);transition:opacity .5s var(--ease),transform .5s var(--ease)}
@@ -288,9 +288,9 @@ main{overflow-x:clip}
 .rstage{position:relative;isolation:isolate;overflow:hidden;padding:clamp(32px,4vw,64px) 0}
 .stage-art{position:absolute;inset:0;z-index:-1;pointer-events:none;
   mask-image:linear-gradient(to bottom,transparent,#000 14px,#000 calc(100% - 14px),transparent);-webkit-mask-image:linear-gradient(to bottom,transparent,#000 14px,#000 calc(100% - 14px),transparent)}
-.stage-art img{width:100%;height:100%;object-fit:cover;object-position:center 70%;opacity:.9}
+.stage-art img{width:100%;height:100%;object-fit:cover;object-position:center 70%;filter:saturate(1.3) contrast(1.06)}
 /* Phones get a portrait crop (bay framed by palms, no empty sky) and equal room above and below the card. */
-@media(max-width:767px){.rstage{padding:36px 0}.stage-art img{object-position:center;opacity:.75}}
+@media(max-width:767px){.rstage{padding:36px 0}.stage-art img{object-position:center}}
 .rep{max-width:1000px;margin-inline:auto;background:var(--surface);border-radius:28px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.7),0 1px 3px rgba(14,42,31,.1),0 24px 48px -28px rgba(14,42,31,.45)}
 .rep-top{display:grid;gap:1.4rem;padding:1.5rem}
 @media(min-width:860px){.rep-top{grid-template-columns:minmax(0,.9fr) minmax(0,1.25fr);gap:2.4rem;padding:2.6rem 2.8rem;align-items:start}}
@@ -309,13 +309,13 @@ main{overflow-x:clip}
 .rep-note{margin-top:.75rem;color:var(--text2);font-size:.88rem;line-height:1.4;max-width:30ch}
 .radar{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0}
 .radar svg{width:100%;max-width:500px;height:auto;overflow:visible}
-.radar .ring{fill:none;stroke:rgba(14,42,31,.13);stroke-dasharray:3 4}
-.radar .ring.out{stroke-dasharray:none;stroke:rgba(14,42,31,.16)}
-.radar .axis{stroke:rgba(14,42,31,.08)}
+.radar .ring{fill:none;stroke:rgba(31,107,69,.22);stroke-dasharray:3 4}
+.radar .ring.out{stroke-dasharray:none;stroke:rgba(31,107,69,.3)}
+.radar .axis{stroke:rgba(31,107,69,.14)}
 .radar .axis{transition:stroke .2s ease}
 .radar .axis.on{stroke:var(--green);stroke-width:1.5}
 .radar .axis.v.on{stroke:var(--green-deep)}
-.radar .poly{fill:rgba(31,107,69,.16);stroke:var(--green);stroke-width:2;stroke-linejoin:round;transform-origin:150px 150px;transform:scale(.3);opacity:0;transition:transform .9s var(--ease) .15s,opacity .4s ease .15s}
+.radar .poly{fill:rgba(31,107,69,.3);stroke:var(--green);stroke-width:2.5;stroke-linejoin:round;transform-origin:150px 150px;transform:scale(.3);opacity:0;transition:transform .9s var(--ease) .15s,opacity .4s ease .15s}
 .rep.in .radar .poly{transform:none;opacity:1}
 .radar .pt{opacity:0;transition:opacity .3s ease}
 .rep.in .radar .pt{opacity:1;transition:opacity .3s ease calc(.75s + var(--k)*60ms)}
@@ -382,7 +382,7 @@ main{overflow-x:clip}
 .final{position:relative;padding:clamp(8px,2vw,24px) 0 0;overflow:hidden}
 .faq-sec h2{margin:0 0 .8rem}
 .endart{position:relative;isolation:isolate;margin-top:clamp(28px,4vw,56px);height:clamp(460px,40vw,560px)}
-.end-img{position:absolute;inset:0;z-index:-1;width:100%;height:100%;object-fit:cover;object-position:center bottom;opacity:.92;pointer-events:none;
+.end-img{position:absolute;inset:0;z-index:-1;width:100%;height:100%;object-fit:cover;object-position:center bottom;filter:saturate(1.45) contrast(1.08);pointer-events:none;
   mask-image:linear-gradient(to bottom,transparent,#000 32px);-webkit-mask-image:linear-gradient(to bottom,transparent,#000 32px)}
 /* the closing call sits in the empty sky at the top centre of the artwork */
 .end-cta{display:flex;flex-direction:column;align-items:center;gap:1.2rem;text-align:center;padding-top:clamp(28px,4vw,56px)}
@@ -476,9 +476,10 @@ main{overflow-x:clip}
 .pp-grid{display:grid;gap:2.2rem}
 .pp-copy h2{max-width:14ch;margin:0 0 .9rem}
 .pp-list{list-style:none;margin:1.6rem 0 0;padding:0}
-.pp-list li{display:flex;align-items:center;gap:.75rem;padding:.75rem 0;border-top:1px solid rgba(14,42,31,.1);font-weight:600;color:var(--ink)}
+.pp-list li{display:grid;gap:.2rem;padding:.85rem 0;border-top:1px solid rgba(14,42,31,.1)}
 .pp-list li:last-child{border-bottom:1px solid rgba(14,42,31,.1)}
-.pp-list li::before{content:"";width:7px;height:7px;flex:none;border-radius:50%;background:var(--green)}
+.pp-list b{font-weight:600;font-size:.98rem;color:var(--ink)}
+.pp-list span{font-size:.86rem;line-height:1.45;color:var(--text2)}
 .pp-bar{display:flex;align-items:center;margin:0 0 .6rem;font-size:.78rem;color:var(--text2)}
 .pp-file{display:inline-flex;align-items:center;gap:.5rem}
 .pp-file::before{content:"";box-sizing:border-box;width:10px;height:13px;border:1.5px solid var(--text2);border-radius:1px;flex:none}
@@ -499,13 +500,13 @@ main{overflow-x:clip}
 .pp-block{display:flex;flex-direction:column;gap:.6rem;padding:0}
 .pp-h{margin:0;padding-top:.85rem;border-top:1px solid rgba(14,42,31,.12);display:flex;align-items:center;gap:.55rem;font-family:var(--sans);font-size:.7rem;font-weight:700;letter-spacing:.1em;line-height:1.2;text-transform:uppercase;color:var(--ink)}
 .pp-h::before{content:"";width:6px;height:6px;flex:none;border-radius:50%;background:var(--green)}
-.pp-summary{margin:0;font-family:var(--serif);font-size:1.08rem;line-height:1.45;color:var(--ink)}
+.pp-summary{margin:0;font-family:var(--sans);font-size:.92rem;line-height:1.55;color:var(--ink)}
 /* errors: what you said next to the right form, with the rule underneath */
 .pp-errh,.pp-errs li{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:1.2rem}
 .pp-errh span{font-family:var(--sans);font-size:.64rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text2)}
 .pp-errs{list-style:none;margin:0;padding:0}
 .pp-errs li{row-gap:.25rem;padding:.6rem 0;border-top:1px solid rgba(14,42,31,.08)}
-.pp-said,.pp-right{margin:0;font-family:var(--serif);font-size:1rem;line-height:1.35}
+.pp-said,.pp-right{margin:0;font-family:var(--sans);font-size:.92rem;line-height:1.55}
 .pp-said{color:var(--text2)}
 .pp-errs small{grid-column:1 / -1;font-size:.8rem;line-height:1.4;color:var(--text2)}
 /* voice: the three Azure scores, side by side */
@@ -519,9 +520,27 @@ main{overflow-x:clip}
 .pp-prio{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.8rem;counter-reset:pp}
 .pp-prio li{counter-increment:pp;display:grid;gap:.1rem;padding-left:1.6rem;position:relative}
 .pp-prio li::before{content:counter(pp);position:absolute;left:0;top:-.05rem;font-family:var(--serif);font-size:1.35rem;line-height:1;color:var(--green)}
-.pp-prio b{font-weight:600;font-size:.9rem}
+.pp-prio b{font-weight:600;font-size:.92rem;line-height:1.4;color:var(--ink);text-wrap:balance}
 .pp-prio span{font-size:.78rem;color:var(--text2)}
 .pp-foot{padding-top:.8rem;border-top:1px solid rgba(14,42,31,.12);font-size:.74rem;color:var(--text2)}
+/* hint under a block title, aligned with the title text (past the green dot) */
+.pp-hint{margin:-.35rem 0 0;padding-left:.93rem;font-size:.78rem;line-height:1.4;color:var(--text2)}
+/* parts: the four sections of the report, each with an ink rule and a serif title, like the app */
+/* the page's global section padding must not reach the report mock's own sections */
+.pp-page section{padding:0}
+.pp-page .pp-part{display:flex;flex-direction:column;gap:1.1rem;padding-top:1.1rem;border-top:2px solid var(--ink)}
+.pp-part-head{display:grid;gap:.15rem}
+.pp-part-title{margin:0;font-family:var(--serif);font-weight:400;font-size:1.45rem;line-height:1.1;letter-spacing:-.02em;color:var(--ink)}
+.pp-part-hint{margin:.15rem 0 0;font-size:.8rem;line-height:1.4;color:var(--text2)}
+.pp-part > .pp-block:first-of-type > .pp-h{border-top:0;padding-top:0}
+/* technical gaps: one card with the question, what was missing, and how to answer */
+.pp-gap{display:grid;gap:.35rem;padding:.85rem 1rem;border-radius:8px;background:var(--field)}
+.pp-gap p{margin:0}
+.pp-gap-q{font-size:.8rem;line-height:1.45;color:var(--text2);overflow-wrap:anywhere}
+.pp-gap-q > span:first-child{font-weight:700;color:var(--ink)}
+.pp-gap-miss{font-size:.92rem;line-height:1.55;color:var(--ink)}
+.pp-gap-how{font-size:.875rem;line-height:1.5;padding-left:.7rem;border-left:2px solid var(--green)}
+.pp-gap-how b{font-weight:600;color:var(--green-deep)}
 /* the left column stays in view while the page scrolls, only when the screen is tall enough to show all of it */
 @media(min-width:1000px){.pp-grid{grid-template-columns:minmax(0,.78fr) minmax(0,1.22fr);gap:3.5rem;align-items:start}}
 @media(min-width:1000px) and (min-height:700px){.pp-copy{position:sticky;top:88px}}
@@ -697,50 +716,78 @@ AWS e observabilidade</div></div>
                 </div>
                 <div class="pp-block dp-b" id="dpB0">
                   <h4 class="pp-h">Resumo da entrevista</h4>
-                  <p class="pp-summary">Você explicou bem a sua experiência com APIs de pagamento e sistemas distribuídos. Os erros desta resposta foram de preposição, tempo verbal, finalidade e comparativo.</p>
+                  <p class="pp-summary">Você explicou bem sua experiência com APIs de pagamento em Go. Faltou dizer que problema elas resolveram. Seu inglês é claro; os erros foram de preposição, tempo verbal, finalidade e comparativo.</p>
                 </div>
-                <div class="pp-block dp-b" id="dpB5">
-                  <h4 class="pp-h">O que funcionou</h4>
-                  <ul class="pp-good">
-                    <li>Abriu com o tempo de experiência e a stack, como a vaga pede.</li>
-                    <li>Citou um projeto concreto: as APIs de pagamento.</li>
-                  </ul>
-                </div>
-                <div class="pp-block dp-b" id="dpB4">
-                  <h4 class="pp-h">Ligado à vaga</h4>
-                  <ul class="pp-job">
-                    <li><b>APIs em Go</b><span>Citado na resposta</span></li>
-                    <li><b>Sistemas distribuídos</b><span>Citado na resposta</span></li>
-                    <li class="wait"><b>AWS e observabilidade</b><span>Ainda não apareceu</span></li>
-                  </ul>
-                </div>
-                <div class="pp-block dp-b" id="dpB1">
-                  <h4 class="pp-h">Seus erros</h4>
-                  <div class="pp-errh" aria-hidden="true"><span>Você disse</span><span>O certo</span></div>
-                  <ul class="pp-errs">
-                    <li><p class="pp-said" lang="en">I have five years experience <s>on</s> backend.</p><p class="pp-right" lang="en">I have five years of experience <u>in</u> backend.</p><small>Experiência numa área pede <em>in</em>.</small></li>
-                    <li><p class="pp-said" lang="en">I <s>am working</s> with Go since 2021.</p><p class="pp-right" lang="en">I <u>’ve been working</u> with Go since 2021.</p><small>O que começou no passado e continua hoje pede o present perfect.</small></li>
-                    <li><p class="pp-said" lang="en">I built payment APIs <s>for make</s> them safer.</p><p class="pp-right" lang="en">I built payment APIs <u>to make</u> them safer.</p><small>Para dizer a finalidade, use <em>to</em> + verbo.</small></li>
-                    <li><p class="pp-said" lang="en">The payments got <s>more fast</s>.</p><p class="pp-right" lang="en">The payments got <u>faster</u>.</p><small>Adjetivo curto faz o comparativo com <em>-er</em>.</small></li>
-                  </ul>
-                </div>
-                <div class="pp-block dp-b" id="dpB2">
-                  <h4 class="pp-h">Notas da sua voz</h4>
-                  <ul class="pp-voice">
-                    <li id="vP" style="--p:84%"><b>84</b><span>Precisão</span><small>Clareza de cada som</small></li>
-                    <li id="vR" style="--p:78%"><b>78</b><span>Ritmo</span><small>Pausas e velocidade</small></li>
-                    <li id="vS" style="--p:72%"><b>72</b><span>Prosódia</span><small>Entonação e acento</small></li>
-                  </ul>
-                </div>
-                <div class="pp-block dp-b" id="dpB3">
-                  <h4 class="pp-h">Prioridades para praticar</h4>
-                  <ol class="pp-prio">
-                    <li><b>Preposições</b><span>1 vez</span></li>
-                    <li><b>Present perfect</b><span>1 vez</span></li>
-                    <li><b>To + verbo</b><span>1 vez</span></li>
-                    <li><b>Comparativos</b><span>1 vez</span></li>
-                  </ol>
-                </div>
+                <section class="pp-part dp-b" id="dpP1">
+                  <header class="pp-part-head">
+                    <h4 class="pp-part-title">Seu inglês</h4>
+                    <p class="pp-part-hint">Como seu inglês soou para o entrevistador.</p>
+                  </header>
+                  <div class="pp-block dp-b" id="dpB1">
+                    <h4 class="pp-h">Seus erros de inglês</h4>
+                    <p class="pp-hint">O que você disse e como fica natural em inglês.</p>
+                    <div class="pp-errh" aria-hidden="true"><span>Você disse</span><span>O certo</span></div>
+                    <ul class="pp-errs">
+                      <li><p class="pp-said" lang="en">I have five years experience <s>on</s> backend.</p><p class="pp-right" lang="en">I have five years of experience <u>in</u> backend.</p><small>Em português “experiência em” vira <em>on</em>; em inglês, experiência numa área pede <em>in</em>. · Resposta 1</small></li>
+                      <li><p class="pp-said" lang="en">I <s>am working</s> with Go since 2021.</p><p class="pp-right" lang="en">I <u>’ve been working</u> with Go since 2021.</p><small>O que começou no passado e continua hoje pede o present perfect. · Resposta 1</small></li>
+                      <li><p class="pp-said" lang="en">I built payment APIs <s>for make</s> them safer.</p><p class="pp-right" lang="en">I built payment APIs <u>to make</u> them safer.</p><small>Para dizer a finalidade, use <em>to</em> + verbo. · Resposta 1</small></li>
+                      <li><p class="pp-said" lang="en">The payments got <s>more fast</s>.</p><p class="pp-right" lang="en">The payments got <u>faster</u>.</p><small>Adjetivo curto faz o comparativo com <em>-er</em>. · Resposta 1</small></li>
+                    </ul>
+                  </div>
+                  <div class="pp-block dp-b" id="dpB2">
+                    <h4 class="pp-h">Notas da sua voz</h4>
+                    <p class="pp-hint">Ritmo, pausas e pronúncia.</p>
+                    <ul class="pp-voice">
+                      <li id="vP" style="--p:84%"><b>84</b><span>Precisão</span><small>Clareza de cada som</small></li>
+                      <li id="vR" style="--p:78%"><b>78</b><span>Ritmo</span><small>Pausas e velocidade</small></li>
+                      <li id="vS" style="--p:72%"><b>72</b><span>Prosódia</span><small>Entonação e acento</small></li>
+                    </ul>
+                  </div>
+                </section>
+                <section class="pp-part dp-b" id="dpP2">
+                  <header class="pp-part-head">
+                    <h4 class="pp-part-title">Conteúdo técnico</h4>
+                    <p class="pp-part-hint">O que suas respostas mostraram e o que faltou.</p>
+                  </header>
+                  <div class="pp-block dp-b" id="dpB5">
+                    <h4 class="pp-h">O que funcionou</h4>
+                    <p class="pp-hint">Pontos técnicos que você mostrou bem.</p>
+                    <ul class="pp-good">
+                      <li>Abriu com o tempo de experiência e a stack, como a vaga pede.</li>
+                      <li>Citou um projeto concreto: as APIs de pagamento.</li>
+                    </ul>
+                  </div>
+                  <div class="pp-block dp-b" id="dpB6">
+                    <h4 class="pp-h">Suas lacunas técnicas</h4>
+                    <p class="pp-hint">O que um entrevistador esperava ouvir e como responder.</p>
+                    <div class="pp-gap">
+                      <p class="pp-gap-q"><span>Pergunta 1</span> <span lang="en">Tell me about your experience with backend systems.</span></p>
+                      <p class="pp-gap-miss">Você citou as APIs de pagamento, mas não disse que problema elas resolviam nem o resultado.</p>
+                      <p class="pp-gap-how"><b>Como responder:</b> Diga o problema que as APIs resolveram e como você soube que deu certo.</p>
+                    </div>
+                  </div>
+                  <div class="pp-block dp-b" id="dpB4">
+                    <h4 class="pp-h">Ligado à vaga</h4>
+                    <ul class="pp-job">
+                      <li><b>APIs em Go</b><span>Citado na resposta</span></li>
+                      <li><b>Sistemas distribuídos</b><span>Citado na resposta</span></li>
+                      <li class="wait"><b>AWS e observabilidade</b><span>Ainda não apareceu</span></li>
+                    </ul>
+                  </div>
+                </section>
+                <section class="pp-part dp-b" id="dpP3">
+                  <header class="pp-part-head">
+                    <h4 class="pp-part-title">Prioridades para praticar</h4>
+                    <p class="pp-part-hint">Por onde começar antes da próxima entrevista.</p>
+                  </header>
+                  <div class="pp-block dp-b" id="dpB3">
+                    <ol class="pp-prio">
+                      <li><b>Diga o problema que as APIs de pagamento resolveram.</b><span>Conteúdo técnico · Resposta 1</span></li>
+                      <li><b>Com <em>since</em>, use present perfect: I’ve been working.</b><span>Inglês · Resposta 1</span></li>
+                      <li><b>Para finalidade, use <em>to</em> + verbo: to make them safer.</b><span>Inglês · Resposta 1</span></li>
+                    </ol>
+                  </div>
+                </section>
                 <footer class="pp-foot">Entoa · Exemplo ilustrativo com dados de uma entrevista simulada</footer>
               </article>
             </div>
@@ -793,12 +840,12 @@ AWS e observabilidade</div></div>
     <div class="pp-copy">
       <p class="kicker">Seu relatório</p>
       <h2 id="ppT">Escrito a partir das suas respostas, para a sua vaga.</h2>
-      <p class="lead">Depois de cada entrevista você recebe um documento curto, na ordem em que vale a pena ler.</p>
+      <p class="lead">Depois de cada entrevista você recebe um relatório curto: primeiro o seu inglês, depois o conteúdo técnico, e no fim o que treinar.</p>
       <ul class="pp-list">
-        <li>Resumo da entrevista</li>
-        <li>Seus erros e a forma certa</li>
-        <li>Notas da sua voz</li>
-        <li>Prioridades para praticar</li>
+        <li><b>Seu inglês</b><span>Cada erro com a forma certa e por que brasileiros erram isso.</span></li>
+        <li><b>Sua voz</b><span>Clareza, ritmo e entonação de 0 a 100, sem avaliar sotaque.</span></li>
+        <li><b>Conteúdo técnico</b><span>O que convenceu e o que um entrevistador sentiria falta, com como responder.</span></li>
+        <li><b>Prioridades</b><span>Por onde começar antes da próxima entrevista.</span></li>
       </ul>
     </div>
     <div class="pp-stage">
@@ -818,32 +865,66 @@ AWS e observabilidade</div></div>
         </div>
         <section class="pp-block">
           <h4 class="pp-h">Resumo da entrevista</h4>
-          <p class="pp-summary">Você explicou bem como evitou cobranças duplicadas e deu exemplos concretos de AWS. Os erros se concentram em preposições e no present perfect, quando você fala da sua experiência.</p>
+          <p class="pp-summary">Você explicou bem por que usou idempotency keys para evitar cobranças duplicadas. Faltou dizer como confirmou que a correção funcionou. Seu inglês é claro; o que mais pesa são preposições e o present perfect.</p>
         </section>
-        <section class="pp-block">
-          <h4 class="pp-h">Seus erros</h4>
-          <div class="pp-errh" aria-hidden="true"><span>Você disse</span><span>O certo</span></div>
-          <ul class="pp-errs">
-            <li><p class="pp-said" lang="en">I have five years experience <s>on</s> backend.</p><p class="pp-right" lang="en">I have five years of experience <u>in</u> backend.</p><small>Experiência numa área pede <em>in</em>.</small></li>
-            <li><p class="pp-said" lang="en">I <s>am working</s> here since 2021.</p><p class="pp-right" lang="en">I <u>’ve been working</u> here since 2021.</p><small>O que começou no passado e continua hoje pede o present perfect.</small></li>
-            <li><p class="pp-said" lang="en">I <s>pretend</s> to lead the team.</p><p class="pp-right" lang="en">I <u>intend</u> to lead the team.</p><small><em>Pretend</em> quer dizer fingir.</small></li>
-          </ul>
+        <section class="pp-part">
+          <header class="pp-part-head">
+            <h4 class="pp-part-title">Seu inglês</h4>
+            <p class="pp-part-hint">Como seu inglês soou para o entrevistador.</p>
+          </header>
+          <section class="pp-block">
+            <h4 class="pp-h">Seus erros de inglês</h4>
+            <p class="pp-hint">O que você disse e como fica natural em inglês.</p>
+            <div class="pp-errh" aria-hidden="true"><span>Você disse</span><span>O certo</span></div>
+            <ul class="pp-errs">
+              <li><p class="pp-said" lang="en">I have five years experience <s>on</s> backend.</p><p class="pp-right" lang="en">I have five years <u>of</u> experience <u>in</u> backend.</p><small>Em português “experiência em” vira <em>on</em>; em inglês, experiência numa área pede <em>in</em>. · Resposta 1</small></li>
+              <li><p class="pp-said" lang="en">I <s>am working</s> here since 2021.</p><p class="pp-right" lang="en">I <u>’ve been working</u> here since 2021.</p><small>O que começou no passado e continua hoje pede o present perfect. · Resposta 1</small></li>
+              <li><p class="pp-said" lang="en">I <s>pretend</s> to lead the team.</p><p class="pp-right" lang="en">I <u>intend</u> to lead the team.</p><small><em>Pretend</em> parece “pretender”, mas quer dizer fingir. · Resposta 4</small></li>
+            </ul>
+          </section>
+          <section class="pp-block">
+            <h4 class="pp-h">Notas da sua voz</h4>
+            <p class="pp-hint">Ritmo, pausas e pronúncia.</p>
+            <ul class="pp-voice">
+              <li style="--p:84%"><b>84</b><span>Precisão</span><small>Clareza de cada som</small></li>
+              <li style="--p:78%"><b>78</b><span>Ritmo</span><small>Pausas e velocidade</small></li>
+              <li style="--p:72%"><b>72</b><span>Prosódia</span><small>Entonação e acento</small></li>
+            </ul>
+            <p class="pp-note">De 0 a 100. A análise não avalia sotaque.</p>
+          </section>
         </section>
-        <section class="pp-block">
-          <h4 class="pp-h">Notas da sua voz</h4>
-          <ul class="pp-voice">
-            <li style="--p:84%"><b>84</b><span>Precisão</span><small>Clareza de cada som</small></li>
-            <li style="--p:78%"><b>78</b><span>Ritmo</span><small>Pausas e velocidade</small></li>
-            <li style="--p:72%"><b>72</b><span>Prosódia</span><small>Entonação e acento</small></li>
-          </ul>
-          <p class="pp-note">De 0 a 100. A análise não avalia sotaque.</p>
+        <section class="pp-part">
+          <header class="pp-part-head">
+            <h4 class="pp-part-title">Conteúdo técnico</h4>
+            <p class="pp-part-hint">O que suas respostas mostraram e o que faltou.</p>
+          </header>
+          <section class="pp-block">
+            <h4 class="pp-h">O que funcionou</h4>
+            <p class="pp-hint">Pontos técnicos que você mostrou bem.</p>
+            <ul class="pp-good">
+              <li>Você explicou por que usou idempotency keys para evitar cobranças duplicadas.</li>
+              <li>Você citou um caso real de falha e como o time reagiu.</li>
+            </ul>
+          </section>
+          <section class="pp-block">
+            <h4 class="pp-h">Suas lacunas técnicas</h4>
+            <p class="pp-hint">O que um entrevistador esperava ouvir e como responder.</p>
+            <div class="pp-gap">
+              <p class="pp-gap-q"><span>Pergunta 3</span> <span lang="en">How did you know the fix worked?</span></p>
+              <p class="pp-gap-miss">Você descreveu a mudança, mas não disse como confirmou que as cobranças duplicadas pararam.</p>
+              <p class="pp-gap-how"><b>Como responder:</b> Diga o que você comparou antes e depois da correção e por que isso mostrou que funcionou.</p>
+            </div>
+          </section>
         </section>
-        <section class="pp-block">
-          <h4 class="pp-h">Prioridades para praticar</h4>
+        <section class="pp-part">
+          <header class="pp-part-head">
+            <h4 class="pp-part-title">Prioridades para praticar</h4>
+            <p class="pp-part-hint">Por onde começar antes da próxima entrevista.</p>
+          </header>
           <ol class="pp-prio">
-            <li><b>Preposições</b><span>3 vezes</span></li>
-            <li><b>Present perfect</b><span>2 vezes</span></li>
-            <li><b>Falsos cognatos</b><span>1 vez</span></li>
+            <li><b>Diga como você confirmou o resultado de uma correção.</b><span>Conteúdo técnico · Resposta 3</span></li>
+            <li><b>Use <em>in</em> para a área da sua experiência: experience in backend.</b><span>Inglês · Resposta 1</span></li>
+            <li><b>Com <em>since</em>, use present perfect: I’ve been working.</b><span>Inglês · Resposta 1</span></li>
           </ol>
         </section>
         <footer class="pp-foot">Entoa · Exemplo ilustrativo com dados de uma entrevista simulada</footer>
@@ -940,7 +1021,7 @@ AWS e observabilidade</div></div>
   const LINE2="Got it. You mentioned payment APIs. How did you keep a payment from being charged twice?";
   const ANS="I have five years experience on backend and I am working with Go since 2021. I built payment APIs for make them safer, and the payments got more fast.";
   const CPS=16, T1=27.0, T2=54.0;
-  const CAPTXT=['Cole a vaga e a IA monta a entrevista.','O entrevistador pergunta, você responde falando.','O relatório mostra seus erros, as notas da sua voz e o que treinar.'];
+  const CAPTXT=['Cole a vaga e a IA monta a entrevista.','O entrevistador pergunta, você responde falando.','O relatório separa seu inglês do conteúdo técnico e mostra o que treinar.'];
 
   const scenes=$('#scenes'),cur=$('#cur'),panels=$$('.sc'),pg0=$('#pg0'),pg2=$('#pg2');
   const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
@@ -950,7 +1031,7 @@ AWS e observabilidade</div></div>
   const css=(el,p,v)=>{let o=memo.get(el);if(!o){o={};memo.set(el,o)}if(o[p]!==v){el.style.setProperty(p,v);o[p]=v}};
   const txt=(el,v)=>{let o=memo.get(el);if(!o){o={};memo.set(el,o)}if(o.t!==v){el.textContent=v;o.t=v}};
   const tg=(el,c,on)=>{on=!!on;let o=memo.get(el);if(!o){o={};memo.set(el,o)}if(o['c'+c]!==on){el.classList.toggle(c,on);o['c'+c]=on}};
-  const E={};['sgMode','mAuto','revJob','ta','taTxt','cnt','bAn','bAnTxt','bClr','revRes','inpRole','sgSen','sgFoc','pf0','pf1','pf2','sgDur','bStart','tInt','tMe','cap','capMe','live','rEl','rRem','rProg','bMic','bCap','bEnd','dlg','dFin','dpB0','dpB1','dpB2','dpB3','dpB4','dpB5','vP','vR','vS','bPdf','bPdfTxt','dpView'].forEach(k=>E[k]=document.getElementById(k));
+  const E={};['sgMode','mAuto','revJob','ta','taTxt','cnt','bAn','bAnTxt','bClr','revRes','inpRole','sgSen','sgFoc','pf0','pf1','pf2','sgDur','bStart','tInt','tMe','cap','capMe','live','rEl','rRem','rProg','bMic','bCap','bEnd','dlg','dFin','dpB0','dpB1','dpB2','dpB3','dpB4','dpB5','dpB6','dpP1','dpP2','dpP3','vP','vR','vS','bPdf','bPdfTxt','dpView'].forEach(k=>E[k]=document.getElementById(k));
   const fmt=s=>String(Math.floor(s/60)).padStart(2,'0')+':'+String(Math.floor(s%60)).padStart(2,'0');
 
   /* cursor: waypoints {c: click time, el}; the pointer leaves the previous one 1.25s before the click */
@@ -1028,8 +1109,8 @@ AWS e observabilidade</div></div>
   function renderReport(t){
     const a=t-63.5;
     // the paper builds up block by block, the voice scores count up, then the page scrolls and the export is clicked
-    [[0,.8],[5,1.8],[4,2.8],[1,3.8],[2,5.0],[3,6.4]].forEach(([n,s])=>tg(E['dpB'+n],'on',a>=s));
-    [[E.vP,84],[E.vR,78],[E.vS,72]].forEach(([el,v],i)=>{const k=ease(prog(a,5.2+i*.15,6.6+i*.15));txt(el.querySelector('b'),String(Math.round(v*k)));css(el,'--p',(v*k).toFixed(1)+'%')});
+    [['dpB0',.8],['dpP1',1.8],['dpB1',1.8],['dpB2',3.0],['dpP2',4.2],['dpB5',4.2],['dpB6',5.0],['dpB4',5.6],['dpP3',6.4],['dpB3',6.4]].forEach(([id,s])=>tg(E[id],'on',a>=s));
+    [[E.vP,84],[E.vR,78],[E.vS,72]].forEach(([el,v],i)=>{const k=ease(prog(a,3.2+i*.15,4.6+i*.15));txt(el.querySelector('b'),String(Math.round(v*k)));css(el,'--p',(v*k).toFixed(1)+'%')});
     const over=Math.max(0,pg2.offsetHeight+32-E.dpView.clientHeight);
     css(pg2,'transform',`translateY(${-over*ease(prog(a,6.8,12.6))}px)`);
     const done=t>=78.2;tg(E.bPdf,'done',done);txt(E.bPdfTxt,done?'PDF pronto':'Exportar PDF');
