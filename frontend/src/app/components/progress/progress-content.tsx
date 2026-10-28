@@ -451,7 +451,7 @@ export function SessionHistory({ sessions, onOpenReport }: { sessions: ProgressS
         {visible.map((s) => {
           const content = <>
             <div className="min-w-0">
-              <p className="font-medium text-ink [overflow-wrap:anywhere]">{s.role || t("Prática de entrevista")}{s.seniority ? ` · ${seniorityLabel(s.seniority)}` : ""}</p>
+              <p className="font-medium text-ink [overflow-wrap:anywhere]">{s.title || s.role || t("Prática de entrevista")}{s.seniority ? ` · ${seniorityLabel(s.seniority)}` : ""}</p>
               <p className="ds-small">{formatDate(s.date)}</p>
               <p className="pg-row-meta">{[plural(s.answerCount, "resposta", "respostas"), formatPracticeDuration(s.durationMs), s.patternCount !== null ? plural(s.patternCount, "erro de inglês", "erros de inglês") : null].filter(Boolean).join(" · ")}</p>
             </div>
@@ -466,7 +466,7 @@ export function SessionHistory({ sessions, onOpenReport }: { sessions: ProgressS
           return (
             <li key={s.id} className="pg-row">
               {onOpenReport
-                ? <button type="button" className="pg-row-action" aria-label={`${t(s.reportStatus === "ready" ? "Abrir relatório de " : "Recuperar relatório de ")}${s.role || t("Prática de entrevista")}, ${formatDate(s.date)}`} onClick={() => onOpenReport(s.id)}>{content}</button>
+                ? <button type="button" className="pg-row-action" aria-label={`${t(s.reportStatus === "ready" ? "Abrir relatório de " : "Recuperar relatório de ")}${s.title || s.role || t("Prática de entrevista")}, ${formatDate(s.date)}`} onClick={() => onOpenReport(s.id)}>{content}</button>
                 : <div className="pg-row-content">{content}</div>}
             </li>
           );

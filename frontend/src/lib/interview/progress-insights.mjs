@@ -143,6 +143,7 @@ function normalizeSession(record) {
     time,
     date: time === null ? null : new Date(time).toISOString(),
     role: record.targetRole || "",
+    title: record.title ?? null,
     seniority: record.seniority || null,
     durationMs: sessionDurationMs(record),
     answerCount,
@@ -413,7 +414,7 @@ export function buildProgressInsights(records, { now = Date.now(), locale = "pt-
     weekly: weeklySessions(sessions, now, locale),
     sessionsUntilTrends: Math.max(0, minSessionsForTrends - analyzedSessions),
     sessions: [...sessions].reverse().map((s) => ({
-      id: s.id, date: s.date, role: s.role, seniority: s.seniority, durationMs: s.durationMs, answerCount: s.answerCount, reportStatus: s.reportStatus,
+      id: s.id, date: s.date, role: s.role, title: s.title, seniority: s.seniority, durationMs: s.durationMs, answerCount: s.answerCount, reportStatus: s.reportStatus,
       patternCount: s.patternsUsable ? s.patterns.length : null,
     })),
   };

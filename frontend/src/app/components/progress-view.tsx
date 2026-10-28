@@ -5,7 +5,7 @@ import { useLocale, t } from "@/lib/locale";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Play } from "lucide-react";
 import { LoadingRegion, SkCard, SkChart } from "@/components/ui/loading-state";
-import { loadProgressRecords } from "@/lib/interview/persistence";
+import { loadProgressRecords, renameInterview } from "@/lib/interview/persistence";
 import { purgeExpiredAnswerClips } from "@/lib/interview/answer-clips";
 import { invalidateDashboardCache, readDashboardCache } from "@/lib/dashboard-data-cache.mjs";
 import { buildProgressInsights, sessionDurationMs } from "@/lib/interview/progress-insights.mjs";
@@ -246,6 +246,15 @@ export function ProgressView({
                 onLeave={closeHistoricalReport}
                 progressRecords={records}
                 currentInterviewId={selectedSession.id}
+                customTitle={selectedSession.title ?? null}
+                onRename={async (title) => {
+                  const result = await renameInterview(selectedSession.id, title);
+                  if (result.ok) {
+                    invalidateDashboardCache("progress");
+                    setRecords((current) => current.map((record) => record.id === selectedSession.id ? { ...record, title: result.title } : record));
+                  }
+                  return result;
+                }}
                 historical
                 onRetry={() => { void generateHistoricalReport(selectedSession.id); }}
                 retrying={retryingSessionId === selectedSession.id}

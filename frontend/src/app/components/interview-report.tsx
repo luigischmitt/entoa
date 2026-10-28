@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import Image from "next/image";
 import { getCurrentLocale, t } from "@/lib/locale";
-import { ArrowLeft, ArrowUpRight, Download } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Download, Pencil } from "lucide-react";
 import { answerOrdinalForSequence, pairInterviewTurns, type InterviewReportResult } from "@/lib/interview/report";
 import type { AzureMetricSummary } from "@/lib/interview/report-metrics.mjs";
 import type { InterviewConfig } from "@/lib/interview/types";
@@ -308,13 +308,32 @@ function exportPdf(fileBase: string) {
   window.print();
 }
 
-export function InterviewReport({ config, elapsed, totalClock, answerCount, persistenceMessage, feedbackSyncMessage, reportState, turns, azureSummary, coverage, onLeave, progressRecords, currentInterviewId, historical = false, onRetry, retrying = false, canRegenerate = false, onRegenerate }: {
-  config: InterviewConfig; elapsed: string; totalClock: string; answerCount: number; persistenceLabel: string; persistenceMessage: string | null; feedbackSyncMessage: string | null; reportState: ReportState; progressRecords: ProgressRecord[]; currentInterviewId?: string; historical?: boolean; turns: Turns; azureSummary: AzureMetricSummary; coverage: { available: number; pending: number; total: number }; onLeave: () => void; onRetry?: () => void; retrying?: boolean; canRegenerate?: boolean; onRegenerate?: () => void;
+type RenameResult = { ok: true; title: string | null } | { ok: false; message: string };
+
+export function InterviewReport({ config, elapsed, totalClock, answerCount, persistenceMessage, feedbackSyncMessage, reportState, turns, azureSummary, coverage, onLeave, progressRecords, currentInterviewId, historical = false, onRetry, retrying = false, canRegenerate = false, onRegenerate, customTitle, onRename }: {
+  config: InterviewConfig; elapsed: string; totalClock: string; answerCount: number; persistenceLabel: string; persistenceMessage: string | null; feedbackSyncMessage: string | null; reportState: ReportState; progressRecords: ProgressRecord[]; currentInterviewId?: string; historical?: boolean; turns: Turns; azureSummary: AzureMetricSummary; coverage: { available: number; pending: number; total: number }; onLeave: () => void; onRetry?: () => void; retrying?: boolean; canRegenerate?: boolean; onRegenerate?: () => void; customTitle?: string | null; onRename?: (title: string | null) => Promise<RenameResult>;
 }): ReactNode {
   const [loadedTurns, setLoadedTurns] = useState<Turns>(turns);
   const [loadingTurns, setLoadingTurns] = useState(historical && turns.length === 0 && Boolean(currentInterviewId));
   const [loadingStep, setLoadingStep] = useState(0);
+  const [displayTitle, setDisplayTitle] = useState<string | null>(customTitle?.trim() || null);
+  const [syncedCustomTitle, setSyncedCustomTitle] = useState(customTitle);
+  if (customTitle !== syncedCustomTitle) {
+    setSyncedCustomTitle(customTitle);
+    setDisplayTitle(customTitle?.trim() || null);
+  }
+  const [renaming, setRenaming] = useState(false);
+  const [renameSaving, setRenameSaving] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const renameSavingRef = useRef(false);
+  const renameExitingRef = useRef(false);
   const rootRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!renaming) return;
+    renameInputRef.current?.focus();
+    renameInputRef.current?.select();
+  }, [renaming]);
   // Sections and their cards rise in once, the first time they are on screen (and again only for genuinely new content).
   useReplayReveal(rootRef, [reportState.status, loadingTurns, loadedTurns.length], { once: true });
   useEffect(() => {
@@ -342,9 +361,52 @@ export function InterviewReport({ config, elapsed, totalClock, answerCount, pers
     const parsed = value ? new Date(value) : null;
     return parsed && !Number.isNaN(parsed.getTime()) ? parsed : new Date();
   }, [progressRecords, currentInterviewId]);
-  const fileBase = useMemo(() => reportFileBase(role, reportDate), [role, reportDate]);
+  const fileBase = useMemo(() => reportFileBase(displayTitle || role, reportDate), [displayTitle, role, reportDate]);
+  const startRename = () => {
+    renameExitingRef.current = false;
+    setRenameError(null);
+    setRenaming(true);
+  };
+  const cancelRename = () => {
+    renameExitingRef.current = true;
+    setRenameError(null);
+    setRenaming(false);
+  };
+  const commitRename = async (value: string) => {
+    if (renameSavingRef.current || renameExitingRef.current || !onRename) return;
+    const next = value.trim();
+    if (next === shownTitle.trim()) {
+      cancelRename();
+      return;
+    }
+    renameSavingRef.current = true;
+    setRenameSaving(true);
+    setRenameError(null);
+    const result = await onRename(next || null);
+    renameSavingRef.current = false;
+    setRenameSaving(false);
+    if (result.ok) {
+      renameExitingRef.current = true;
+      setDisplayTitle(result.title?.trim() || null);
+      setRenaming(false);
+    } else {
+      setRenameError(result.message);
+      renameInputRef.current?.focus();
+    }
+  };
+  const onRenameKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void commitRename(event.currentTarget.value);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      cancelRename();
+    }
+  };
   const dateLabel = formatReportDate(reportDate, getCurrentLocale() === "en" ? "en" : "pt-BR");
   const seniorityLabel = config.seniority === "staff" ? "Staff / Lead" : seniorityLabels[config.seniority] ? t(seniorityLabels[config.seniority]) : null;
+  const defaultTitle = `${role}${seniorityLabel && !isResume ? ` · ${seniorityLabel}` : ""}`;
+  const shownTitle = displayTitle || defaultTitle;
   const focusLabel = config.focus === "technical-depth" ? t("Profundidade técnica")
     : config.focus === "communication" ? t("Comunicação e clareza")
       : config.focus === "behavioral" ? t("Respostas comportamentais")
@@ -398,7 +460,30 @@ export function InterviewReport({ config, elapsed, totalClock, answerCount, pers
           <span>{t("Relatório de entrevista")} · {dateLabel}</span>
         </header>
         <div className="rp-cover">
-          <h1 id="interview-complete-title" className="rp-ptitle">{role}{seniorityLabel && !isResume ? ` · ${seniorityLabel}` : ""}</h1>
+          <div className="rp-title-row">
+            <h1 id="interview-complete-title" className={`rp-ptitle${renaming ? " rp-ptitle-editing" : ""}`}>
+              {renaming ? (
+                <input
+                  ref={renameInputRef}
+                  className="rp-title-input"
+                  type="text"
+                  maxLength={80}
+                  aria-label={t("Nome do relatório")}
+                  defaultValue={shownTitle}
+                  disabled={renameSaving}
+                  onKeyDown={onRenameKeyDown}
+                  onBlur={(event) => { void commitRename(event.currentTarget.value); }}
+                />
+              ) : shownTitle}
+            </h1>
+            {onRename && !renaming && (
+              <button type="button" className="rp-rename rp-noprint" aria-label={t("Renomear relatório")} onClick={startRename}>
+                <Pencil className="size-4" aria-hidden="true" />
+              </button>
+            )}
+          </div>
+          {renaming && <p className="rp-rename-hint">{t("Deixe vazio para voltar ao nome original.")}</p>}
+          {renameError && <p className="rp-rename-error" role="alert">{t(renameError)}</p>}
           <dl className="rp-pfacts">
             <div><dt>{t("Foco")}</dt><dd>{focusLabel}</dd></div>
             <div><dt>{t("Duração")}</dt><dd className="tabular-nums">{duration}</dd></div>
