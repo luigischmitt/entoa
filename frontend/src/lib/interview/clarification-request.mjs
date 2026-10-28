@@ -107,6 +107,15 @@ const stem = (word) => word.replace(/(?:es|s)$/u, "");
  * question means is a definition request even after an echo of the question. Only words the interviewer actually
  * said qualify, so "what is the impact" in an answer about something else never does.
  */
+/** A 1–4 word sentence made only of words the interviewer just said ("writing software"). */
+function isQuestionTermEcho(sentence, question) {
+  if (typeof question !== "string" || !question) return false;
+  const words = sentence.split(" ").filter(Boolean);
+  if (words.length === 0 || words.length > 4 || notATerm.test(sentence)) return false;
+  const questionStems = new Set(normalize(question).split(" ").filter(Boolean).map(stem));
+  return words.every((word) => questionStems.has(stem(word)));
+}
+
 function asksForQuestionTerm(core, question) {
   if (typeof question !== "string" || !question) return false;
   const match = core.match(trailingTermQuestion);
@@ -131,8 +140,14 @@ export function detectClarificationRequest(transcript, question = null) {
   const wholeKind = classifyCore(wholeCore);
   if (wholeKind) return wholeKind;
   let best = null;
+  let echoesQuestionTerm = false;
   for (const sentence of sentences) {
     const kind = classifyCore(sentence);
+    // "I don't understand. Writing software": a short echo of the question's own words names the term they ask about.
+    if (!kind && isQuestionTermEcho(sentence, question)) {
+      echoesQuestionTerm = true;
+      continue;
+    }
     // Anything that is not a clarification request makes the utterance an answer (fillers were already removed).
     if (!kind) {
       best = null;
@@ -140,6 +155,6 @@ export function detectClarificationRequest(transcript, question = null) {
     }
     if (best === null || priority[kind] > priority[best]) best = kind;
   }
-  if (best) return best;
+  if (best) return echoesQuestionTerm ? "define" : best;
   return asksForQuestionTerm(wholeCore, question) ? "define" : null;
 }

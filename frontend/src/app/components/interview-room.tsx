@@ -14,7 +14,7 @@ import { pickFixedHandoffTransition, repeatTurnDecision } from "@/lib/interview/
 import { detectClarificationRequest } from "@/lib/interview/clarification-request.mjs";
 import { isShortUtterance, shortReplyDecision, type ShortReply } from "@/lib/interview/short-reply-policy.mjs";
 import { requestShortReply } from "@/lib/interview/short-reply";
-import { assessmentContextKey, composeClarificationTurn, planTurnAfterDecision, type ClarificationTurn } from "@/lib/interview/clarification-policy.mjs";
+import { assessmentContextKey, canClarifyAgain, composeClarificationTurn, planTurnAfterDecision, type ClarificationTurn } from "@/lib/interview/clarification-policy.mjs";
 import { plannedQuestionType, resolveFixedPromptForAudio, resolveMonotonicFixedAction, resolveSpeculativeFixedSelection, selectNextPlannedQuestion, selectNextPlannedQuestions, shouldUseMonotonicFixedFallback } from "@/lib/interview/question-scheduling.mjs";
 import { createNextTurnPreparationRegistry } from "@/lib/interview/next-turn-preparation.mjs";
 import { createFixedHandoffPreparationRegistry, type FixedHandoffEntry } from "@/lib/interview/fixed-handoff-preparation.mjs";
@@ -928,19 +928,26 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
     const followUpUsed = followUpUsedFor(savedAnswer);
     const lastQuestion = finishAfter || timeLimitReached || !hasTimeForNextQuestion(elapsedSecondsRef.current, durationMinutes);
     let shortReply: ShortReply | null = null;
-    if (clarificationHint === null && !lastQuestion && isShortUtterance(savedAnswer)) {
-      const nextFixed = selectNextPlannedQuestion({ questions, askedQuestionIds: askedPlannedQuestionIdsRef.current, elapsedSeconds: elapsedSecondsRef.current, durationMinutes }).question;
+    // Also near the end: "I don't understand" on the last question still deserves an answer (never after the candidate chose to finish).
+    // A detected rephrase/define request also asks Gemma, which writes the explanation fast (a plain repeat needs no model).
+    if (clarificationHint !== "repeat" && !finishAfter && isShortUtterance(savedAnswer)) {
+      const nextFixed = lastQuestion ? null : selectNextPlannedQuestion({ questions, askedQuestionIds: askedPlannedQuestionIdsRef.current, elapsedSeconds: elapsedSecondsRef.current, durationMinutes }).question;
       shortReply = await requestShortReply({ currentQuestion: heardQuestion(), transcript: savedAnswer, nextQuestionAvailable: Boolean(nextFixed), signal: abortController.signal });
       if (leftRef.current || !mountedRef.current || generation !== generationRef.current || abortController.signal.aborted) return;
       if (shortReply?.action === "REPEAT") clarificationHint = "repeat";
       else if (shortReply?.action === "REPHRASE") clarificationHint = "rephrase";
       else if (shortReply?.action === "DEFINE") clarificationHint = "define";
+      // The detector already knows it is a request: a model "answer" or "move on" never overrides it.
+      else if (clarificationHint !== null) shortReply = null;
       console.info(JSON.stringify({ event: "interview_short_reply", action: shortReply?.action ?? "none" }));
     }
     const movesOn = shortReply?.action === "MOVE_ON";
 
+    // A clarification of the current question is not a new question: it is answered even when no time is left for
+    // another one (up to the per-question limit). Anything else on the last question closes the interview.
+    const clarifiesLastQuestion = lastQuestion && clarificationHint !== null && !finishAfter && canClarifyAgain(clarificationCountsRef.current.get(question.id) ?? 0);
     // Too little time left for another question: skip the decision call and close.
-    if (lastQuestion) {
+    if (lastQuestion && !clarifiesLastQuestion) {
       finishFixedPreparation("closing");
       if (clarificationHint === null) commitAnswer();
       else excludeClarificationAssessment();
@@ -1258,7 +1265,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
     if (plan.countsAsAnswer) commitAnswer();
     else excludeClarificationAssessment();
 
-    if (!hasTimeForNextQuestion(elapsedSecondsRef.current, durationMinutes)) {
+    if (!hasTimeForNextQuestion(elapsedSecondsRef.current, durationMinutes) && !isClarificationTurn(turn)) {
       // The instant acknowledgement already played for this answer: only the reaction and the closing line follow.
       await closeAfterAnswer(plan.countsAsAnswer ? savedAnswer : null, false, generation, "time_up");
       return;
