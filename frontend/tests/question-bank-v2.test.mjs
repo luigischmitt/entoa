@@ -65,3 +65,13 @@ test("tailored questions replace technical slots only", () => {
   assert.equal(result[0].id, "introduction");
   assert.equal(result.at(-1).id, "closing");
 });
+
+test("no bank prompt has punctuation or a space right before its question mark", () => {
+  for (const [file, bank] of roleFiles) {
+    for (const [level, groups] of Object.entries(bank.levels)) {
+      for (const question of [...groups.technical, ...groups.behavioral, ...groups.background]) {
+        assert.doesNotMatch(question.prompt, /[.,;:!\s]\?$/u, `${file} ${level} ${question.id}`);
+      }
+    }
+  }
+});

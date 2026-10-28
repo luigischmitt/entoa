@@ -21,15 +21,20 @@ describe("short reply service", () => {
     ["REPHRASE", reply("REPHRASE", "Let me ask it another way.", "What part of the system was slow?" )],
     ["DEFINE", reply("DEFINE", "A bottleneck is the part that limits overall system speed.")],
     ["MOVE_ON", reply("MOVE_ON", "No problem, let's move on to the next question.")],
+    ["END", reply("END", "Of course, let's stop here. Thank you for your time.")],
+    ["ASIDE", reply("ASIDE", "I'm an AI interviewer for interview practice.")],
   ] as const)("accepts %s", async (_action, modelReply) => {
     vi.spyOn(console, "info").mockImplementation(() => undefined);
-    expect(await service(fakeFetch(modelReply)).decide(input)).toMatchObject({ ...modelReply, outcome: "decided" });
+    expect(await service(fakeFetch(modelReply)).decide({ ...input, nextQuestionAvailable: _action === "END" || _action === "ASIDE" ? false : true })).toMatchObject({ ...modelReply, outcome: "decided" });
   });
 
   it.each([
     ["REPHRASE without question mark", reply("REPHRASE", null, "What part of the system was slow")],
     ["DEFINE with URL", reply("DEFINE", "See https://example.com for a bottleneck definition.")],
     ["MOVE_ON without next question", reply("MOVE_ON", "No problem, let's move on.") , false],
+    ["END without say", reply("END")],
+    ["ASIDE naming a provider", reply("ASIDE", "I'm Gemini, an AI interviewer for interview practice.")],
+    ["ASIDE with question mark", reply("ASIDE", "I'm an AI interviewer for interview practice, okay?")],
     ["unknown action", { action: "OTHER", say: null, question: null }],
     ["extra key", { ...reply("ANSWER"), extra: true }],
   ])("falls back for %s", async (_label, modelReply, available = true) => {
@@ -53,7 +58,10 @@ describe("short reply service", () => {
     const body = JSON.parse(String(init?.body));
     expect(body.model).toBe("google/gemma-fast");
     expect(body.response_format.json_schema).toMatchObject({ name: "short_reply", strict: true, schema: { additionalProperties: false } });
+    expect(body.response_format.json_schema.schema.properties.action.enum).toEqual(["ANSWER", "REPEAT", "REPHRASE", "DEFINE", "MOVE_ON", "END", "ASIDE"]);
     expect(body.messages[0].content).toBe(shortReplySystemPrompt);
+    expect(shortReplySystemPrompt).toContain("END:");
+    expect(shortReplySystemPrompt).toContain("ASIDE:");
     expect(JSON.parse(body.messages[1].content)).toEqual({ currentQuestion: input.currentQuestion, transcript, nextQuestionAvailable: true });
     expect(body.usage).toEqual({ include: true });
     const line = String(info.mock.calls[0]?.[0]);
@@ -77,10 +85,10 @@ describe("POST /api/v1/thinking/short-reply", () => {
     expect(response.body).toEqual({ enabled: false, action: "ANSWER", say: null, question: null });
   });
   it("passes the decision through", async () => {
-    const decide = vi.fn(async () => ({ action: "REPHRASE" as const, say: "Let me ask it another way.", question: "What system issue did you solve?", outcome: "decided" as const }));
+    const decide = vi.fn(async () => ({ action: "END" as const, say: "Of course, let's stop here.", question: null, outcome: "decided" as const }));
     const response = await request(appWith({ decide })).post("/api/v1/thinking/short-reply").send(input);
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({ enabled: true, action: "REPHRASE", say: "Let me ask it another way.", question: "What system issue did you solve?" });
+    expect(response.body).toEqual({ enabled: true, action: "END", say: "Of course, let's stop here.", question: null });
     expect(decide).toHaveBeenCalledWith(expect.objectContaining(input));
   });
 });
