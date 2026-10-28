@@ -22,6 +22,7 @@ import { OpenRouterPolishedAnswerService, type PolishedAnswerService } from "./t
 import { JobDirectionUserLimit } from "./thinking/job-direction-user-limit.js";
 import type { InterviewOrchestrationService, InterviewReportService, JobDirectionService, ResumeDirectionService, ThinkingService } from "./thinking/types.js";
 import { createClosingReactionService, type ClosingReactionService } from "./thinking/closing-reaction-service.js";
+import { createShortReplyService, type ShortReplyService } from "./thinking/short-reply-service.js";
 import { createRedoCheckService, type RedoCheckService } from "./thinking/redo-check-service.js";
 import { SpeculativeTurnAnalysisService } from "./thinking/speculative-turn-analysis-service.js";
 import { loadTranscriptionConfig, type TranscriptionConfig } from "./transcription/config.js";
@@ -69,6 +70,7 @@ type AppDependencies = {
   resumeDirectionService?: ResumeDirectionService | null;
   jobDirectionUserLimit?: JobDirectionUserLimit;
   closingReactionService?: ClosingReactionService | null;
+  shortReplyService?: ShortReplyService | null;
   polishedAnswerService?: PolishedAnswerService | null;
   redoCheckService?: RedoCheckService | null;
   adminUsageService?: AdminUsageService;
@@ -86,7 +88,7 @@ type AppDependencies = {
   clientEventLogger?: (line: string) => void;
 };
 
-export function createApp({ speechConfig, speechProvider, transcriptionConfig, transcriptionService, thinkingConfig, thinkingService, orchestrationService, reportService, jobDirectionService, resumeDirectionService, jobDirectionUserLimit, accessTokenVerifier, clientEventLogger, closingReactionService, polishedAnswerService, redoCheckService, adminUsageService, adminUserIds, pronunciationAssessmentService, practiceDailyLimit, practiceLogger, persistedReportPersistence }: AppDependencies = {}) {
+export function createApp({ speechConfig, speechProvider, transcriptionConfig, transcriptionService, thinkingConfig, thinkingService, orchestrationService, reportService, jobDirectionService, resumeDirectionService, jobDirectionUserLimit, accessTokenVerifier, clientEventLogger, closingReactionService, shortReplyService, polishedAnswerService, redoCheckService, adminUsageService, adminUserIds, pronunciationAssessmentService, practiceDailyLimit, practiceLogger, persistedReportPersistence }: AppDependencies = {}) {
   const resolvedSpeechConfig = speechConfig ?? loadSpeechConfig();
   const resolvedSpeechProvider = speechProvider ?? createSpeechProvider(resolvedSpeechConfig);
   const resolvedTranscriptionService = transcriptionService
@@ -104,6 +106,7 @@ export function createApp({ speechConfig, speechProvider, transcriptionConfig, t
   const resolvedResumeDirectionService = resumeDirectionService === undefined ? createResumeDirectionService({ ...resolvedThinkingConfig, timeoutMs: resolvedThinkingConfig.resumeDirectionTimeoutMs ?? resolvedThinkingConfig.timeoutMs, hedgeAfterMs: resolvedThinkingConfig.resumeDirectionHedgeAfterMs }) : resumeDirectionService;
   const resolvedJobDirectionUserLimit = jobDirectionUserLimit ?? new JobDirectionUserLimit();
   const speculativeModel = speculativeAnalysisModel();
+  const resolvedShortReplyService = shortReplyService === undefined ? createShortReplyService(resolvedThinkingConfig.openRouterApiKey ?? undefined, speculativeModel) : shortReplyService;
   // Only mistral is served by the pinned provider; other models use plain OpenRouter routing.
   const speculativeService = resolvedThinkingConfig.openRouterApiKey ? new SpeculativeTurnAnalysisService({ apiKey: resolvedThinkingConfig.openRouterApiKey, model: speculativeModel, timeoutMs: speculativeAnalysisTimeoutMs() }, speculativeModel.startsWith("mistralai/") ? pinnedOpenRouterFetch : fetch) : null;
   const resolvedClosingReactionService = closingReactionService === undefined ? (resolvedThinkingConfig.openRouterApiKey ? createClosingReactionService(resolvedThinkingConfig) : null) : closingReactionService;
@@ -130,7 +133,7 @@ export function createApp({ speechConfig, speechProvider, transcriptionConfig, t
 
   const verifier = accessTokenVerifier === undefined ? defaultAccessTokenVerifier : accessTokenVerifier;
   app.use("/api/v1", requireAccessToken(verifier, (request) => request.method === "GET" && request.path === "/speech/health"));
-  app.use("/api/v1", createApiRouter(resolvedSpeechProvider, resolvedSpeechConfig, resolvedTranscriptionService, resolvedThinkingService, resolvedOrchestrationService, resolvedReportService, resolvedJobDirectionService, resolvedResumeDirectionService, resolvedJobDirectionUserLimit, clientEventLogger, speculativeService, resolvedThinkingConfig.speculativeHandoffEnabled === true, resolvedClosingReactionService, resolvedPolishedAnswerService, resolvedRedoCheckService, adminUsageService, adminUserIds, resolvedPronunciationAssessmentService, practiceDailyLimit, practiceLogger, persistedReportGenerator));
+  app.use("/api/v1", createApiRouter(resolvedSpeechProvider, resolvedSpeechConfig, resolvedTranscriptionService, resolvedThinkingService, resolvedOrchestrationService, resolvedReportService, resolvedJobDirectionService, resolvedResumeDirectionService, resolvedJobDirectionUserLimit, clientEventLogger, speculativeService, resolvedThinkingConfig.speculativeHandoffEnabled === true, resolvedClosingReactionService, resolvedPolishedAnswerService, resolvedRedoCheckService, adminUsageService, adminUserIds, resolvedPronunciationAssessmentService, practiceDailyLimit, practiceLogger, persistedReportGenerator, resolvedShortReplyService));
   app.use(notFoundHandler);
   app.use(errorHandler);
 

@@ -28,6 +28,7 @@ export type ClarificationTurnDecision = {
   acknowledgement: null;
   clarificationText: string | null;
   clarification: "detector" | "model";
+  leadIn?: string | null;
 };
 
 export function repeatTurnDecision(source?: "detector" | "model"): ClarificationTurnDecision & { decision: "REPEAT"; clarificationText: null };

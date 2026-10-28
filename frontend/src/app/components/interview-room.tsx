@@ -11,6 +11,8 @@ import type { ProgressRecord } from "@/lib/interview/progress-insights.mjs";
 import { buildPreviousAnswers, decideNextTurn, isClarificationTurn, type TurnDecision } from "@/lib/interview/orchestration";
 import { pickFixedHandoffTransition, repeatTurnDecision } from "@/lib/interview/orchestration-policy.mjs";
 import { detectClarificationRequest } from "@/lib/interview/clarification-request.mjs";
+import { isShortUtterance, shortReplyDecision, type ShortReply } from "@/lib/interview/short-reply-policy.mjs";
+import { requestShortReply } from "@/lib/interview/short-reply";
 import { assessmentContextKey, composeClarificationTurn, planTurnAfterDecision, type ClarificationTurn } from "@/lib/interview/clarification-policy.mjs";
 import { plannedQuestionType, resolveFixedPromptForAudio, resolveMonotonicFixedAction, resolveSpeculativeFixedSelection, selectNextPlannedQuestion, selectNextPlannedQuestions, shouldUseMonotonicFixedFallback } from "@/lib/interview/question-scheduling.mjs";
 import { createNextTurnPreparationRegistry } from "@/lib/interview/next-turn-preparation.mjs";
@@ -876,7 +878,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
     const abortController = new AbortController();
     decisionAbortRef.current = abortController;
     // "Can you repeat the question?" and similar are not answers: they are never reported, analyzed or persisted.
-    const clarificationHint = detectClarificationRequest(savedAnswer, heardQuestion());
+    let clarificationHint = detectClarificationRequest(savedAnswer, heardQuestion());
     const candidateSequenceNumber = questionSequenceNumber + 1;
     const submittedTurns = appendInterviewReportPair(reportTurnsRef.current, {
       questionSequenceNumber,
@@ -909,8 +911,21 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
     setAnswerError(null);
     setSpeechMessage(null);
 
+    const lastQuestion = finishAfter || timeLimitReached || !hasTimeForNextQuestion(elapsedSecondsRef.current, durationMinutes);
+    let shortReply: ShortReply | null = null;
+    if (clarificationHint === null && !lastQuestion && isShortUtterance(savedAnswer)) {
+      const nextFixed = selectNextPlannedQuestion({ questions, askedQuestionIds: askedPlannedQuestionIdsRef.current, elapsedSeconds: elapsedSecondsRef.current, durationMinutes }).question;
+      shortReply = await requestShortReply({ currentQuestion: heardQuestion(), transcript: savedAnswer, nextQuestionAvailable: Boolean(nextFixed), signal: abortController.signal });
+      if (leftRef.current || !mountedRef.current || generation !== generationRef.current || abortController.signal.aborted) return;
+      if (shortReply?.action === "REPEAT") clarificationHint = "repeat";
+      else if (shortReply?.action === "REPHRASE") clarificationHint = "rephrase";
+      else if (shortReply?.action === "DEFINE") clarificationHint = "define";
+      console.info(JSON.stringify({ event: "interview_short_reply", action: shortReply?.action ?? "none" }));
+    }
+    const movesOn = shortReply?.action === "MOVE_ON";
+
     // Too little time left for another question: skip the decision call and close.
-    if (finishAfter || timeLimitReached || !hasTimeForNextQuestion(elapsedSecondsRef.current, durationMinutes)) {
+    if (lastQuestion) {
       finishFixedPreparation("closing");
       if (clarificationHint === null) commitAnswer();
       else excludeClarificationAssessment();
@@ -922,7 +937,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
     }
 
     // The answer is in and it is not a clarification request: react at once while the next turn is decided and synthesized.
-    if (clarificationHint === null) playAcknowledgement(savedAnswer);
+    if (clarificationHint === null && !movesOn) playAcknowledgement(savedAnswer);
     else acknowledgementOutcomeRef.current = { turn: micTurnIdRef.current, willPlay: false };
     transitionPhase("advancing");
     const decisionInput = { ...buildDecisionInput(submittedTurns, savedAnswer), ...(clarificationHint ? { clarificationHint } : {}) };
@@ -963,7 +978,13 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
     let finalAnalysisWait: { waitMs: number; arrived: boolean } | null = null;
     // Set when submit waited for the verdict the backend was still computing when the answer completed.
     let candidateStatusWait: { waitMs: number; arrived: boolean } | null = null;
-    if (clarificationHint === "repeat") {
+    const replyDecision = shortReply ? shortReplyDecision(shortReply, decisionInput.nextFixedQuestion) : null;
+    if (replyDecision) {
+      nextTurnPreparation.abort();
+      finishFixedPreparation("discarded");
+      fixedPreparationSettled = true;
+      decision = replyDecision as TurnDecision;
+    } else if (clarificationHint === "repeat") {
       // A pure repeat request needs no model call: replay the question locally.
       nextTurnPreparation.abort();
       finishFixedPreparation("discarded");
@@ -1177,7 +1198,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
     applyPlannedCoveredSkip();
     // Any NEXT handoff still on a neutral transition speaks the newest grounded bridge of this answer instead, but only
     // before the exact question it was validated and synthesized for, and only when its audio is ready (never waited for).
-    if (clarificationHint === null && decision?.decision === "NEXT" && decision.nextQuestion && config.playInterviewerAudio) {
+    if (clarificationHint === null && !movesOn && decision?.decision === "NEXT" && decision.nextQuestion && config.playInterviewerAudio) {
       const nextQuestion = decision.nextQuestion;
       const bridge = preparedBridges.find({
         turnId: speculativeTurnIdRef.current,
@@ -1230,7 +1251,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
       clarificationCountsRef.current.set(question.id, plan.clarificationsAfter);
       // Content-free diagnostics only.
       console.info(JSON.stringify({ event: "interview_clarification", kind: turn.decision, source: turn.clarification, countForQuestion: plan.clarificationsAfter }));
-      setSpokenTurn(composeClarificationTurn({ decision: turn.decision, clarificationText: turn.clarificationText, question: spokenTurn?.base ?? question.prompt }));
+      setSpokenTurn(composeClarificationTurn({ decision: turn.decision, clarificationText: turn.clarificationText, question: spokenTurn?.base ?? question.prompt, leadIn: turn.leadIn ?? null }));
       setClarifyRound((round) => round + 1);
       setCaptionsPreference(true);
       transitionPhase("speaking");
