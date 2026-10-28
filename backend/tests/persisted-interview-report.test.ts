@@ -16,8 +16,8 @@ const report: InterviewReport = {
   priorities: [],
 };
 
-function store(initial: { status: "pending" | "ready" | "unavailable"; analysis?: InterviewReport | null } = { status: "unavailable" }) {
-  let feedback: any = initial.status === "ready" ? { status: "ready", analysis: initial.analysis ?? report, model: "saved-model", analysis_version: "v2", azure_summary: null } : { status: initial.status, analysis: null, azure_summary: null };
+function store(initial: { status: "pending" | "ready" | "unavailable"; analysis?: InterviewReport | null; analysisVersion?: string } = { status: "unavailable" }) {
+  let feedback: any = initial.status === "ready" ? { status: "ready", analysis: initial.analysis ?? report, model: "saved-model", analysis_version: initial.analysisVersion ?? "v3", azure_summary: null } : { status: initial.status, analysis: null, azure_summary: null };
   const stateChanges: string[] = [];
   const persistence: ReportPersistence = {
     loadInterview: vi.fn(async () => ({ id: interviewId, target_role: "Backend Engineer", seniority: "senior", focus: "technical-depth", job_direction: null, status: "completed" })),
@@ -36,6 +36,12 @@ function store(initial: { status: "pending" | "ready" | "unavailable"; analysis?
       stateChanges.push(feedback.status);
       return feedback;
     }),
+    resetOutdated: vi.fn(async () => {
+      if (feedback.status !== "ready" || feedback.analysis_version === "v3") return null;
+      feedback = { status: "pending", analysis: null, model: null, generated_at: null, analysis_version: feedback.analysis_version, azure_summary: feedback.azure_summary };
+      stateChanges.push(feedback.status);
+      return feedback;
+    }),
     markUnavailable: vi.fn(async () => {
       if (feedback.status !== "ready") feedback = { ...feedback, status: "unavailable", analysis: null };
       stateChanges.push(feedback.status);
@@ -46,9 +52,9 @@ function store(initial: { status: "pending" | "ready" | "unavailable"; analysis?
 
 const echoAnalysis = async (input: { turn: { sequenceNumber: number } }) => ({ sequenceNumber: input.turn.sequenceNumber, technicalStrengths: [], technicalGaps: [], englishPatterns: [], model: "test-model" });
 const serviceStub = (
-  generate = vi.fn(async () => ({ ...report, model: "test-model", analysisVersion: "v2" })),
+  generate = vi.fn(async () => ({ ...report, model: "test-model", analysisVersion: "v3" })),
   analyzeTurn = vi.fn(echoAnalysis),
-  consolidate = vi.fn(async () => ({ ...report, model: "test-model", analysisVersion: "v2" })),
+  consolidate = vi.fn(async () => ({ ...report, model: "test-model", analysisVersion: "v3" })),
 ) => ({ generate, analyzeTurn, consolidate }) as unknown as InterviewReportService;
 
 const twoAnswers = [
@@ -82,7 +88,7 @@ describe("persisted interview reports", () => {
 
   it("uses conditional status filters so late completion and retry cannot overwrite ready", async () => {
     const calls: Array<{ url: string; method: string; body: string }> = [];
-    const ready = { status: "ready", analysis: report, model: "first", analysis_version: "v2", generated_at: "2026-10-20T00:00:00Z", azure_summary: null };
+    const ready = { status: "ready", analysis: report, model: "first", analysis_version: "v3", generated_at: "2026-10-20T00:00:00Z", azure_summary: null };
     const fetchImpl: typeof fetch = async (input, init) => {
       calls.push({ url: String(input), method: init?.method ?? "GET", body: String(init?.body ?? "") });
       if (init?.method === "PATCH") return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
@@ -90,7 +96,7 @@ describe("persisted interview reports", () => {
     };
     const persistence = createSupabaseReportPersistence({ supabaseUrl: "https://example.supabase.co", publishableKey: "public", fetchImpl });
 
-    const lateSave = await persistence.saveReady(token, interviewId, report, "late", "v2");
+    const lateSave = await persistence.saveReady(token, interviewId, report, "late", "v3");
     const retry = await persistence.ensurePending(token, interviewId, null);
 
     expect(lateSave.model).toBe("first");
@@ -141,14 +147,14 @@ describe("persisted interview reports", () => {
 
   it("shares concurrent generation for one interview and persists pending then ready once", async () => {
     const data = store();
-    let finish!: (value: InterviewReport & { model: string; analysisVersion: "v2" }) => void;
-    const gate = new Promise<InterviewReport & { model: string; analysisVersion: "v2" }>((resolve) => { finish = resolve; });
+    let finish!: (value: InterviewReport & { model: string; analysisVersion: "v3" }) => void;
+    const gate = new Promise<InterviewReport & { model: string; analysisVersion: "v3" }>((resolve) => { finish = resolve; });
     const consolidate = vi.fn(() => gate);
     const generator = createPersistedInterviewReportService(serviceStub(undefined, undefined, consolidate), data.persistence);
     const first = generator.generate(token, interviewId, { locale: "en" }, "user-a");
     const second = generator.generate(token, interviewId, { locale: "en" }, "user-a");
     await vi.waitFor(() => expect(consolidate).toHaveBeenCalledOnce());
-    finish({ ...report, model: "test-model", analysisVersion: "v2" });
+    finish({ ...report, model: "test-model", analysisVersion: "v3" });
 
     const [one, two] = await Promise.all([first, second]);
     expect(one).toEqual(two);
@@ -159,7 +165,7 @@ describe("persisted interview reports", () => {
 
   it("keeps concurrent users isolated in the in-process idempotency map", async () => {
     const data = store();
-    const consolidate = vi.fn(async () => ({ ...report, model: "test-model", analysisVersion: "v2" }));
+    const consolidate = vi.fn(async () => ({ ...report, model: "test-model", analysisVersion: "v3" }));
     const generator = createPersistedInterviewReportService(serviceStub(undefined, undefined, consolidate), data.persistence);
     await Promise.all([
       generator.generate(token, interviewId, { locale: "en" }, "user-a"),
@@ -200,7 +206,7 @@ describe("persisted interview reports", () => {
     data.persistence.loadTurns = vi.fn(async () => twoAnswers);
     const generate = vi.fn();
     const analyzeTurn = vi.fn(echoAnalysis);
-    const consolidate = vi.fn(async (_input: unknown) => ({ ...report, model: "test-model", analysisVersion: "v2" as const }));
+    const consolidate = vi.fn(async (_input: unknown) => ({ ...report, model: "test-model", analysisVersion: "v3" as const }));
     const generator = createPersistedInterviewReportService(serviceStub(generate, analyzeTurn, consolidate as never), data.persistence);
 
     const result = await generator.generate(token, interviewId, { locale: "en" }, "user-a");
@@ -231,7 +237,7 @@ describe("persisted interview reports", () => {
       return echoAnalysis(input);
     });
     const generate = vi.fn();
-    const consolidate = vi.fn(async () => ({ ...report, model: "test-model", analysisVersion: "v2" as const }));
+    const consolidate = vi.fn(async () => ({ ...report, model: "test-model", analysisVersion: "v3" as const }));
     const generator = createPersistedInterviewReportService(serviceStub(generate, analyzeTurn, consolidate as never), data.persistence);
 
     await generator.generate(token, interviewId, { locale: "en" }, "user-a");
@@ -248,7 +254,7 @@ describe("persisted interview reports", () => {
       if (input.turn.sequenceNumber === 3) throw new Error("timeout");
       return echoAnalysis(input);
     });
-    const generate = vi.fn(async () => ({ ...report, model: "single-call", analysisVersion: "v2" }));
+    const generate = vi.fn(async () => ({ ...report, model: "single-call", analysisVersion: "v3" }));
     const consolidate = vi.fn();
     const generator = createPersistedInterviewReportService(serviceStub(generate, analyzeTurn, consolidate as never), data.persistence);
 
@@ -266,7 +272,7 @@ describe("persisted interview reports", () => {
   it("falls back to the single-call report when consolidation throws", async () => {
     const data = store();
     data.persistence.loadTurns = vi.fn(async () => twoAnswers);
-    const generate = vi.fn(async () => ({ ...report, model: "single-call", analysisVersion: "v2" }));
+    const generate = vi.fn(async () => ({ ...report, model: "single-call", analysisVersion: "v3" }));
     const consolidate = vi.fn(async () => { throw new Error("consolidation failed"); });
     const generator = createPersistedInterviewReportService(serviceStub(generate, undefined, consolidate), data.persistence);
 
@@ -276,6 +282,68 @@ describe("persisted interview reports", () => {
     expect(generate).toHaveBeenCalledOnce();
     expect(result.status).toBe("ready");
     expect(data.feedback.status).toBe("ready");
+  });
+
+  it("regenerates a ready report from an older analysis version when regenerate is requested", async () => {
+    const data = store({ status: "ready", analysis: report, analysisVersion: "v2" });
+    const consolidate = vi.fn(async () => ({ ...report, model: "test-model", analysisVersion: "v3" as const }));
+    const generator = createPersistedInterviewReportService(serviceStub(undefined, undefined, consolidate), data.persistence);
+
+    const result = await generator.generate(token, interviewId, { locale: "en", regenerate: true }, "user-a");
+
+    expect(data.persistence.resetOutdated).toHaveBeenCalledOnce();
+    expect(consolidate).toHaveBeenCalledOnce();
+    expect(data.persistence.saveReady).toHaveBeenCalledOnce();
+    expect((data.persistence.saveReady as ReturnType<typeof vi.fn>).mock.calls[0]![4]).toBe("v3");
+    expect(result.status).toBe("ready");
+    expect(result.report.analysisVersion).toBe("v3");
+    expect(data.feedback.analysis_version).toBe("v3");
+  });
+
+  it("returns a ready report already at the current version without regenerating, even when regenerate is requested", async () => {
+    const data = store({ status: "ready", analysis: report, analysisVersion: "v3" });
+    const generate = vi.fn();
+    const generator = createPersistedInterviewReportService(serviceStub(generate), data.persistence);
+
+    const result = await generator.generate(token, interviewId, { locale: "en", regenerate: true }, "user-a");
+
+    expect(result.report.analysisVersion).toBe("v3");
+    expect(data.persistence.resetOutdated).not.toHaveBeenCalled();
+    expect(generate).not.toHaveBeenCalled();
+    expect(data.persistence.saveReady).not.toHaveBeenCalled();
+  });
+
+  it("returns an outdated ready report as-is when regenerate is not requested", async () => {
+    const data = store({ status: "ready", analysis: report, analysisVersion: "v2" });
+    const generate = vi.fn();
+    const consolidate = vi.fn();
+    const generator = createPersistedInterviewReportService(serviceStub(generate, undefined, consolidate), data.persistence);
+
+    const result = await generator.generate(token, interviewId, { locale: "en" }, "user-a");
+
+    expect(result.report.analysisVersion).toBe("v2");
+    expect(data.persistence.resetOutdated).not.toHaveBeenCalled();
+    expect(generate).not.toHaveBeenCalled();
+    expect(consolidate).not.toHaveBeenCalled();
+    expect(data.persistence.saveReady).not.toHaveBeenCalled();
+  });
+
+  it("passes the regenerate flag from the request body and rejects a non-boolean value", async () => {
+    const generate = vi.fn(async () => ({ status: "ready", report }));
+    const verifier: AccessTokenVerifier = { verify: vi.fn(async () => ({ userId: "user-private-id" })) };
+    const app = express();
+    app.use(express.json());
+    app.use("/api", requireAccessToken(verifier));
+    app.post("/api/report/:interviewId", createPersistedInterviewReportController({ generate }));
+
+    const accepted = await request(app).post(`/api/report/${interviewId}`).set("authorization", `Bearer ${token}`).send({ locale: "en", regenerate: true });
+    expect(accepted.status).toBe(200);
+    expect(generate).toHaveBeenCalledWith(token, interviewId, expect.objectContaining({ locale: "en", regenerate: true }), "user-private-id");
+
+    const rejected = await request(app).post(`/api/report/${interviewId}`).set("authorization", `Bearer ${token}`).send({ locale: "en", regenerate: "yes" });
+    expect(rejected.status).toBe(400);
+    expect(rejected.body.error.code).toBe("INVALID_INTERVIEW_REPORT_REQUEST");
+    expect(generate).toHaveBeenCalledOnce();
   });
 
   it("keeps generation alive after the HTTP request is aborted", async () => {

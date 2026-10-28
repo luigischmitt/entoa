@@ -44,8 +44,9 @@ export function createPersistedInterviewReportController(generator: PersistedRep
     }
     const body = request.body as Record<string, unknown> | null;
     if (!body || typeof body !== "object" || Array.isArray(body)
-      || Object.keys(body).some((key) => !["locale", "azureSummary"].includes(key))
+      || Object.keys(body).some((key) => !["locale", "azureSummary", "regenerate"].includes(key))
       || (body.locale !== undefined && body.locale !== "pt-BR" && body.locale !== "en")
+      || (body.regenerate !== undefined && typeof body.regenerate !== "boolean")
       || !validAzureSummary(body.azureSummary)) {
       response.status(400).json({ error: { code: "INVALID_INTERVIEW_REPORT_REQUEST", message: "The report request is invalid." } });
       return;
@@ -59,6 +60,7 @@ export function createPersistedInterviewReportController(generator: PersistedRep
       const result = await generator.generate(token, interviewId, {
         locale: body.locale === "en" ? "en" : "pt-BR",
         ...(body.azureSummary !== undefined ? { azureSummary: body.azureSummary } : {}),
+        regenerate: body.regenerate === true,
       }, authenticatedUser.userId);
       // The browser may have left while the work continued. Persistence is
       // authoritative; simply skip writing to a response that no longer exists.

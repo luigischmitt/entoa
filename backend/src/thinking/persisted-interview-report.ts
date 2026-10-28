@@ -1,3 +1,4 @@
+import { reportAnalysisVersion } from "./types.js";
 import type { InterviewReport, InterviewReportInput, InterviewReportService, InterviewTurnAnalysis, InterviewTurnAnalysisInput } from "./types.js";
 import { parseApprovedJobDirection } from "./job-direction-validation.js";
 
@@ -20,6 +21,7 @@ export type ReportPersistence = {
   ensurePending(token: string, interviewId: string, azureSummary: unknown): Promise<FeedbackRow>;
   saveReady(token: string, interviewId: string, report: InterviewReport, model: string, analysisVersion: string): Promise<FeedbackRow>;
   markUnavailable(token: string, interviewId: string): Promise<void>;
+  resetOutdated(token: string, interviewId: string): Promise<FeedbackRow | null>;
 };
 
 export type SupabaseRestOptions = { supabaseUrl: string | null; publishableKey?: string; fetchImpl?: typeof fetch };
@@ -87,7 +89,7 @@ export function createSupabaseReportPersistence({ supabaseUrl, publishableKey, f
         const inserted = await rest<FeedbackRow[]>(token, "interview_feedback", "", {
           method: "POST",
           headers: { prefer: "return=representation" },
-          body: JSON.stringify({ interview_id: interviewId, status: "pending", azure_summary: azureSummary ?? null, analysis_version: "v2" }),
+          body: JSON.stringify({ interview_id: interviewId, status: "pending", azure_summary: azureSummary ?? null, analysis_version: reportAnalysisVersion }),
         });
         if (inserted[0]) return inserted[0];
       } catch (error) {
@@ -111,11 +113,19 @@ export function createSupabaseReportPersistence({ supabaseUrl, publishableKey, f
       if (latest?.status === "ready") return latest;
       throw new Error("Could not save report.");
     },
+    async resetOutdated(token, interviewId) {
+      const updated = await rest<FeedbackRow[]>(token, "interview_feedback", `?interview_id=eq.${interviewId}&status=eq.ready&analysis_version=neq.${reportAnalysisVersion}`, {
+        method: "PATCH",
+        headers: { prefer: "return=representation" },
+        body: JSON.stringify({ status: "pending", analysis: null, model: null, generated_at: null }),
+      });
+      return updated[0] ?? null;
+    },
     async markUnavailable(token, interviewId) {
       await rest<FeedbackRow[]>(token, "interview_feedback", `?interview_id=eq.${interviewId}&status=neq.ready`, {
         method: "PATCH",
         headers: { prefer: "return=representation" },
-        body: JSON.stringify({ status: "unavailable", analysis: null, model: null, generated_at: null, analysis_version: "v2" }),
+        body: JSON.stringify({ status: "unavailable", analysis: null, model: null, generated_at: null, analysis_version: reportAnalysisVersion }),
       });
     },
   };
@@ -152,7 +162,7 @@ async function analyzeTurnWithRetry(reportService: InterviewReportService, input
  * Per-answer analyses, then one consolidation. Returns null when any answer still failed or consolidation throws,
  * so the caller can fall back to the single-call report and the user always gets a report.
  */
-async function generatePerAnswerReport(reportService: InterviewReportService, input: InterviewReportInput): Promise<(InterviewReport & { model: string; analysisVersion: "v2" }) | null> {
+async function generatePerAnswerReport(reportService: InterviewReportService, input: InterviewReportInput): Promise<(InterviewReport & { model: string; analysisVersion: typeof reportAnalysisVersion }) | null> {
   const analyses = await mapWithConcurrency(input.turns, turnAnalysisConcurrency, async (turn) => {
     try {
       return await analyzeTurnWithRetry(reportService, { locale: input.locale, roleContext: input.roleContext, turn, ...(input.jobDirection ? { jobDirection: input.jobDirection } : {}) });
@@ -170,7 +180,7 @@ async function generatePerAnswerReport(reportService: InterviewReportService, in
   }
 }
 
-export type GeneratePersistedReportInput = { locale: "pt-BR" | "en"; azureSummary?: unknown };
+export type GeneratePersistedReportInput = { locale: "pt-BR" | "en"; azureSummary?: unknown; regenerate?: boolean };
 export type GeneratePersistedReportResult = { status: "ready"; report: InterviewReport & { model: string; analysisVersion: string }; feedback: FeedbackRow };
 
 export function createPersistedInterviewReportService(reportService: InterviewReportService | null, persistence: ReportPersistence | null) {
@@ -187,7 +197,12 @@ export function createPersistedInterviewReportService(reportService: InterviewRe
         const interview = await persistence.loadInterview(token, interviewId);
         if (!interview) throw Object.assign(new Error("Interview not found."), { status: 404 });
         if (interview.status !== "completed") throw Object.assign(new Error("Interview is not complete."), { status: 409 });
-        const existing = await persistence.loadFeedback(token, interviewId);
+        let existing = await persistence.loadFeedback(token, interviewId);
+        if (input.regenerate && existing?.status === "ready" && existing.analysis_version !== reportAnalysisVersion) {
+          // Outdated reports are reset to pending so this request regenerates them; if another request already reset them, reload and follow the normal path.
+          const reset = await persistence.resetOutdated(token, interviewId);
+          existing = reset ?? await persistence.loadFeedback(token, interviewId);
+        }
         if (existing?.status === "ready" && existing.analysis) {
           return { status: "ready" as const, report: { ...existing.analysis, model: existing.model ?? "unknown", analysisVersion: existing.analysis_version }, feedback: existing };
         }
