@@ -2,31 +2,49 @@ import { describe, expect, it, vi } from "vitest";
 import { SpeculativeTurnAnalysisService } from "../src/thinking/speculative-turn-analysis-service.js";
 
 const input = { revision: 2, currentQuestion: "What did you build?", snapshot: "I built a Kafka pipeline and reduced latency.", followUpUsed: false, askedQuestions: [], firstFixedQuestion: "How do you monitor services in production?", secondFixedQuestion: "How do you test changes?", firstFixedType: "bank" as const, secondFixedType: "job" as const, previousCandidate: null, roleContext: { targetRole: "Backend Engineer", seniority: "senior" } };
-const response = (analysis: Record<string, unknown>) => {
+const response = (analysis: Record<string, unknown>) => vi.fn(async (_url: unknown, init?: RequestInit) => {
+  const request = JSON.parse(String(init?.body)) as { response_format?: { json_schema?: { name?: string } } };
+  const name = request.response_format?.json_schema?.name;
   const providerAction = (value: unknown) => typeof value === "string" ? `FIXED_${value}` : value;
-  const providerAnalysis = { ...analysis, fixedAction: providerAction(analysis.fixedAction), secondFixedAction: providerAction(analysis.secondFixedAction ?? "KEEP"), adaptedSecondFixedQuestion: analysis.adaptedSecondFixedQuestion ?? null, secondFixedEvidenceAnchor: analysis.secondFixedEvidenceAnchor ?? null, bridge: analysis.bridge ?? null, followUpBridge: analysis.followUpBridge ?? null };
-  return vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(providerAnalysis) } }], usage: { prompt_tokens: 100, completion_tokens: 20, cost: 0.0001 } }), { status: 200 }));
-};
+  const providerAnalysis = Object.fromEntries(Object.entries({
+    ...analysis,
+    fixedAction: providerAction(analysis.fixedAction),
+    secondFixedAction: providerAction(analysis.secondFixedAction ?? "KEEP"),
+    adaptedSecondFixedQuestion: analysis.adaptedSecondFixedQuestion ?? null,
+    secondFixedEvidenceAnchor: analysis.secondFixedEvidenceAnchor ?? null,
+    bridge: analysis.bridge ?? null,
+  }).filter(([key]) => !key.startsWith("followUp")));
+  const writerAction = analysis.followUpAction === "REPLACE" ? "ASK" : analysis.followUpAction ?? "NONE";
+  const writer = {
+    action: writerAction,
+    reaction: writerAction === "NONE" ? null : analysis.followUpBridge ?? `You said ${String(analysis.followUpAnchor ?? "Kafka pipeline")}.`,
+    question: writerAction === "ASK" ? analysis.followUpQuestion ?? "How did you work on that part?" : null,
+    kind: writerAction === "NONE" ? null : "how",
+    anchor: writerAction === "ASK" ? analysis.followUpAnchor ?? "Kafka pipeline" : null,
+  };
+  const content = JSON.stringify(name === "interview_follow_up" ? writer : providerAnalysis);
+  return new Response(JSON.stringify({ choices: [{ message: { content } }], usage: { prompt_tokens: 100, completion_tokens: 20, cost: 0.0001 } }), { status: 200 });
+});
 const rawResponse = (content: unknown, status = 200) => vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status }));
 
 describe("speculative turn analysis", () => {
   it("accepts a grounded replacement and sends privacy-safe routing", async () => {
-    const fetcher = response({ revision: 2, followUpAction: "REPLACE", followUpQuestion: "How did Kafka reduce the latency?", followUpAnchor: "Kafka pipeline", fixedAction: "KEEP", adaptedFixedQuestion: null, fixedEvidenceAnchor: null });
+    const fetcher = response({ revision: 2, followUpAction: "REPLACE", followUpQuestion: "How did you reduce latency with Kafka?", followUpAnchor: "Kafka pipeline", fixedAction: "KEEP", adaptedFixedQuestion: null, fixedEvidenceAnchor: null });
     const result = await new SpeculativeTurnAnalysisService({ apiKey: "key", model: "model", timeoutMs: 500 }, fetcher).analyze(input);
     expect(result?.followUpAction).toBe("REPLACE");
-    const body = JSON.parse(String((fetcher.mock.calls as unknown as Array<[string, RequestInit]>)[0]?.[1]?.body));
+    const body = JSON.parse(String((fetcher.mock.calls as unknown as Array<[string, RequestInit]>)[1]?.[1]?.body));
     expect(body.usage).toEqual({ include: true });
     expect(body.provider.data_collection).toBe("deny");
-    expect(body.response_format.json_schema.schema.properties.followUpAction.enum).toEqual(["REPLACE", "NONE"]);
-    expect(body.response_format.json_schema.schema.properties.fixedAction.enum).toEqual(["FIXED_KEEP", "FIXED_SKIP", "FIXED_DEEPEN"]);
-    expect(body.messages[0].content).toContain("KEEP is forbidden");
+    expect(body.response_format.json_schema.name).toBe("speculative_turn_analysis");
+    expect(body.response_format.json_schema.schema.properties.fixedAction.enum).toEqual(["FIXED_KEEP", "FIXED_SKIP"]);
+    expect(body.messages[0].content).toContain("Bank and resume questions may only be kept or skipped");
   });
 
   it("returns a validated grounded bridge from the same speculative call", async () => {
     const fetcher = response({
       revision: 2,
       followUpAction: "REPLACE",
-      followUpQuestion: "How did Kafka reduce the latency?",
+      followUpQuestion: "How did you reduce latency with Kafka?",
       followUpAnchor: "Kafka pipeline",
       fixedAction: "KEEP",
       adaptedFixedQuestion: null,
@@ -37,8 +55,8 @@ describe("speculative turn analysis", () => {
     const result = await new SpeculativeTurnAnalysisService({ apiKey: "key", model: "model", timeoutMs: 500 }, fetcher).analyze({ ...input, recentAcknowledgements });
     // The bridge always introduces the planned question (never the follow-up), so the frontend can check it is the one asked.
     expect(result).toMatchObject({ followUpAction: "REPLACE", bridge: "You mentioned building a Kafka pipeline.", bridgeFor: input.firstFixedQuestion });
-    const body = JSON.parse(String((fetcher.mock.calls as unknown as Array<[string, RequestInit]>)[0]?.[1]?.body));
-    expect(body.response_format.json_schema.schema.required).toContain("bridge");
+    const body = JSON.parse(String((fetcher.mock.calls as unknown as Array<[string, RequestInit]>)[1]?.[1]?.body));
+    expect(body.response_format.json_schema.schema.properties.bridge).toBeDefined();
     expect(JSON.parse(body.messages[1].content)).toMatchObject({ recentAcknowledgements, bridgeLeadIn: "You mentioned" });
   });
 
@@ -46,8 +64,8 @@ describe("speculative turn analysis", () => {
     const fetcher = response({ revision: 2, followUpAction: "NONE", followUpQuestion: null, followUpAnchor: null, fixedAction: "KEEP", adaptedFixedQuestion: null, fixedEvidenceAnchor: null, bridge: "Now I'd like to talk about how you test your code." });
     const result = await new SpeculativeTurnAnalysisService({ apiKey: "key", model: "model", timeoutMs: 500 }, fetcher).analyze({ ...input, snapshot: "Um, yeah.", currentQuestion: "Tell me about yourself.", firstFixedQuestion: "How do you test your code?" });
     expect(result).toMatchObject({ bridge: "Now I'd like to talk about how you test your code.", bridgeFor: "How do you test your code?" });
-    const body = JSON.parse(String((fetcher.mock.calls as unknown as Array<[string, RequestInit]>)[0]?.[1]?.body));
-    expect(body.messages[0].content).toContain("one topical transition");
+    const body = JSON.parse(String((fetcher.mock.calls as unknown as Array<[string, RequestInit]>)[1]?.[1]?.body));
+    expect(body.messages[0].content).toContain("short natural topic shift");
   });
 
   it("returns a one-sentence follow-up bridge validated against the follow-up, and drops an invented one", async () => {
@@ -61,7 +79,7 @@ describe("speculative turn analysis", () => {
   });
 
   it("drops an invented bridge without losing the selected question", async () => {
-    const fetcher = response({ revision: 2, followUpAction: "REPLACE", followUpQuestion: "How did Kafka reduce the latency?", followUpAnchor: "Kafka pipeline", fixedAction: "KEEP", adaptedFixedQuestion: null, fixedEvidenceAnchor: null, bridge: "You mentioned deploying Kafka on Azure." });
+    const fetcher = response({ revision: 2, followUpAction: "REPLACE", followUpQuestion: "How did you reduce latency with Kafka?", followUpAnchor: "Kafka pipeline", fixedAction: "KEEP", adaptedFixedQuestion: null, fixedEvidenceAnchor: null, bridge: "You mentioned deploying Kafka on Azure." });
     await expect(new SpeculativeTurnAnalysisService({ apiKey: "key", model: "model", timeoutMs: 500 }, fetcher).analyze(input)).resolves.toMatchObject({ followUpAction: "REPLACE", bridge: null, bridgeFor: null });
   });
 
@@ -81,12 +99,12 @@ describe("speculative turn analysis", () => {
     try {
       const result = await new SpeculativeTurnAnalysisService({ apiKey: "key", model: "model", timeoutMs: 500 }, fetcher).analyze({ ...input, previousCandidate });
       expect(result?.followUpAction).toBe("KEEP");
-      const body = JSON.parse(String((fetcher.mock.calls as unknown as Array<[string, RequestInit]>)[0]?.[1]?.body));
-      expect(body.response_format.json_schema.schema.properties.followUpAction.enum).toEqual(["KEEP", "REPLACE", "NONE"]);
-      const diagnostic = JSON.parse(String(info.mock.calls[0]?.[0]));
+      const body = JSON.parse(String((fetcher.mock.calls as unknown as Array<[string, RequestInit]>)[1]?.[1]?.body));
+      expect(fetcher.mock.calls.map((call) => JSON.parse(String((call[1] as RequestInit).body)).response_format.json_schema.name)).toContain("interview_follow_up");
+      const diagnostic = JSON.parse(String(info.mock.calls.find((call) => String(call[0]).includes("interview_speculative_analysis"))?.[0]));
       expect(diagnostic).toMatchObject({ revision: 2, hadPreviousCandidate: true, followUpSelected: true });
-      expect(String(info.mock.calls[0]?.[0])).not.toContain(previousCandidate.question);
-      expect(String(info.mock.calls[0]?.[0])).not.toContain(input.snapshot);
+      expect(String(info.mock.calls.find((call) => String(call[0]).includes("interview_speculative_analysis"))?.[0])).not.toContain(previousCandidate.question);
+      expect(String(info.mock.calls.find((call) => String(call[0]).includes("interview_speculative_analysis"))?.[0])).not.toContain(input.snapshot);
     } finally {
       info.mockRestore();
     }
@@ -112,7 +130,7 @@ describe("speculative turn analysis", () => {
   it("drops only a follow-up whose anchor is absent from the snapshot", async () => {
     const fetcher = response({ revision: 2, followUpAction: "REPLACE", followUpQuestion: "Why did Redis help?", followUpAnchor: "Redis", fixedAction: "KEEP", adaptedFixedQuestion: null, fixedEvidenceAnchor: null });
     await expect(new SpeculativeTurnAnalysisService({ apiKey: "key", model: "model", timeoutMs: 500 }, fetcher).analyze(input)).resolves.toEqual({
-      revision: 2, followUpAction: "NONE", followUpQuestion: null, followUpAnchor: null, fixedAction: "KEEP", adaptedFixedQuestion: null, fixedEvidenceAnchor: null, secondFixedAction: "KEEP", adaptedSecondFixedQuestion: null, secondFixedEvidenceAnchor: null, bridge: null, bridgeFor: null, followUpBridge: null, followUpRejected: true,
+      revision: 2, followUpAction: "NONE", followUpQuestion: null, followUpAnchor: null, fixedAction: "KEEP", adaptedFixedQuestion: null, fixedEvidenceAnchor: null, secondFixedAction: "KEEP", adaptedSecondFixedQuestion: null, secondFixedEvidenceAnchor: null, bridge: null, bridgeFor: null, followUpBridge: null, followUpKind: null, followUpRejected: true,
     });
   });
 
@@ -126,10 +144,10 @@ describe("speculative turn analysis", () => {
     const service = new SpeculativeTurnAnalysisService({ apiKey: "key", model: "model", timeoutMs: 500 }, fetcher);
     await expect(service.analyze({ ...input, firstFixedType: "job" })).resolves.toMatchObject({ fixedAction: "KEEP" });
     await expect(service.analyze({ ...input, followUpUsed: true })).resolves.toMatchObject({ followUpAction: "NONE", fixedAction: "KEEP" });
-    expect(fetcher).toHaveBeenCalledTimes(2);
-    const secondBody = JSON.parse(String((fetcher.mock.calls as unknown as Array<[string, RequestInit]>)[1]?.[1]?.body));
-    expect(secondBody.response_format.json_schema.schema.properties.followUpAction.enum).toEqual(["NONE"]);
-    expect(secondBody.messages[0].content).toContain("Do not create another follow-up");
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    const secondBody = JSON.parse(String((fetcher.mock.calls as unknown as Array<[string, RequestInit]>)[2]?.[1]?.body));
+    expect(secondBody.response_format.json_schema.name).toBe("speculative_turn_analysis");
+    expect(JSON.parse(secondBody.messages[1].content).followUpUsed).toBe(true);
   });
 
   it("never allows SKIP for a second planned job question", async () => {
@@ -168,7 +186,7 @@ describe("speculative turn analysis", () => {
     const fetcher = response({ revision: 2, followUpAction: "NONE", followUpQuestion: null, followUpAnchor: null, fixedAction: "SKIP", adaptedFixedQuestion: null, fixedEvidenceAnchor: "Kafka pipeline" });
     const result = await new SpeculativeTurnAnalysisService({ apiKey: "key", model: "model", timeoutMs: 500 }, fetcher).analyze({ ...input, firstFixedType: "bank", firstFixedQuestion: "Tell me about a project you worked on?", previousAnswers });
     expect(result).toMatchObject({ fixedAction: "SKIP", fixedEvidenceAnchor: "Kafka pipeline" });
-    const body = JSON.parse(String((fetcher.mock.calls as unknown as Array<[string, RequestInit]>)[0]?.[1]?.body));
+    const body = JSON.parse(String((fetcher.mock.calls as unknown as Array<[string, RequestInit]>)[1]?.[1]?.body));
     expect(body.messages[1].content).toContain('"previousAnswers"');
     expect(JSON.parse(body.messages[1].content).previousAnswers).toHaveLength(8);
       expect(body.messages[0].content).toContain("project-name overlap is insufficient");
@@ -223,9 +241,11 @@ describe("speculative turn analysis", () => {
     ])("keeps the question when only generic words overlap: %s", async (_label, firstFixedQuestion, snapshot) => {
       await expect(run({}, { snapshot, firstFixedType: "bank", firstFixedQuestion })).resolves.toMatchObject({ fixedAction: "KEEP", fixedEvidenceAnchor: null });
     });
-    it("preserves a valid model DEEPEN instead of a heuristic SKIP", async () => {
-      const result = await run({ fixedAction: "DEEPEN", adaptedFixedQuestion: "What was the hardest technical challenge when you migrated the payments data?", fixedEvidenceAnchor: "payments migration" }, { snapshot: "Last year I worked on the payments migration at my company and it took six months.", firstFixedType: "bank", firstFixedQuestion: "What was the biggest technical challenge in your payments migration?" });
-      expect(result).toMatchObject({ fixedAction: "DEEPEN" });
+    it("limits bank questions to KEEP or SKIP in the planner schema", async () => {
+      const fetcher = response({ revision: 2, fixedAction: "KEEP" });
+      await new SpeculativeTurnAnalysisService({ apiKey: "key", model: "model", timeoutMs: 500 }, fetcher).analyze({ ...input, snapshot: "Last year I worked on the payments migration at my company and it took six months.", firstFixedType: "bank", firstFixedQuestion: "What was the biggest technical challenge in your payments migration?" });
+      const planner = JSON.parse(String((fetcher.mock.calls as unknown as Array<[string, RequestInit]>)[1]?.[1]?.body));
+      expect(planner.response_format.json_schema.schema.properties.fixedAction.enum).toEqual(["FIXED_KEEP", "FIXED_SKIP"]);
     });
     it("rejects a model SKIP whose anchor shares only the topic or generic words", async () => {
       const result = await run({ fixedAction: "SKIP", fixedEvidenceAnchor: "worked on the payments migration" }, { snapshot: "Last year I worked on the payments migration at my company.", firstFixedType: "bank", firstFixedQuestion: "What was the biggest technical challenge in your payments migration?" });
@@ -316,9 +336,12 @@ describe("speculative turn analysis", () => {
 
   it("keeps a specific fixed competency and deepens it with an unexplored supported angle", async () => {
     const snapshot = "I built a Kafka pipeline. We used Grafana alerts to detect spikes before customer impact.";
-    const fetcher = response({ revision: 2, followUpAction: "NONE", followUpQuestion: null, followUpAnchor: null, fixedAction: "DEEPEN", adaptedFixedQuestion: "How did you monitor service health before customer impact?", fixedEvidenceAnchor: "Grafana alerts" });
+    const fetcher = response({ revision: 2, followUpAction: "NONE", followUpQuestion: null, followUpAnchor: null, fixedAction: "DEEPEN", adaptedFixedQuestion: "How did Grafana help you spot issues sooner?", fixedEvidenceAnchor: "Grafana alerts" });
     const result = await new SpeculativeTurnAnalysisService({ apiKey: "key", model: "model", timeoutMs: 500 }, fetcher).analyze({ ...input, snapshot, currentQuestion: "What did you build?", firstFixedQuestion: "How did you monitor services in production?" });
-    expect(result).toMatchObject({ fixedAction: "DEEPEN", adaptedFixedQuestion: "How did you monitor service health before customer impact?", fixedEvidenceAnchor: "Grafana alerts" });
+    expect(result).toMatchObject({ fixedAction: "SKIP", fixedEvidenceAnchor: "Grafana alerts" });
+    const plannerCall = (fetcher.mock.calls as unknown as Array<[string, RequestInit]>).find((call) => JSON.parse(String(call[1]?.body)).response_format.json_schema.name === "speculative_turn_analysis");
+    const planner = JSON.parse(String(plannerCall?.[1]?.body));
+    expect(planner.response_format.json_schema.schema.properties.fixedAction.enum).toEqual(["FIXED_KEEP", "FIXED_SKIP"]);
   });
 
   it("rejects a DEEPEN that presupposes a detail the candidate never said", async () => {
@@ -372,7 +395,7 @@ describe("speculative turn analysis", () => {
       const fetcher = response({ revision: 2, followUpAction: "NONE", followUpQuestion: null, followUpAnchor: null, fixedAction: "DEEPEN", adaptedFixedQuestion: q7, fixedEvidenceAnchor: "synthetic lung CT and mammography images", secondFixedAction: "NONE" });
       const result = await new SpeculativeTurnAnalysisService({ apiKey: "key", model: "model", timeoutMs: 500 }, fetcher).analyze({ ...input, snapshot: "We generated synthetic lung CT and mammography images and checked texture and anatomical fidelity against real scans.", currentQuestion: "What did you build for the synthetic images?", firstFixedQuestion: "How do you check the synthetic images for texture and anatomy?", secondFixedQuestion: null, secondFixedType: null, askedQuestions: [q3] });
       expect(result).toMatchObject({ fixedAction: "KEEP", adaptedFixedQuestion: null, fixedEvidenceAnchor: null });
-      expect(JSON.parse(String(info.mock.calls[0]?.[0])).reason).toContain("deepen_repeats_asked_question");
+      expect(JSON.parse(String(info.mock.calls.find((call) => String(call[0]).includes("interview_speculative_analysis"))?.[0])).reason).toContain("deepen_repeats_asked_question");
     } finally { info.mockRestore(); }
   });
 
@@ -405,7 +428,8 @@ describe("speculative turn analysis", () => {
       secondFixedEvidenceAnchor: null,
       bridge: null,
       bridgeFor: null,
-      followUpBridge: null,
+      followUpBridge: "You said kafka pipeline.",
+      followUpKind: "how",
       followUpRejected: false,
     });
   });
@@ -418,8 +442,8 @@ describe("speculative turn analysis", () => {
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
     try {
       await expect(new SpeculativeTurnAnalysisService({ apiKey: "key", model: "model", timeoutMs: 500 }, fetcher).analyze(input)).resolves.toBeNull();
-      expect(String(info.mock.calls[0]?.[0])).toContain(`\"reason\":\"${expectedReason}\"`);
-      expect(String(info.mock.calls[0]?.[0])).not.toContain(input.snapshot);
+      expect(String(info.mock.calls.find((call) => String(call[0]).includes("interview_speculative_analysis"))?.[0])).toContain(`\"reason\":\"${expectedReason}\"`);
+      expect(String(info.mock.calls.find((call) => String(call[0]).includes("interview_speculative_analysis"))?.[0])).not.toContain(input.snapshot);
     } finally { info.mockRestore(); }
   });
 
@@ -428,8 +452,8 @@ describe("speculative turn analysis", () => {
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
     try {
       await expect(new SpeculativeTurnAnalysisService({ apiKey: "key", model: "model", timeoutMs: 500 }, fetcher).analyze(input)).resolves.toBeNull();
-      expect(String(info.mock.calls[0]?.[0])).toContain('"reason":"invalid_json"');
-      expect(String(info.mock.calls[0]?.[0])).not.toContain(input.snapshot);
+      expect(String(info.mock.calls.find((call) => String(call[0]).includes("interview_speculative_analysis"))?.[0])).toContain('"reason":"invalid_json"');
+      expect(String(info.mock.calls.find((call) => String(call[0]).includes("interview_speculative_analysis"))?.[0])).not.toContain(input.snapshot);
     } finally { info.mockRestore(); }
   });
 
@@ -438,10 +462,10 @@ describe("speculative turn analysis", () => {
     try {
       const unavailable = vi.fn(async () => new Response("", { status: 503 }));
       await expect(new SpeculativeTurnAnalysisService({ apiKey: "key", model: "model", timeoutMs: 500 }, unavailable).analyze(input)).resolves.toBeNull();
-      expect(String(info.mock.calls.at(-1)?.[0])).toContain("provider_status");
-      const slow = vi.fn((_url: string | URL | Request, init?: RequestInit) => new Promise<Response>((_resolve, reject) => init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true })));
+      expect(String(info.mock.calls.find((call) => String(call[0]).includes("interview_speculative_analysis"))?.[0])).toContain("provider_status");
+      const slow = vi.fn((_url: string | URL | Request, init?: RequestInit) => new Promise<Response>((_resolve, reject) => init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true })));
       await expect(new SpeculativeTurnAnalysisService({ apiKey: "key", model: "model", timeoutMs: 5 }, slow).analyze(input)).resolves.toBeNull();
-      expect(String(info.mock.calls.at(-1)?.[0])).toContain("timeout");
+      expect(info.mock.calls.some((call) => String(call[0]).includes("timeout"))).toBe(true);
     } finally { info.mockRestore(); }
   });
 });
@@ -489,10 +513,12 @@ describe("broad project coverage", () => {
     expect(await run({ ...base, firstFixedCoverage: "broad-project", snapshot: "I worked on a payments project last year.", previousAnswers: [{ question: "Q", answer: "I built an app once and it was fun to build with friends at the university." }] })).toMatchObject({ fixedAction: "KEEP" });
   });
 
-  it("accepts a DEEPEN whose anchor is only in an earlier answer", async () => {
-    const analysis = { ...keep, fixedAction: "DEEPEN", adaptedFixedQuestion: "How did you test the Redis caching you added to the dashboard?", fixedEvidenceAnchor: "caching results in Redis" };
-    const result = await run({ ...base, firstFixedQuestion: "How do you test your changes before sharing them?", firstFixedType: "bank", snapshot: "Yes, that was a nice team.", previousAnswers: [{ question: "Q", answer: described }] }, analysis);
-    expect(result).toMatchObject({ fixedAction: "DEEPEN", fixedEvidenceAnchor: "caching results in Redis" });
+  it("limits bank questions to KEEP or SKIP even with previous answer context", async () => {
+    const fetcher = response({ ...keep, fixedAction: "KEEP" });
+    await new SpeculativeTurnAnalysisService({ apiKey: "key", model: "model", timeoutMs: 500 }, fetcher).analyze({ ...input, ...base, firstFixedQuestion: "How do you test your changes before sharing them?", firstFixedType: "bank", snapshot: "Yes, that was a nice team.", previousAnswers: [{ question: "Q", answer: described }] });
+    const plannerCall = (fetcher.mock.calls as unknown as Array<[string, RequestInit]>).find((call) => JSON.parse(String(call[1]?.body)).response_format.json_schema.name === "speculative_turn_analysis");
+    const planner = JSON.parse(String(plannerCall?.[1]?.body));
+    expect(planner.response_format.json_schema.schema.properties.fixedAction.enum).toEqual(["FIXED_KEEP", "FIXED_SKIP"]);
   });
 
   it("rejects a DEEPEN that changes the planned competency and logs the reason", async () => {
@@ -501,7 +527,7 @@ describe("broad project coverage", () => {
       const analysis = { ...keep, fixedAction: "DEEPEN", adaptedFixedQuestion: "How did the dashboard design change after the team reviewed it?", fixedEvidenceAnchor: "payments dashboard" };
       const result = await run({ ...base, firstFixedQuestion: "How do you test your changes before sharing them?", snapshot: described }, analysis);
       expect(result).toMatchObject({ fixedAction: "KEEP", adaptedFixedQuestion: null });
-      expect(String(info.mock.calls.at(-1)?.[0])).toContain("deepen_competency_changed");
+      expect(String(info.mock.calls.find((call) => String(call[0]).includes("interview_speculative_analysis"))?.[0])).toContain("deepen_competency_changed");
     } finally { info.mockRestore(); }
   });
 
@@ -595,7 +621,7 @@ describe("speculative analysis on disfluent speech and covered resume questions"
     try {
       const result = await new SpeculativeTurnAnalysisService({ apiKey: "key", model: "model", timeoutMs: 500 }, response({ ...keep, fixedAction: "DEEPEN", adaptedFixedQuestion: metricsQuestion, fixedEvidenceAnchor: "used precision and recall to evaluate it" })).analyze(resume as unknown as typeof input);
       expect(result).toMatchObject({ fixedAction: "SKIP", adaptedFixedQuestion: null });
-      expect(JSON.parse(String(info.mock.calls[0]?.[0])).reason).toContain("deepen_rejected_skip");
+      expect(JSON.parse(String(info.mock.calls.find((call) => String(call[0]).includes("interview_speculative_analysis"))?.[0])).reason).toContain("deepen_rejected_skip");
     } finally { info.mockRestore(); }
     const changed = await run({ fixedAction: "DEEPEN", adaptedFixedQuestion: "How did the team celebrate the launch of the model?", fixedEvidenceAnchor: "used precision and recall to evaluate it" });
     expect(changed).toMatchObject({ fixedAction: "SKIP" });
@@ -637,7 +663,7 @@ describe("speculative follow-up validation", () => {
     try {
       const fetcher = response({ revision: 2, followUpAction: "REPLACE", followUpQuestion: "Why did you choose Kafka for this project?", followUpAnchor: "I built it with Node and Kafka, so the order service publishes an event and", ...fixedKeep, ...overrides });
       const result = await new SpeculativeTurnAnalysisService({ apiKey: "key", model: "model", timeoutMs: 500 }, fetcher).analyze({ ...base, ...inputOverrides });
-      return { result, reason: JSON.parse(String(info.mock.calls[0]?.[0])).reason as string | undefined, log: String(info.mock.calls[0]?.[0]) };
+      return { result, reason: (JSON.parse(String(info.mock.calls.find((call) => String(call[0]).includes("interview_follow_up_writer"))?.[0])).rejected as string | null) ?? JSON.parse(String(info.mock.calls.find((call) => String(call[0]).includes("interview_speculative_analysis"))?.[0])).reason as string | undefined, log: String(info.mock.calls.find((call) => String(call[0]).includes("interview_speculative_analysis"))?.[0]) };
     } finally { info.mockRestore(); }
   };
 
@@ -648,7 +674,7 @@ describe("speculative follow-up validation", () => {
     expect(clipped.split(/\s+/u).length).toBeLessThanOrEqual(12);
     expect(clipped).toContain("Kafka");
     expect(longSnapshot).toContain(clipped);
-    expect(reason).toContain("follow_up_anchor_clipped");
+    expect(result?.followUpRejected).toBe(false);
     expect(log).not.toContain("Kafka");
   });
 
@@ -660,20 +686,20 @@ describe("speculative follow-up validation", () => {
   it("still rejects a shared verb with a previous question", async () => {
     const { result, reason } = await run({ followUpQuestion: "How did you implement the idempotency with Kafka?", followUpAnchor: "Node and Kafka" }, { askedQuestions: ["How did you implement the retry policy?", base.currentQuestion] });
     expect(result).toMatchObject({ followUpAction: "NONE", followUpRejected: true });
-    expect(reason).toContain("follow_up_repeats_question");
+    expect(reason).toContain("repeated_question");
   });
 
   it("rejects a follow-up restating the current question lead", async () => {
     const { result, reason } = await run({ followUpQuestion: "How did you design the event schema for orders in Kafka?", followUpAnchor: "Node and Kafka" }, { currentQuestion: "How did you design the event schema for orders and billing?", askedQuestions: ["Tell me about yourself.", "How did you design the event schema for orders and billing?"] });
     expect(result).toMatchObject({ followUpAction: "NONE", followUpRejected: true });
-    expect(reason).toContain("follow_up_repeats_question");
+    expect(reason).toContain("repeated_question");
   });
 
   it("reports distinct content-free sub-reasons", async () => {
-    expect((await run({ followUpQuestion: "Why Kafka" })).reason).toContain("follow_up_invalid_shape");
-    expect((await run({ followUpAnchor: "Python and RabbitMQ" })).reason).toContain("follow_up_anchor_not_literal");
-    expect((await run({ followUpQuestion: "How did you test the mobile checkout flow?", followUpAnchor: "Node and Kafka" })).reason).toContain("follow_up_not_grounded");
-    expect((await run({ followUpAction: "REPLACE", followUpQuestion: "Why did you choose Kafka for this project?" }, {})).reason).not.toContain("invalid_follow_up");
+    expect((await run({ followUpQuestion: "Why Kafka" })).reason).toContain("invalid_question_shape");
+    expect((await run({ followUpAnchor: "Python and RabbitMQ" })).reason).toContain("anchor_not_literal");
+    expect((await run({ followUpQuestion: "How did you test the mobile checkout flow?", followUpAnchor: "Node and Kafka" })).reason).toContain("not_grounded");
+    expect((await run({ followUpAction: "REPLACE", followUpQuestion: "Why did you choose Kafka for this project?" }, {})).reason).not.toBe("invalid_shape");
   });
 
   it("sets followUpRejected only when a proposed follow-up is refused", async () => {

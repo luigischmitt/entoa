@@ -169,7 +169,7 @@ export function missingBridgeDetailWords(text: string, transcript: string, decis
 }
 
 /** Deterministic bridge gate. An invalid bridge never affects the question: it is dropped with a fixed, content-free reason. */
-export function evaluateBridge(raw: unknown, input: Pick<BridgeInput, "decision" | "transcript" | "recentAcknowledgements" | "question"> & { currentQuestion?: string; askedQuestion?: string }): Evaluation {
+export function evaluateBridge(raw: unknown, input: Pick<BridgeInput, "decision" | "transcript" | "recentAcknowledgements" | "question"> & { currentQuestion?: string; askedQuestion?: string; requireLeadIn?: boolean }): Evaluation {
   if (raw === null || raw === undefined) return { bridge: null };
   if (typeof raw !== "string") return { dropReason: "invalid_text" };
   const text = raw.trim().replace(/\s+/gu, " ");

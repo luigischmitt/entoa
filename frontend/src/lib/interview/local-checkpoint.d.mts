@@ -6,7 +6,10 @@ export type InterviewCheckpointSnapshot = {
   activeQuestion: InterviewQuestion;
   currentIndex: number;
   questionSequenceNumber: number;
-  followUpUsed: boolean;
+  followUpsAsked: number;
+  threadQuestions: string[];
+  recentFollowUpKinds: string[];
+  followUpUsed?: boolean;
   elapsedSeconds: number;
   turns: InterviewReportTurnSource[];
   askedQuestionIds: string[];

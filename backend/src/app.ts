@@ -25,6 +25,7 @@ import { createClosingReactionService, type ClosingReactionService } from "./thi
 import { createShortReplyService, type ShortReplyService } from "./thinking/short-reply-service.js";
 import { createRedoCheckService, type RedoCheckService } from "./thinking/redo-check-service.js";
 import { SpeculativeTurnAnalysisService } from "./thinking/speculative-turn-analysis-service.js";
+import { FollowUpWriter } from "./thinking/follow-up-writer.js";
 import { loadTranscriptionConfig, type TranscriptionConfig } from "./transcription/config.js";
 import { createTranscriptionService } from "./transcription/create-transcription-service.js";
 import { createPronunciationAssessmentService } from "./transcription/create-pronunciation-assessment-service.js";
@@ -108,7 +109,7 @@ export function createApp({ speechConfig, speechProvider, transcriptionConfig, t
   const speculativeModel = speculativeAnalysisModel();
   const resolvedShortReplyService = shortReplyService === undefined ? createShortReplyService(resolvedThinkingConfig.openRouterApiKey ?? undefined, speculativeModel) : shortReplyService;
   // Only mistral is served by the pinned provider; other models use plain OpenRouter routing.
-  const speculativeService = resolvedThinkingConfig.openRouterApiKey ? new SpeculativeTurnAnalysisService({ apiKey: resolvedThinkingConfig.openRouterApiKey, model: speculativeModel, timeoutMs: speculativeAnalysisTimeoutMs() }, speculativeModel.startsWith("mistralai/") ? pinnedOpenRouterFetch : fetch) : null;
+  const speculativeService = resolvedThinkingConfig.openRouterApiKey ? new SpeculativeTurnAnalysisService({ apiKey: resolvedThinkingConfig.openRouterApiKey, model: speculativeModel, timeoutMs: speculativeAnalysisTimeoutMs() }, speculativeModel.startsWith("mistralai/") ? pinnedOpenRouterFetch : fetch, new FollowUpWriter({ apiKey: resolvedThinkingConfig.openRouterApiKey, model: process.env.INTERVIEW_FOLLOW_UP_MODEL?.trim() || speculativeModel, timeoutMs: speculativeAnalysisTimeoutMs() }, speculativeModel.startsWith("mistralai/") ? pinnedOpenRouterFetch : fetch)) : null;
   const resolvedClosingReactionService = closingReactionService === undefined ? (resolvedThinkingConfig.openRouterApiKey ? createClosingReactionService(resolvedThinkingConfig) : null) : closingReactionService;
   const resolvedPolishedAnswerService = polishedAnswerService === undefined && resolvedThinkingConfig.openRouterApiKey
     ? new OpenRouterPolishedAnswerService({ key: resolvedThinkingConfig.openRouterApiKey, model: resolvedThinkingConfig.model, timeoutMs: 20_000 })

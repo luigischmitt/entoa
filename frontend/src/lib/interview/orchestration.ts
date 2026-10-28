@@ -12,7 +12,7 @@ export function buildPreviousAnswers(pairs: PreviousAnswer[]): PreviousAnswer[] 
   return pairs.slice(-9, -1).map((pair) => ({ question: pair.question.slice(0, 500), answer: condensePreviousAnswer(pair.answer) }));
 }
 
-export type TurnDecision = ClarificationTurnDecision | { decision: "FOLLOW_UP"; followUpQuestion: string; nextQuestion: null; acknowledgement: string | null } | { decision: "NEXT"; followUpQuestion: null; nextQuestion: string | null; acknowledgement: string | null };
+export type TurnDecision = ClarificationTurnDecision | { decision: "FOLLOW_UP"; followUpQuestion: string; nextQuestion: null; acknowledgement: string | null; followUpKind?: "clarify" | "why" | "how" | "result" | "role" | "example" | "hypothetical" | "challenge" | null } | { decision: "NEXT"; followUpQuestion: null; nextQuestion: string | null; acknowledgement: string | null };
 
 export async function decideNextTurn(input: {
   config: InterviewConfig;
