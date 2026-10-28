@@ -109,7 +109,8 @@ export class OpenRouterWhisperTranscriptionService implements TranscriptionServi
         }
         if (!response.ok) {
           const category: TranscriptionFailureCategory = response.status === 429 ? "429" : response.status >= 500 ? "5xx" : "rejected";
-          throw new TranscriptionUnavailableError(response.status === 429 ? "OpenRouter returned HTTP 429 after retries." : `OpenRouter returned HTTP ${response.status}.`, { providerStatus: category, attempts, httpStatus: response.status });
+          const providerMessage = await openRouterErrorMessage(response);
+          throw new TranscriptionUnavailableError(response.status === 429 ? "OpenRouter returned HTTP 429 after retries." : `OpenRouter returned HTTP ${response.status}.`, { providerStatus: category, attempts, httpStatus: response.status, ...(providerMessage ? { providerMessage } : {}) });
         }
         let result: OpenRouterResponse;
         try {
@@ -250,4 +251,20 @@ async function discardBody(response: Response): Promise<void> {
   } catch {
     // A failed body discard should not prevent a bounded retry.
   }
+}
+
+/**
+ * OpenRouter's error message plus the upstream provider name, clipped. Error bodies describe the failure (credits,
+ * quota, provider outage) and never echo the audio, so they are safe to log; anything key-like is masked anyway.
+ */
+async function openRouterErrorMessage(response: Response): Promise<string | undefined> {
+  const text = await response.text().catch(() => "");
+  if (!text) return undefined;
+  let message = text;
+  try {
+    const body = JSON.parse(text) as { error?: { message?: unknown; metadata?: { provider_name?: unknown; raw?: unknown } } };
+    const parts = [body.error?.message, body.error?.metadata?.provider_name, body.error?.metadata?.raw].filter((part): part is string => typeof part === "string" && part.length > 0);
+    if (parts.length) message = parts.join(" | ");
+  } catch { /* Not JSON: keep the raw text. */ }
+  return message.replace(/sk-[A-Za-z0-9-_]{8,}/gu, "sk-***").replace(/\s+/gu, " ").trim().slice(0, 300) || undefined;
 }
