@@ -67,3 +67,12 @@ test("an echo of the question ending in 'what is <term>' is a definition request
   assert.equal(detectClarificationRequest("I improved the queue, what is latency", question), null);
   assert.equal(detectClarificationRequest("Profile and resolve performance bottlenecks what is bottlenecks"), null);
 });
+
+test("a request followed by an echo of the question's words asks what those words mean", () => {
+  const question = "What first made you curious about writing software?";
+  assert.equal(detectClarificationRequest("I don't understand. Writing software", question), "define");
+  assert.equal(detectClarificationRequest("Sorry, I didn't get it. Curious?", question), "define");
+  assert.equal(detectClarificationRequest("I don't understand. Writing software", null), null);
+  assert.equal(detectClarificationRequest("Writing software. I like it.", question), null);
+  assert.equal(detectClarificationRequest("I don't understand. Databases", question), null);
+});
