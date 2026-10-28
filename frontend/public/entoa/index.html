@@ -553,23 +553,16 @@ main{overflow-x:clip}
   .pp-voice li::after{grid-column:1 / -1}
 }
 @view-transition{navigation:auto}
-.leave{position:fixed;inset:0;z-index:200;display:grid;place-items:center;background:var(--cream);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .28s var(--ease),visibility 0s linear .28s}
-html.leaving .leave{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .28s var(--ease)}
-.leave-inner{display:flex;flex-direction:column;align-items:center}
-.leave-mark{display:flex;align-items:flex-end;gap:.35rem}
-.leave-bird{width:46px;height:auto;view-transition-name:entoa-mark;animation:leave-bob 1.6s var(--ease) infinite}
-.leave-leaf{width:26px;height:26px;color:var(--green);transform-origin:bottom center;animation:leave-sway 2.2s ease-in-out infinite}
-.leave-leaf.r{animation-name:leave-sway-r;animation-delay:-1.1s;transform:scaleX(-1)}
-.leave-vine{display:block;width:120px;height:2px;margin-top:1.1rem;border-radius:2px;background:linear-gradient(90deg,var(--green-deep),var(--green));transform-origin:left;animation:leave-grow 1.2s var(--ease) infinite}
-@keyframes leave-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
-@keyframes leave-sway{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}
-@keyframes leave-sway-r{0%,100%{transform:scaleX(-1) rotate(-8deg)}50%{transform:scaleX(-1) rotate(8deg)}}
-@keyframes leave-grow{0%{transform:scaleX(0);opacity:1}70%{transform:scaleX(1);opacity:1}100%{transform:scaleX(1);opacity:0}}
-@media(prefers-reduced-motion:reduce){.leave-bird,.leave-leaf,.leave-vine{animation:none}}
+.leave{position:fixed;inset:0;z-index:200;display:grid;place-items:center;background:color-mix(in srgb,var(--cream) 92%,transparent);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .22s var(--ease),visibility 0s linear .22s}
+html.leaving .leave{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .22s var(--ease)}
+.leave-spin{width:30px;height:30px;border-radius:50%;border:2.5px solid var(--track);border-top-color:var(--green);animation:leave-spin .75s linear infinite}
+@keyframes leave-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.leave-spin{animation-duration:1.6s}}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 </style>
 </head>
 <body>
-<div class="leave" id="leave" aria-hidden="true"><div class="leave-inner"><div class="leave-mark"><svg class="leave-leaf" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22C7 18 4 13 6 7c3 1 6 4 6 9 0-6 3-11 7-13 2 7-1 14-7 19z"/></svg><img class="leave-bird" src="/landing/tucano-mark.webp" alt="" width="46" height="54"><svg class="leave-leaf r" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22C7 18 4 13 6 7c3 1 6 4 6 9 0-6 3-11 7-13 2 7-1 14-7 19z"/></svg></div><i class="leave-vine"></i></div></div>
+<div class="leave" id="leave" role="status" aria-live="polite"><span class="leave-spin" aria-hidden="true"></span><span class="sr-only">Carregando…</span></div>
 
 <header class="nav">
   <div class="wrap">
@@ -1296,7 +1289,7 @@ AWS e observabilidade</div></div>
     if(!a||e.defaultPrevented||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey||a.target==='_blank')return;
     e.preventDefault();
     document.documentElement.classList.add('leaving');
-    setTimeout(()=>location.assign(a.href),reduce?0:260);
+    setTimeout(()=>location.assign(a.href),reduce?0:120);
   });
   // Back/forward restores this page from the cache with the overlay still on.
   addEventListener('pageshow',e=>{if(e.persisted)document.documentElement.classList.remove('leaving')});

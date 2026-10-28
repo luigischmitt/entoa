@@ -8,7 +8,6 @@
 .au-shell { display: flex; width: 100%; max-width: 27.5rem; flex-direction: column; gap: 1.5rem; }
 .au-brand { display: inline-flex; align-items: center; align-self: center; gap: 0.625rem; border-radius: 0.5rem; font-size: 0.9375rem; font-weight: 600; letter-spacing: -0.012em; }
 .au-brand img { height: 2rem; width: auto; }
-.au-brand img { view-transition-name: entoa-mark; }
 .au-brand:focus-visible, .au-link:focus-visible { outline: var(--ds-focus-outline); outline-offset: 3px; }
 
 .au-card { padding: 1.5rem; }
@@ -16,7 +15,6 @@
 .au-card { animation: au-enter 0.5s cubic-bezier(0.23, 1, 0.32, 1) 0.12s both; }
 @keyframes au-enter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
-::view-transition-group(entoa-mark) { animation-duration: 0.6s; animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1); }
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.35s; }
 .au-stack { display: flex; flex-direction: column; gap: 1.5rem; }
 
