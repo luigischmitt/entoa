@@ -1,5 +1,6 @@
 import type { VoiceTranscription } from "./transcription.js";
 
+export const RETAINED_AUDIO_FAILURE_MESSAGE: string;
 export function transcriptionFailureMessage(code: unknown): string;
 export function finalVoiceTranscription(message: {
   status?: unknown;

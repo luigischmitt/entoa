@@ -17,6 +17,8 @@ const failureMessages = {
   UNSUPPORTED_PCM_PROTOCOL: "O formato de áudio deste navegador não é compatível. Tente em outro navegador, pule a pergunta ou encerre a prática.",
 };
 
+export const RETAINED_AUDIO_FAILURE_MESSAGE = "Não conseguimos transcrever sua resposta. Seu áudio foi guardado: toque em Tentar novamente.";
+
 export function transcriptionFailureMessage(code) {
   return typeof code === "string" && Object.hasOwn(failureMessages, code)
     ? failureMessages[code]
