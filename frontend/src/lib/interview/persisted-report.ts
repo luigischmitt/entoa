@@ -3,12 +3,15 @@ import { requestPersistedReport } from "./persisted-report-request.mjs";
 import type { AzureMetricSummary } from "./report-metrics.mjs";
 import type { InterviewReportResult } from "./report";
 
+export const currentReportAnalysisVersion = "v3";
+
 export async function requestPersistedInterviewReport(
   interviewId: string,
   azureSummary: AzureMetricSummary | null,
   locale: "pt-BR" | "en",
   fetcher: typeof fetch = authorizedFetch,
   endpoint = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001",
+  options: { regenerate?: boolean } = {},
 ): Promise<InterviewReportResult> {
-  return requestPersistedReport(interviewId, azureSummary, locale, fetcher, endpoint) as Promise<InterviewReportResult>;
+  return requestPersistedReport(interviewId, azureSummary, locale, fetcher, endpoint, options) as Promise<InterviewReportResult>;
 }

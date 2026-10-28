@@ -149,13 +149,11 @@
   padding: clamp(1.25rem, 2.6vw, 2rem);
 }
 .shl-home-card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.5rem 1rem; }
-.shl-home-takeaway {
+.shl-home-priority {
   margin: 0;
   color: var(--ds-ink);
-  font-family: var(--font-display);
-  font-size: clamp(1.45rem, 1.2rem + 0.9vw, 1.9rem);
-  line-height: 1.25;
-  letter-spacing: -0.015em;
+  font-size: 1.05rem;
+  line-height: 1.5;
   text-wrap: pretty;
 }
 .shl-home-card-foot { padding-top: 0.75rem; }

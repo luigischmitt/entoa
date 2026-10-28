@@ -16,6 +16,20 @@ test("posts only the persisted interview id, locale and voice summary to the aut
   assert.deepEqual(JSON.parse(request.init.body), { locale: "en", azureSummary: { accuracy: { mean: 80, sampleCount: 1 } } });
 });
 
+test("sends regenerate only when requested", async () => {
+  const bodies = [];
+  const fetcher = async (_url, init) => {
+    bodies.push(JSON.parse(init.body));
+    return new Response(JSON.stringify({ status: "ready", report: {} }), { status: 200 });
+  };
+  await requestPersistedReport("id", null, "pt-BR", fetcher, "https://api.example.test");
+  await requestPersistedReport("id", null, "pt-BR", fetcher, "https://api.example.test", { regenerate: false });
+  await requestPersistedReport("id", null, "pt-BR", fetcher, "https://api.example.test", { regenerate: true });
+  assert.equal("regenerate" in bodies[0], false);
+  assert.equal("regenerate" in bodies[1], false);
+  assert.equal(bodies[2].regenerate, true);
+});
+
 test("surfaces the retryable server error copy", async () => {
   await assert.rejects(
     requestPersistedReport("id", null, "pt-BR", async () => new Response(JSON.stringify({ error: { message: "Tente em instantes." } }), { status: 502 }), "https://api.example.test"),

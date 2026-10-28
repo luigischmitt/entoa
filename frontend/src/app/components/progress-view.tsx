@@ -17,7 +17,7 @@ import { PageIntro } from "./shared";
 import { formatPracticeDuration, ProgressContent } from "./progress/progress-content";
 import { InterviewReport } from "./interview-report";
 import type { ReportState } from "./interview-report";
-import { requestPersistedInterviewReport } from "@/lib/interview/persisted-report";
+import { currentReportAnalysisVersion, requestPersistedInterviewReport } from "@/lib/interview/persisted-report";
 
 const emptyAzureSummary: AzureMetricSummary = {
   accuracy: { mean: null, sampleCount: 0 },
@@ -30,7 +30,15 @@ function formatClock(seconds: number) {
   return `${String(Math.floor(safeSeconds / 60)).padStart(2, "0")}:${String(safeSeconds % 60).padStart(2, "0")}`;
 }
 
-export function ProgressView({ onStart }: { onStart?: () => void } = {}) {
+export function ProgressView({
+  onStart,
+  initialReportId,
+  onInitialReportOpened,
+}: {
+  onStart?: () => void;
+  initialReportId?: string | null;
+  onInitialReportOpened?: () => void;
+} = {}) {
   const { locale } = useLocale();
   const cachedRecords = readDashboardCache("progress") as ProgressRecord[] | undefined;
   const [records, setRecords] = useState<ProgressRecord[]>(() => cachedRecords ?? []);
@@ -90,13 +98,13 @@ export function ProgressView({ onStart }: { onStart?: () => void } = {}) {
     setAttempt((value) => value + 1);
   };
 
-  const generateHistoricalReport = async (sessionId: string) => {
+  const generateHistoricalReport = async (sessionId: string, options?: { regenerate?: boolean }) => {
     const session = records.find((record) => record.id === sessionId);
     if (!session || retryingSessionId === sessionId) return;
     setRetryingSessionId(sessionId);
     setRecoveryStates((current) => ({ ...current, [sessionId]: { status: "pending" } }));
     try {
-      const result = await requestPersistedInterviewReport(sessionId, session.feedback?.azureSummary ?? null, locale === "en" ? "en" : "pt-BR");
+      const result = await requestPersistedInterviewReport(sessionId, session.feedback?.azureSummary ?? null, locale === "en" ? "en" : "pt-BR", undefined, undefined, options);
       setRecoveryStates((current) => ({ ...current, [sessionId]: { status: "ready", result } }));
       invalidateDashboardCache("progress");
       const refreshed = await loadProgressRecords();
@@ -120,6 +128,14 @@ export function ProgressView({ onStart }: { onStart?: () => void } = {}) {
     const session = records.find((record) => record.id === sessionId);
     if (session?.feedback?.status === "pending") void generateHistoricalReport(sessionId);
   };
+
+  useEffect(() => {
+    if (!initialReportId || !records.some((record) => record.id === initialReportId)) return;
+    openHistoricalReport(initialReportId);
+    onInitialReportOpened?.();
+    // openHistoricalReport is recreated each render; it only needs the current records.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialReportId, records]);
 
   const closeHistoricalReport = () => {
     setSelectedSessionId(null);
@@ -209,7 +225,7 @@ export function ProgressView({ onStart }: { onStart?: () => void } = {}) {
       ) : (
         <>
           <div hidden={!!selectedSession}>
-            <ProgressContent insights={insights} onOpenReport={openHistoricalReport} />
+            <ProgressContent insights={insights} onOpenReport={openHistoricalReport} records={records} />
           </div>
           {selectedSession && historicalConfig && (
             <div className="mt-8 lg:mt-10">
@@ -231,6 +247,8 @@ export function ProgressView({ onStart }: { onStart?: () => void } = {}) {
                 historical
                 onRetry={() => { void generateHistoricalReport(selectedSession.id); }}
                 retrying={retryingSessionId === selectedSession.id}
+                canRegenerate={selectedSession.feedback?.status === "ready" && selectedSession.feedback?.analysisVersion !== currentReportAnalysisVersion}
+                onRegenerate={() => { void generateHistoricalReport(selectedSession.id, { regenerate: true }); }}
               />
             </div>
           )}

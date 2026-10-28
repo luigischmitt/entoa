@@ -11,7 +11,7 @@ import type { ProgressRecord } from "@/lib/interview/progress-insights.mjs";
 import { RESUME_PRACTICE_LABEL } from "@/lib/interview/resume-neutral.mjs";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { findingsForAnswer } from "@/lib/interview/report-response.mjs";
-import { analysisCoverageNotice, buildReportDeltas, displayInterviewerTakeaway, displayTechnicalFindings, phonemeTip } from "@/lib/interview/report-presentation.mjs";
+import { analysisCoverageNotice, displayInterviewerTakeaway, displayTechnicalFindings, phonemeTip } from "@/lib/interview/report-presentation.mjs";
 import { voiceDeliveryInterpretation } from "@/lib/interview/voice-report-insights.mjs";
 import { buildErrorRows, buildJobCoverage, buildPracticePriorities, buildVoiceNotes, formatReportDate, reportFileBase, reportSummaryText, type JobCoverageItem } from "@/lib/interview/report-document.mjs";
 import { useReplayReveal } from "@/lib/use-replay-reveal";
@@ -41,7 +41,7 @@ const reportLoadingSteps = [
   "Juntando os sinais da sua voz",
 ];
 const maxVisibleErrors = 8;
-const maxStrengths = 4;
+const maxStrengths = 3;
 const maxPronunciationWords = 6;
 const pronunciationScoreLimit = 70;
 /** Answers longer than this are clamped on screen (to four lines) until the reader asks for the full text. */
@@ -60,16 +60,6 @@ function CapturedAnswers({ turns }: { turns: Turns }) {
   return <details className="rp-more"><summary>{t("Transcrição completa")}</summary><ol className="rp-transcript">{turns.map((turn, index) => <li key={`${turn.sequenceNumber}-${index}`}><p lang="en"><span className="font-semibold">{t("Pergunta:")}</span> {turn.question}</p><p lang="en" className="mt-2"><span className="font-semibold">{t("Sua resposta:")}</span> {turn.answer}</p></li>)}</ol></details>;
 }
 
-/** Antes → depois rows tick in: the row slides in, the arrow points, then the new value lands. */
-function DeltaRow({ label, change, index }: { label: string; change?: string; index: number }) {
-  const [from, to] = label.split(" → ");
-  return (
-    <p className="rp-delta ds-item" data-change={change} style={{ "--i": index + 3 } as CSSProperties}>
-      {to === undefined ? label : <>{from} <span className="rp-delta-arrow" aria-hidden="true">→</span><span className="sr-only"> → </span> <span className="rp-delta-to">{to}</span></>}
-    </p>
-  );
-}
-
 /** Section title plus one plain line saying what the section holds, so the paper reads without guessing. */
 function SectionHead({ title, hint, screenOnlyHint = false }: { title: string; hint?: string; screenOnlyHint?: boolean }) {
   return (
@@ -77,52 +67,6 @@ function SectionHead({ title, hint, screenOnlyHint = false }: { title: string; h
       <h2 className="rp-ph">{t(title)}</h2>
       {hint && <p className={`rp-phint${screenOnlyHint ? " rp-noprint" : ""}`}>{t(hint)}</p>}
     </header>
-  );
-}
-
-function countLabel(count: number, one: string, many: string) {
-  return count === 1 ? t(one) : t(many, { n: count });
-}
-
-/**
- * One answer as a single row: the question and what was found in it. The answer and its notes open on demand, so the
- * paper (and the PDF, where rows stay closed) is an index of the interview rather than the whole transcript.
- */
-function ReportAnswer({ answer }: { answer: ReadyAnswer }) {
-  const { turn, ordinal, findings } = answer;
-  const counts = [
-    findings.patterns.length > 0 ? countLabel(findings.patterns.length, "1 erro de inglês", "{n} erros de inglês") : null,
-    findings.gaps.length > 0 ? countLabel(findings.gaps.length, "1 lacuna técnica", "{n} lacunas técnicas") : null,
-    findings.strengths.length > 0 ? countLabel(findings.strengths.length, "1 ponto forte", "{n} pontos fortes") : null,
-  ].filter(Boolean);
-  return (
-    <details className="rp-answer">
-      <summary>
-        <span className="rp-answer-n">{ordinal}</span>
-        <span className="rp-answer-head">
-          <span className="rp-answer-question" lang="en">{turn.question}</span>
-          <span className="rp-answer-counts">{counts.length > 0 ? counts.join(" · ") : t("Sem observações nesta resposta")}</span>
-        </span>
-      </summary>
-      <div className="rp-answer-body">
-        <div className="rp-answer-quote">
-          <p className="rp-psub">{t("Sua resposta")}</p>
-          <p lang="en" className="rp-answer-text">{turn.answer}</p>
-        </div>
-        {findings.strengths.length > 0 && (
-          <div className="rp-answer-col">
-            <p className="rp-psub">{t("O que funcionou")}</p>
-            {findings.strengths.map((item, index) => <p key={index}>{item.explanation}</p>)}
-          </div>
-        )}
-        {findings.gaps.length > 0 && (
-          <div className="rp-answer-col is-improve">
-            <p className="rp-psub">{t("O que faltou")}</p>
-            {findings.gaps.map((item, index) => <p key={index}>{item.explanation}</p>)}
-          </div>
-        )}
-      </div>
-    </details>
   );
 }
 
@@ -143,7 +87,7 @@ function pronunciationWords(summary: AzureMetricSummary) {
 }
 
 /** Everything the ready report shows, derived once from the result (shared by the paper and the appendix). */
-function buildReadyModel(result: InterviewReportResult, turns: Turns, azureSummary: AzureMetricSummary, progressRecords: ProgressRecord[], currentInterviewId: string | undefined, answerCount: number) {
+function buildReadyModel(result: InterviewReportResult, turns: Turns, azureSummary: AzureMetricSummary) {
   const reference = (sequenceNumber: number) => answerOrdinalForSequence(turns, sequenceNumber);
   const answers: ReadyAnswer[] = turns.map((turn, index) => ({
     turn,
@@ -159,13 +103,11 @@ function buildReadyModel(result: InterviewReportResult, turns: Turns, azureSumma
     coverageNotice: analysisCoverageNotice(result.analysisCoverage, reference),
     strengths: technical.strengths.slice(0, maxStrengths),
     gaps: (technical.gaps as InterviewReportResult["technicalContent"]["gaps"]).map((gap) => ({ ...gap, ordinal: reference(gap.sequenceNumber), question: turns.find((turn) => turn.sequenceNumber === gap.sequenceNumber)?.question ?? null })),
-    answers,
     errorRows: buildErrorRows(allPatterns),
     voiceNotes: buildVoiceNotes(azureSummary),
     voiceFacts: voiceDeliveryInterpretation(azureSummary.answers ?? []),
     pronunciation: pronunciationWords(azureSummary),
     priorities: buildPracticePriorities(result),
-    deltas: buildReportDeltas(result, azureSummary, progressRecords, currentInterviewId, answerCount),
   };
 }
 
@@ -176,7 +118,7 @@ function refLabel(sequenceNumber: number | null | undefined) {
 }
 
 /** The document itself: the whole report, in the order it prints. */
-function ReadyDocument({ model, jobItems, dateLabel, turnsLoading }: { model: ReadyModel; jobItems: JobCoverageItem[]; dateLabel: string; turnsLoading: boolean }) {
+function ReadyDocument({ model, jobItems, dateLabel }: { model: ReadyModel; jobItems: JobCoverageItem[]; dateLabel: string }) {
   const [showAllErrors, setShowAllErrors] = useState(false);
   const { reference, errorRows, voiceFacts, pronunciation } = model;
   const hasVoice = model.voiceNotes.some((note) => note.value !== null);
@@ -197,20 +139,7 @@ function ReadyDocument({ model, jobItems, dateLabel, turnsLoading }: { model: Re
           </ul>
         </section>
       )}
-      {jobItems.length > 0 && (
-        <section className="rp-pblock ds-item" style={rise(2)}>
-          <SectionHead title="Ligado à vaga" hint="Competências da vaga que a entrevista testou." />
-          <ul className="rp-job">
-            {jobItems.map((item) => (
-              <li key={item.competency} data-status={item.status}>
-                <b>{item.competency}</b>
-                <span>{t(jobStatusLabels[item.status])}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-      <section className="rp-pblock rp-pblock-long ds-item" style={rise(3)}>
+      <section className="rp-pblock rp-pblock-long ds-item" style={rise(2)}>
         <SectionHead title="Seus erros de inglês" hint="O que você disse e como fica natural em inglês." />
         {errorRows.length > 0 ? (
           <>
@@ -241,21 +170,7 @@ function ReadyDocument({ model, jobItems, dateLabel, turnsLoading }: { model: Re
           <p className="rp-pnote">{t("Nenhum erro de inglês recorrente apareceu nesta entrevista.")}</p>
         )}
       </section>
-      {model.gaps.length > 0 && (
-        <section className="rp-pblock rp-pblock-long ds-item" style={rise(4)}>
-          <SectionHead title="Suas lacunas técnicas" hint="O que um entrevistador esperava ouvir e como responder da próxima vez." />
-          <ul className="rp-gaps">
-            {model.gaps.map((gap, index) => (
-              <li key={`${gap.sequenceNumber}-${index}`}>
-                {gap.question && <p className="rp-gap-q"><span>{t("Pergunta {n}", { n: gap.ordinal ?? gap.sequenceNumber })}</span> <span lang="en">{gap.question}</span></p>}
-                <p className="rp-gap-miss">{gap.explanation}</p>
-                {gap.howToAnswer && <p className="rp-gap-how"><b>{t("Como responder:")}</b> {gap.howToAnswer}</p>}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-      <section className="rp-pblock ds-item" style={rise(5)}>
+      <section className="rp-pblock ds-item" style={rise(3)}>
         <SectionHead title="Notas da sua voz" hint="Como sua fala soou: ritmo, pausas e pronúncia." />
         {hasVoice ? (
           <>
@@ -298,6 +213,35 @@ function ReadyDocument({ model, jobItems, dateLabel, turnsLoading }: { model: Re
           </div>
         )}
       </section>
+      <section className="rp-pblock rp-pblock-long ds-item" style={rise(4)}>
+          <SectionHead title="Suas lacunas técnicas" hint="O que um entrevistador esperava ouvir e como responder da próxima vez." />
+          {model.gaps.length > 0 ? (
+          <ul className="rp-gaps">
+            {model.gaps.map((gap, index) => (
+              <li key={`${gap.sequenceNumber}-${index}`}>
+                {gap.question && <p className="rp-gap-q"><span>{t("Pergunta {n}", { n: gap.ordinal ?? gap.sequenceNumber })}</span> <span lang="en">{gap.question}</span></p>}
+                <p className="rp-gap-miss">{gap.explanation}</p>
+                {gap.howToAnswer && <p className="rp-gap-how"><b>{t("Como responder:")}</b> {gap.howToAnswer}</p>}
+              </li>
+            ))}
+          </ul>
+          ) : (
+            <p className="rp-pnote">{t("Nenhuma lacuna técnica relevante nesta entrevista.")}</p>
+          )}
+        </section>
+      {jobItems.length > 0 && (
+        <section className="rp-pblock ds-item" style={rise(5)}>
+          <SectionHead title="Ligado à vaga" hint="Competências da vaga que a entrevista testou." />
+          <ul className="rp-job">
+            {jobItems.map((item) => (
+              <li key={item.competency} data-status={item.status}>
+                <b>{item.competency}</b>
+                <span>{t(jobStatusLabels[item.status])}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {model.priorities.length > 0 && (
         <section className="rp-pblock ds-item" style={rise(6)}>
           <SectionHead title="Prioridades para praticar" hint="Por onde começar antes da próxima entrevista." />
@@ -318,23 +262,7 @@ function ReadyDocument({ model, jobItems, dateLabel, turnsLoading }: { model: Re
           </ol>
         </section>
       )}
-      {model.deltas.length > 0 && (
-        <section className="rp-pblock ds-item" style={rise(7)}>
-          <SectionHead title="Desde a última entrevista" />
-          {model.deltas.map((delta, index) => <DeltaRow key={delta.label} label={t(delta.label)} change={delta.change} index={index} />)}
-        </section>
-      )}
-      <section className="rp-pblock rp-pblock-long ds-item" style={rise(8)}>
-        <SectionHead title="Resposta por resposta" hint="Abra uma pergunta para ver sua resposta e o que foi apontado nela." screenOnlyHint />
-        {model.answers.length > 0 ? (
-          <div className="rp-answers">
-            {model.answers.map((answer) => <ReportAnswer key={answer.turn.sequenceNumber} answer={answer} />)}
-          </div>
-        ) : !turnsLoading ? (
-          <p className="rp-pnote">{t("As perguntas e respostas desta entrevista não estão disponíveis.")}</p>
-        ) : null}
-      </section>
-      <footer className="rp-pfoot ds-item" style={rise(9)}>
+      <footer className="rp-pfoot ds-item" style={rise(7)}>
         {t("Entoa · Gerado a partir da sua entrevista simulada de {date}", { date: dateLabel })}
       </footer>
     </>
@@ -364,8 +292,8 @@ function exportPdf(fileBase: string) {
   window.print();
 }
 
-export function InterviewReport({ config, elapsed, totalClock, answerCount, persistenceMessage, feedbackSyncMessage, reportState, turns, azureSummary, coverage, onLeave, progressRecords, currentInterviewId, historical = false, onRetry, retrying = false }: {
-  config: InterviewConfig; elapsed: string; totalClock: string; answerCount: number; persistenceLabel: string; persistenceMessage: string | null; feedbackSyncMessage: string | null; reportState: ReportState; progressRecords: ProgressRecord[]; currentInterviewId?: string; historical?: boolean; turns: Turns; azureSummary: AzureMetricSummary; coverage: { available: number; pending: number; total: number }; onLeave: () => void; onRetry?: () => void; retrying?: boolean;
+export function InterviewReport({ config, elapsed, totalClock, answerCount, persistenceMessage, feedbackSyncMessage, reportState, turns, azureSummary, coverage, onLeave, progressRecords, currentInterviewId, historical = false, onRetry, retrying = false, canRegenerate = false, onRegenerate }: {
+  config: InterviewConfig; elapsed: string; totalClock: string; answerCount: number; persistenceLabel: string; persistenceMessage: string | null; feedbackSyncMessage: string | null; reportState: ReportState; progressRecords: ProgressRecord[]; currentInterviewId?: string; historical?: boolean; turns: Turns; azureSummary: AzureMetricSummary; coverage: { available: number; pending: number; total: number }; onLeave: () => void; onRetry?: () => void; retrying?: boolean; canRegenerate?: boolean; onRegenerate?: () => void;
 }): ReactNode {
   const [loadedTurns, setLoadedTurns] = useState<Turns>(turns);
   const [loadingTurns, setLoadingTurns] = useState(historical && turns.length === 0 && Boolean(currentInterviewId));
@@ -407,8 +335,8 @@ export function InterviewReport({ config, elapsed, totalClock, answerCount, pers
         : t("Prática equilibrada");
   const duration = historical ? elapsed : `${elapsed} / ${totalClock}`;
   const readyModel = useMemo(
-    () => reportState.result ? buildReadyModel(reportState.result, loadedTurns, azureSummary, progressRecords, currentInterviewId, answerCount) : null,
-    [reportState.result, loadedTurns, azureSummary, progressRecords, currentInterviewId, answerCount],
+    () => reportState.result ? buildReadyModel(reportState.result, loadedTurns, azureSummary) : null,
+    [reportState.result, loadedTurns, azureSummary],
   );
   const jobItems = useMemo(
     () => !isResume && reportDirection?.priorityCompetencies?.length && reportState.result
@@ -430,6 +358,11 @@ export function InterviewReport({ config, elapsed, totalClock, answerCount, pers
           <Download width={14} height={14} aria-hidden="true" />
           {t("Exportar PDF")}
         </button>
+        {canRegenerate && onRegenerate && (
+          <button type="button" className="ds-btn ds-btn-soft rp-regenerate rp-noprint" onClick={onRegenerate} disabled={retrying} aria-busy={retrying}>
+            {t("Gerar com a análise nova")}
+          </button>
+        )}
       </div>
       {persistenceMessage && (
         <div role="status" className="rp-alert mt-5">{t(persistenceMessage)}</div>
@@ -491,7 +424,7 @@ export function InterviewReport({ config, elapsed, totalClock, answerCount, pers
             <AzureVoiceReport summary={azureSummary} coverage={coverage} />
           </div>
         ) : ready ? (
-          <ReadyDocument model={ready.model} jobItems={jobItems} dateLabel={dateLabel} turnsLoading={loadingTurns} />
+          <ReadyDocument model={ready.model} jobItems={jobItems} dateLabel={dateLabel} />
         ) : null}
       </article>
       {ready && <ReadyAppendix />}

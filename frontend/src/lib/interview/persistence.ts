@@ -187,6 +187,7 @@ type ProgressFeedbackRow = {
   status: "pending" | "ready" | "unavailable";
   azure_summary: AzureMetricSummary | null;
   analysis: unknown;
+  analysis_version: string | null;
 };
 type ProgressInterviewRow = InterviewRow & { interview_feedback: ProgressFeedbackRow | ProgressFeedbackRow[] | null };
 
@@ -207,7 +208,7 @@ async function loadProgressRecordsUncached(): Promise<PersistenceResult<Progress
   const { client } = auth.value;
   const { data, error } = await client
     .from("interviews")
-    .select(`${sessionColumns},interview_feedback(status,azure_summary,analysis)`)
+    .select(`${sessionColumns},interview_feedback(status,azure_summary,analysis,analysis_version)`)
     .eq("status", "completed")
     .order("created_at", { ascending: false })
     .limit(progressSessionLimit);
@@ -251,7 +252,7 @@ async function loadProgressRecordsUncached(): Promise<PersistenceResult<Progress
         createdAt: session.createdAt,
         answerCount: answerCounts.get(session.id) ?? 0,
         candidateAnswers: (candidateAnswers.get(session.id) ?? []).sort((first, second) => first.sequenceNumber - second.sequenceNumber),
-        feedback: embedded ? { status: embedded.status, azureSummary: embedded.azure_summary, analysis: embedded.analysis } : null,
+        feedback: embedded ? { status: embedded.status, azureSummary: embedded.azure_summary, analysis: embedded.analysis, analysisVersion: embedded.analysis_version } : null,
       };
     });
   return { ok: true, value };

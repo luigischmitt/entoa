@@ -33,6 +33,15 @@ test("report deltas describe direction for the latest previous completed ready r
   assert.deepEqual(buildReportDeltas({}, {}, [], undefined, 1), []);
 });
 
+test("report deltas compare only reports analysed by the same analysis version", () => {
+  const current = { englishCommunication: { patterns: [{}] }, technicalContent: { gaps: [{}] } };
+  const azure = { accuracy: { mean: 80 }, answers: [{ delivery: { wordsPerMinute: 120 } }] };
+  const previous = { id: "previous", status: "completed", completedAt: "2026-02-01", answerCount: 2, feedback: { status: "ready", analysisVersion: "v1", analysis: { englishCommunication: { patterns: [{}, {}] }, technicalContent: { gaps: [{}] } }, azureSummary: { accuracy: { mean: 70 }, answers: [{ delivery: { wordsPerMinute: 100 } }] } } };
+  assert.deepEqual(buildReportDeltas(current, azure, [previous], "current", 2, "v2"), []);
+  assert.notDeepEqual(buildReportDeltas(current, azure, [previous], "current", 2, "v1"), []);
+  assert.notDeepEqual(buildReportDeltas(current, azure, [previous], "current", 2), []);
+});
+
 test("report deltas use equal copy, omit tiny pace changes, and hide an incomplete comparison base", () => {
   const previous = { id: "previous", status: "completed", completedAt: "2026-02-01", answerCount: 2, feedback: { status: "ready", analysis: { englishCommunication: { patterns: [{}] }, technicalContent: { gaps: [{}] } }, azureSummary: { accuracy: { mean: 90 }, answers: [{ delivery: { wordsPerMinute: 100 } }] } } };
   const current = { englishCommunication: { patterns: [{}] }, technicalContent: { gaps: [{}] } };

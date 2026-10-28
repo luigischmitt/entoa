@@ -30,6 +30,12 @@ function takeawayFrom(analysis) {
     ?? cleanText(technicalContent?.summary);
 }
 
+function priorityFrom(analysis) {
+  if (!isRecord(analysis) || !Array.isArray(analysis.priorities)) return null;
+  const priority = analysis.priorities.find((item) => isRecord(item) && cleanText(item.focus));
+  return priority ? cleanText(priority.focus) : null;
+}
+
 function patternFrom(analysis) {
   if (!isRecord(analysis) || !isRecord(analysis.englishCommunication)) return null;
   const patterns = analysis.englishCommunication.patterns;
@@ -52,6 +58,8 @@ export function buildHomeInsights(input) {
     lastInterviewAt: timeOf(latest) ? new Date(timeOf(latest)).toISOString() : null,
     lastReportReady: latest?.feedback?.status === "ready",
     lastTakeaway: takeawayFrom(latest?.feedback?.analysis),
+    lastInterviewId: latest?.id ?? null,
+    lastPriority: priorityFrom(latest?.feedback?.analysis),
     topPattern: patternFrom(latest?.feedback?.analysis),
   };
 }

@@ -28,6 +28,7 @@
 .rp-pdf:disabled { opacity: 0.5; cursor: not-allowed; }
 .rp-pdf:focus-visible { outline: var(--ds-focus-outline); outline-offset: 2px; }
 .rp-pdf svg { flex: none; }
+.rp-regenerate { flex: none; white-space: nowrap; padding: 0.45rem 1rem; font-size: 0.82rem; font-weight: 600; }
 
 /* The paper: a printed page, read top to bottom. */
 .rp-paper { display: flex; flex-direction: column; gap: 1.9rem; margin-top: 0.75rem; background: #fff; border-radius: 6px; padding: clamp(1.2rem, 3vw, 2.2rem) clamp(1.1rem, 3.4vw, 2.4rem); box-shadow: 0 1px 2px rgba(14, 42, 31, 0.08), 0 16px 32px -24px rgba(14, 42, 31, 0.28); font-size: 0.92rem; color: var(--ds-ink); }
@@ -104,19 +105,6 @@
 .rp-appendix { margin-top: 1.5rem; display: flex; flex-direction: column; }
 .rp-voice-link { align-self: flex-start; }
 
-/* Desde a última entrevista: rows slide in, the arrow points, then the new value lands. */
-@keyframes rp-delta-in { from { opacity: 0; transform: translateX(-14px); } }
-@keyframes rp-arrow { from { opacity: 0; transform: translateX(-10px); } 60% { transform: translateX(3px); } }
-@keyframes rp-to { from { opacity: 0; transform: translateY(6px) scale(0.9); } 60% { transform: translateY(-1px) scale(1.06); } }
-.rp-delta { display: block; font-size: 0.8125rem; line-height: 1.5; color: var(--ds-text-2); }
-.rp-delta[data-change="better"] { color: var(--ds-green-deep); }
-.rp-delta[data-change="worse"] { color: var(--ds-warning); }
-.rp-delta.ds-item { animation: rp-delta-in 600ms var(--ease-out) backwards; animation-delay: calc(var(--rd, 0ms) + 80ms + var(--i, 0) * 200ms); }
-.rp-delta-arrow, .rp-delta-to { display: inline-block; font-weight: 700; }
-.rp-delta-arrow { animation: rp-arrow 520ms var(--ease-out) calc(var(--rd, 0ms) + 360ms + var(--i, 0) * 200ms) backwards; }
-.rp-delta-to { animation: rp-to 560ms var(--ease-out) calc(var(--rd, 0ms) + 560ms + var(--i, 0) * 200ms) backwards; }
-[data-inview="false"] :is(.rp-delta-arrow, .rp-delta-to, .rp-delta.ds-item) { animation-play-state: paused; }
-
 /* Trechos da sua voz: the cards arrive one after another, each number counts up while its bar fills, then the delivery line sweeps in. */
 @keyframes rp-metric-in { 0% { opacity: 0; transform: translateY(28px) scale(0.93); filter: blur(6px); } 62% { opacity: 1; transform: translateY(-4px) scale(1.012); filter: blur(0); } 100% { transform: none; filter: blur(0); } }
 @keyframes rp-sweep { from { clip-path: inset(0 100% 0 0 round 1rem); opacity: 0.2; } to { clip-path: inset(0 0 0 0 round 1rem); } }
@@ -168,29 +156,6 @@
 .rp-gap-how { font-size: 0.875rem; line-height: 1.5; padding-left: 0.7rem; border-left: 2px solid var(--ds-green); }
 .rp-gap-how b { font-weight: 600; color: var(--ds-green-deep, var(--ds-green)); }
 
-/* Resposta por resposta: one row per question (number, question, what was found); the answer opens on demand. */
-.rp-answers { display: grid; border-top: 1px solid var(--ds-hairline); }
-.rp-answer { border-bottom: 1px solid var(--ds-hairline); }
-.rp-answer > summary { list-style: none; display: grid; grid-template-columns: 1.6rem minmax(0, 1fr) auto; gap: 0.7rem; align-items: start; padding: 0.7rem 0.1rem; cursor: pointer; }
-.rp-answer > summary::-webkit-details-marker { display: none; }
-.rp-answer > summary::after { content: ""; width: 0.45rem; height: 0.45rem; margin: 0.45rem 0.3rem 0 0; border-right: 1.5px solid var(--ds-text-2); border-bottom: 1.5px solid var(--ds-text-2); transform: rotate(45deg); transition: transform var(--ds-dur-fast, 150ms) ease; }
-.rp-answer[open] > summary::after { transform: rotate(225deg); margin-top: 0.65rem; }
-.rp-answer > summary:hover .rp-answer-question { color: var(--ds-green); }
-.rp-answer > summary:focus-visible { outline: 2px solid var(--ds-green); outline-offset: 2px; border-radius: 0.375rem; }
-.rp-answer-n { display: grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: var(--ds-field); font-size: 0.78rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ds-ink); }
-.rp-answer-head { display: grid; gap: 0.15rem; min-width: 0; }
-.rp-answer-question { font-size: 0.92rem; font-weight: 600; line-height: 1.4; color: var(--ds-ink); overflow-wrap: anywhere; transition: color var(--ds-dur-fast, 150ms) ease; }
-.rp-answer-counts { font-size: 0.78rem; line-height: 1.4; color: var(--ds-text-2); }
-.rp-answer-body { display: grid; gap: 0.75rem; padding: 0 0.1rem 0.95rem 2.3rem; }
-.rp-answer-body p { margin: 0; }
-.rp-answer-quote { display: grid; gap: 0.3rem; padding: 0.7rem 0.85rem; border-radius: var(--ds-r-lg, 0.75rem); background: var(--ds-field); }
-.rp-answer-text { font-size: 0.875rem; line-height: 1.6; color: var(--ds-text-2); overflow-wrap: anywhere; }
-.rp-answer-col { display: grid; gap: 0.3rem; font-size: 0.875rem; line-height: 1.5; }
-/* The two note groups are told apart by a small coloured mark, not by the colour of the text. */
-.rp-answer-col > .rp-psub { display: flex; align-items: center; gap: 0.4rem; }
-.rp-answer-col > .rp-psub::before { content: ""; width: 0.4rem; height: 0.4rem; border-radius: 999px; background: var(--ds-green); }
-.rp-answer-col.is-improve > .rp-psub::before { background: var(--ds-warning); }
-
 /* Notas da sua voz: the speech rhythm facts and the words to review, under the score tiles. */
 .rp-voice-detail { display: grid; gap: 0.5rem; margin-top: 0.5rem; }
 .rp-vfacts { margin: 0; font-size: 0.8125rem; line-height: 1.5; color: var(--ds-text-2); }
@@ -220,9 +185,7 @@
   html.rp-printing .rp-sh, html.rp-printing .rp-errh { break-after: avoid; page-break-after: avoid; }
   html.rp-printing .rp-pblock-long > .rp-sh + * { break-before: avoid; }
   html.rp-printing .rp-errs li { break-inside: avoid; }
-  html.rp-printing .rp-answer, html.rp-printing .rp-gaps li { break-inside: avoid; }
-  /* in the PDF the answers stay an index: closed rows, no chevron */
-  html.rp-printing .rp-answer > summary::after { display: none; }
+  html.rp-printing .rp-gaps li { break-inside: avoid; }
   html.rp-printing .rp-words li, html.rp-printing .rp-voice-detail { break-inside: avoid; }
   html.rp-printing .rp-noprint, html.rp-printing .rp-docbar, html.rp-printing .rp-appendix, html.rp-printing .rp-foot { display: none !important; }
 }
