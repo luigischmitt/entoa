@@ -1,15 +1,23 @@
 /* Auth screens (ENG-111). Scoped by the `au-` prefix; uses --ds-* tokens and ds-* primitives. */
 
+@view-transition { navigation: auto; }
+
 .au-page { display: flex; min-height: 100dvh; flex-direction: column; align-items: center; justify-content: center; background: var(--ds-cream); color: var(--ds-ink); padding: 2rem 1rem; }
 @media (min-width: 640px) { .au-page { padding: 3rem 2rem; } }
 
 .au-shell { display: flex; width: 100%; max-width: 27.5rem; flex-direction: column; gap: 1.5rem; }
 .au-brand { display: inline-flex; align-items: center; align-self: center; gap: 0.625rem; border-radius: 0.5rem; font-size: 0.9375rem; font-weight: 600; letter-spacing: -0.012em; }
 .au-brand img { height: 2rem; width: auto; }
+.au-brand img { view-transition-name: entoa-mark; }
 .au-brand:focus-visible, .au-link:focus-visible { outline: var(--ds-focus-outline); outline-offset: 3px; }
 
 .au-card { padding: 1.5rem; }
 @media (min-width: 640px) { .au-card { padding: 2.25rem; } }
+.au-card { animation: au-enter 0.5s cubic-bezier(0.23, 1, 0.32, 1) 0.12s both; }
+@keyframes au-enter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+::view-transition-group(entoa-mark) { animation-duration: 0.6s; animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1); }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.35s; }
 .au-stack { display: flex; flex-direction: column; gap: 1.5rem; }
 
 .au-title { margin-top: 0.5rem; font-family: var(--font-display); font-size: clamp(2rem, 1.6rem + 1.6vw, 2.5rem); font-weight: 400; line-height: 1.08; letter-spacing: -0.02em; text-wrap: balance; }
@@ -38,6 +46,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .au-spinner { animation-duration: 1.6s !important; }
+  .au-card { animation: none; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
 
 /* Inline actions inside alerts and the e-mail typo hint. */
