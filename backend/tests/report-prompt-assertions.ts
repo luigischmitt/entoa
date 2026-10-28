@@ -6,8 +6,8 @@ export function expectPrecisionRules(prompt: string) {
   expect(prompt).toContain("stylistic rewording or preferences; synonyms or near-synonyms; punctuation, commas, or capitalization; filler words");
   expect(prompt).toContain("anything that could be a transcription artifact");
   expect(prompt).toContain("Returning fewer items, or none, is correct");
-  expect(prompt).toContain("never pad the list to reach a count");
-  expect(prompt).toContain("fix only the cited error and keep the candidate's own wording otherwise");
+  expect(prompt).toContain("never pad, and never repeat the same underlying error with different wording");
+  expect(prompt).toContain("and keeps the candidate's own wording otherwise");
   expect(prompt).toContain("Choose each pattern type by its definition");
   expect(prompt).toContain("GRAMMAR: tense or aspect");
   expect(prompt).toContain("WORD_CHOICE: a real English word used with the wrong meaning");
@@ -19,17 +19,17 @@ export function expectPrecisionRules(prompt: string) {
 }
 
 export function expectConciseTechnicalRules(prompt: string) {
-  expect(prompt).toContain("Report every material technical gap, at most 2 per answer");
-  expect(prompt).toContain("a real interviewer for that role and seniority would expect in order to answer THAT question well");
+  expect(prompt).toContain("report every material technical gap, at most 2 per answer");
+  expect(prompt).toContain("as an experienced interviewer for that role and seniority scoring THAT answer");
   expect(prompt).toContain("If the answer fully covered the question, return no gaps");
-  expect(prompt).toContain("an answer without the concrete criterion or result is a material gap");
+  expect(prompt).toContain("an answer that never says against what reference or by what criterion it was judged is a material gap");
   expect(prompt).toContain("For every gap also write howToAnswer");
-  expect(prompt).toContain("Never list optional details the candidate simply did not mention");
-  expect(prompt).toContain("nitpicks, generic \"could have mentioned X\" items, or gaps about things outside the question");
-  expect(prompt).toContain("Do not demand process steps, checks, rollback steps or trade-offs the question did not ask for");
+  expect(prompt).toContain("Never report as a gap:");
+  expect(prompt).toContain("generic \"could have mentioned X\" items, nitpicks, or anything only natural in a written document");
+  expect(prompt).toContain("process steps, checks, rollback steps or trade-offs the question did not ask for");
   expect(prompt).toContain("never \"mentioned technology X\"");
-  expect(prompt).toContain("how an API was integrated, how data was separated, or how conflicts were avoided");
-  expect(prompt).toContain("report at most 2 strengths per answer and 5 in total");
+  expect(prompt).toContain("how something was integrated, implemented or built when the question did not ask");
+  expect(prompt).toContain("at most 2 per answer and 5 in total, one per distinct point");
 }
 
 export function expectPortugueseQualityRules(prompt: string) {

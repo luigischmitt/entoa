@@ -157,12 +157,14 @@ export type InterviewTurnAnalysisInput = {
 
 export type InterviewReportConsolidationInput = InterviewReportInput & { turnAnalyses: InterviewTurnAnalysis[] };
 
+export const reportAnalysisVersion = "v3" as const;
+
 export interface InterviewReportService {
-  generate(input: InterviewReportInput): Promise<InterviewReport & { model: string; analysisVersion: "v2" }>;
+  generate(input: InterviewReportInput): Promise<InterviewReport & { model: string; analysisVersion: typeof reportAnalysisVersion }>;
   /** Analyze one answer; returns only server-validated items. */
   analyzeTurn(input: InterviewTurnAnalysisInput): Promise<InterviewTurnAnalysis & { model: string }>;
   /** Re-validate per-answer findings and produce the final report with one small call. */
-  consolidate(input: InterviewReportConsolidationInput): Promise<InterviewReport & { model: string; analysisVersion: "v2" }>;
+  consolidate(input: InterviewReportConsolidationInput): Promise<InterviewReport & { model: string; analysisVersion: typeof reportAnalysisVersion }>;
 }
 
 /** The kind of clarification request a deterministic detector found in a short candidate utterance. */

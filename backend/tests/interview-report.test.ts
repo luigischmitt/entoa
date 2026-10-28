@@ -68,7 +68,7 @@ describe("final interview report service", () => {
       return providerResponse(JSON.stringify(providerReport), 200, { prompt_tokens: 800, completion_tokens: 210, cost: 0.00012, prompt_tokens_details: { cached_tokens: 500 } });
     });
 
-    await expect(service.generate(input)).resolves.toEqual({ ...validReport, model: defaultThinkingModel, analysisVersion: "v2" });
+    await expect(service.generate(input)).resolves.toEqual({ ...validReport, model: defaultThinkingModel, analysisVersion: "v3" });
     const body = requestBody as { provider: unknown; response_format: { json_schema: { strict: boolean; schema: { properties: Record<string, unknown> } } }; messages: Array<{ content: string }> };
     expect(body.provider).toEqual({ sort: "latency", require_parameters: true, data_collection: "deny" });
     expect((body as { usage?: unknown }).usage).toEqual({ include: true });
@@ -78,16 +78,16 @@ describe("final interview report service", () => {
     expect(body.response_format.json_schema.schema.properties).toHaveProperty("overview");
     expect(body.messages[0].content).toContain("Write the report in Brazilian Portuguese");
     expect(body.messages[0].content).toContain("Cite the matching sequenceNumber and a short exact excerpt from that answer");
-    expect(body.messages[0].content).toContain("Review each question and its answer as a separate pair");
+    expect(body.messages[0].content).toContain("Judge each question and its answer as a separate pair");
     expect(body.messages[0].content).toContain("Do not infer mastery, correctness, ownership, impact, or expertise from merely naming a tool");
     expect(body.messages[0].content).toContain("Do not criticize isolated acronyms, names, technical terms, fillers, repeated syllables, phonetic fragments");
-    expect(body.messages[0].content).toContain("Include a concrete, corrected English rephrasing grounded in that answer");
+    expect(body.messages[0].content).toContain("CORRECTION: rephrasedExample is exactly the cited evidence span, corrected");
     expect(body.messages[0].content).toContain("audit every answer independently");
     expect(body.messages[0].content).toContain("articles; prepositions and verb/adjective collocations");
     expect(body.messages[0].content).toContain("tense choice against explicit time markers");
     expect(body.messages[0].content).toContain("subject-verb agreement; countability and plural; word order; literal translations; and false cognates");
     expectPrecisionRules(body.messages[0].content);
-    expect(body.messages[0].content).toContain("Group occurrences by underlying pattern (one item per pattern, not per occurrence)");
+    expect(body.messages[0].content).toContain("one item per underlying pattern (not per occurrence)");
     expect(body.messages[0].content).toContain("Never turn an English grammar, vocabulary, or phrasing error into a technical gap");
     expectConciseTechnicalRules(body.messages[0].content);
     expectRealReportCalibrationRules(body.messages[0].content);
@@ -102,7 +102,7 @@ describe("final interview report service", () => {
     expect(englishPatternSchema.properties.patterns.items.required).toContain("why");
     expect(englishPatternSchema.properties.patterns.items.properties.why.maxLength).toBe(170);
     expect(body.messages[0].content).toContain("fazer uma pergunta maps literally to 'make a question'");
-    expect(englishPatternSchema.properties.patterns.items.properties.rephrasedExample.description).toContain("complete English sentence");
+    expect(englishPatternSchema.properties.patterns.items.properties.rephrasedExample.description).toContain("The cited evidence span, corrected");
     expect((schema.technicalContent as { properties: { strengths: { maxItems: number }; gaps: { maxItems: number } } }).properties.strengths.maxItems).toBe(5);
     expect((schema.technicalContent as { properties: { strengths: { maxItems: number }; gaps: { maxItems: number } } }).properties.gaps.maxItems).toBe(4);
     expect(JSON.parse(body.messages[1].content)).toEqual({ roleContext: input.roleContext, turns: input.turns });
@@ -216,7 +216,7 @@ describe("final interview report service", () => {
       return providerResponse(JSON.stringify(providerReport));
     }).generate({ ...input, turns });
 
-    expect(report.analysisVersion).toBe("v2");
+    expect(report.analysisVersion).toBe("v3");
     expect(requestBody?.max_tokens).toBeGreaterThanOrEqual(4_096);
     expect(JSON.parse(requestBody?.messages[1].content ?? "{}").turns).toEqual(turns);
   });
@@ -236,7 +236,7 @@ describe("final interview report service", () => {
     const report = await makeService(async () => providerResponse(JSON.stringify(partiallyInvalid))).generate(input);
     expect(report.technicalContent.strengths).toEqual(validReport.technicalContent.strengths);
     expect(report.englishCommunication.patterns).toEqual(validReport.englishCommunication.patterns);
-    expect(report.analysisVersion).toBe("v2");
+    expect(report.analysisVersion).toBe("v3");
   });
 
   it("keeps complete feedback and drops truncated optional prose while recovering a truncated summary", async () => {
@@ -429,19 +429,19 @@ describe("final interview report service", () => {
   });
 
   it("preserves already punctuated sentences within the schema limit before applying fragment heuristics", async () => {
-    const answer = "The service was slow. We added an index.";
+    const answer = "the service were slow. We added an index.";
     const turns = [{ sequenceNumber: 1, question: "What changed?", answer }];
     const longCompleteSuggestion = "Revise esta construção para manter clareza, precisão e relevância profissional, usando exemplos específicos ligados à pergunta do entrevistador.";
     expect(longCompleteSuggestion.length).toBeGreaterThan(120);
     expect(longCompleteSuggestion.length).toBeLessThanOrEqual(170);
     const pattern = {
-      type: "GRAMMAR", sequenceNumber: 1, evidence: "The service was slow",
+      type: "GRAMMAR", sequenceNumber: 1, evidence: "the service were slow",
       suggestion: longCompleteSuggestion,
-      rephrasedExample: "Because the service was slow, we added an index.",
+      rephrasedExample: "The service was slow.",
     };
     const invalidFragments = [
       { ...pattern, suggestion: "Because." },
-      { ...pattern, evidence: "The service was slow", rephrasedExample: "Because we presented it last month." },
+      { ...pattern, rephrasedExample: "Because we presented it last month." },
     ];
     const report = await makeService(async () => providerResponse(JSON.stringify({
       ...providerReport,
@@ -482,11 +482,11 @@ describe("final interview report service", () => {
 
 describe("POST /api/v1/thinking/report", () => {
   it("returns only the batched report and rejects interview identifiers or unordered payloads before provider calls", async () => {
-    const reportService = { generate: vi.fn(async () => ({ ...validReport, model: defaultThinkingModel, analysisVersion: "v2" as const })), analyzeTurn: vi.fn(), consolidate: vi.fn() };
+    const reportService = { generate: vi.fn(async () => ({ ...validReport, model: defaultThinkingModel, analysisVersion: "v3" as const })), analyzeTurn: vi.fn(), consolidate: vi.fn() };
     const app = createApp({ speechConfig, reportService });
     const success = await request(app).post("/api/v1/thinking/report").send(input);
     expect(success.status).toBe(200);
-    expect(success.body).toEqual({ ...validReport, model: defaultThinkingModel, analysisVersion: "v2" });
+    expect(success.body).toEqual({ ...validReport, model: defaultThinkingModel, analysisVersion: "v3" });
     expect(reportService.generate).toHaveBeenCalledWith(input);
 
     const withInterviewId = await request(app).post("/api/v1/thinking/report").send({ ...input, interviewId: "private-db-id" });

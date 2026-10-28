@@ -243,7 +243,7 @@ export const interviewReportEvalFixtures = [
         patterns: [
           { type: "GRAMMAR", sequenceNumber: 1, evidence: "added index", suggestion: "Inclua o artigo indefinido antes de um substantivo contável singular.", rephrasedExample: "I added an index to the reports table." },
           { type: "GRAMMAR", sequenceNumber: 1, evidence: "have presented it last month", suggestion: "Com um período encerrado como last month, use simple past em vez de present perfect.", rephrasedExample: "I presented it last month." },
-          { type: "FALSE_COGNATE", sequenceNumber: 2, evidence: "realized a staged migration", suggestion: "Use o verbo que significa executar uma migração; realized significa perceber ou compreender.", rephrasedExample: "We carried out a staged migration in two steps." },
+          { type: "FALSE_COGNATE", sequenceNumber: 2, evidence: "realized a staged migration", suggestion: "Use o verbo que significa executar uma migração; realized significa perceber ou compreender.", rephrasedExample: "carried out a staged migration." },
           { type: "WORD_CHOICE", sequenceNumber: 2, evidence: "discussed about the rollback", suggestion: "Retire a preposição após o verbo discuss, que recebe o assunto diretamente.", rephrasedExample: "We discussed the rollback." },
           { type: "WORD_CHOICE", sequenceNumber: 2, evidence: "responsible of the change", suggestion: "Use a colocação responsible for para indicar responsabilidade por algo.", rephrasedExample: "I was responsible for the change." },
         ],
@@ -258,7 +258,7 @@ export const interviewReportEvalFixtures = [
       patterns: [
         { type: "GRAMMAR", sequenceNumber: 1, evidence: "added index", suggestion: "Inclua o artigo indefinido antes de um substantivo contável singular.", rephrasedExample: "I added an index to the reports table." },
         { type: "GRAMMAR", sequenceNumber: 1, evidence: "have presented it last month", suggestion: "Com um período encerrado como last month, use simple past em vez de present perfect.", rephrasedExample: "I presented it last month." },
-        { type: "FALSE_COGNATE", sequenceNumber: 2, evidence: "realized a staged migration", suggestion: "Use o verbo que significa executar uma migração; realized significa perceber ou compreender.", rephrasedExample: "We carried out a staged migration in two steps." },
+        { type: "FALSE_COGNATE", sequenceNumber: 2, evidence: "realized a staged migration", suggestion: "Use o verbo que significa executar uma migração; realized significa perceber ou compreender.", rephrasedExample: "carried out a staged migration." },
       ],
       evidenceStatus: "SUFFICIENT",
       optionalItems: { candidates: 6, accepted: 4, rejected: 2 },

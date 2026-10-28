@@ -226,6 +226,21 @@ export function isRephraseUnchanged(excerpt: string, rephrased: string): boolean
   return normalize(excerpt) === normalize(rephrased);
 }
 
+const scopeFunctionWords = new Set(["a", "an", "the", "to", "of", "in", "on", "at", "for", "is", "are", "was", "were", "be", "i", "it", "that", "this", "those", "these", "and", "with"]);
+
+/** The correction must be the cited span fixed, not the span plus the rest of the sentence: more than 3 added content words means the model rewrote context the candidate never said here. */
+export function isRephraseScopeExpanded(excerpt: string, rephrased: string): boolean {
+  const available = new Map<string, number>();
+  for (const word of excerpt.toLowerCase().match(/[\p{L}\p{N}'’]+/gu) ?? []) available.set(word, (available.get(word) ?? 0) + 1);
+  let added = 0;
+  for (const word of rephrased.toLowerCase().match(/[\p{L}\p{N}'’]+/gu) ?? []) {
+    const count = available.get(word) ?? 0;
+    if (count > 0) { available.set(word, count - 1); continue; }
+    if (!scopeFunctionWords.has(word)) added += 1;
+  }
+  return added > 3;
+}
+
 /** Removing the optional relative pronoun in "the project that I led" is a style preference, not a correction. */
 export function isOptionalRelativeThatRemoval(excerpt: string, rephrased: string): boolean {
   const { removed, added } = diffTokens(tokenize(excerpt), tokenize(rephrased));
