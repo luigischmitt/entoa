@@ -7,6 +7,7 @@ import type { ProgressRecord } from "./progress-insights.mjs";
 import type { AzureMetricSummary } from "./report-metrics.mjs";
 import type { JobDirection } from "./job-direction.mjs";
 import { buildInterviewSessionPayload } from "./session-payload.mjs";
+import { normalizeFocus, normalizeSeniority } from "./interview-normalization.mjs";
 
 import type {
   InterviewConfig,
@@ -58,8 +59,8 @@ const toSession = (row: InterviewRow): InterviewSession & { title: string | null
   userId: row.user_id,
   targetRole: row.target_role,
   title: row.title ?? null,
-  seniority: row.seniority,
-  focus: row.focus,
+  seniority: row.seniority === null ? null : normalizeSeniority(row.seniority),
+  focus: row.focus === null ? null : normalizeFocus(row.focus),
   jobDirection: row.job_direction,
   durationMinutes: row.duration_minutes,
   questionCount: row.question_count,

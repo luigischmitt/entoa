@@ -1,3 +1,4 @@
+import { normalizeFocus, normalizeSeniority } from "./interview-normalization.mjs";
 import { isValidJobDirection, isValidTailoredQuestion, maxTailoredQuestions } from "./job-direction.mjs";
 
 export const resumeMaxBytes = 5 * 1024 * 1024;
@@ -8,7 +9,7 @@ export const resumeMaxBytes = 5 * 1024 * 1024;
 // response instead of aborting first.
 export const resumeDirectionClientTimeoutMs = 35_000;
 
-const focuses = ["technical-depth", "communication", "behavioral", "mixed"];
+const focuses = ["technical-depth", "mixed"];
 const resumeEmphasis = "Experiências, projetos e decisões descritos no currículo.";
 const resumeContext = "Entrevista orientada exclusivamente pelo currículo enviado.";
 const resumeCompetencies = ["Experiências e projetos do currículo"];
@@ -85,7 +86,7 @@ export async function requestResumeDirection(file, fetcher, endpoint = "http://l
     tailoredQuestions: questions,
   };
   const profileValid = isValidJobDirection({ ...direction, tailoredQuestions: undefined });
-  const focusValid = suggestedFocus === undefined || focuses.includes(suggestedFocus);
+  const focusValid = suggestedFocus === undefined || focuses.includes(normalizeFocus(suggestedFocus));
   if (!isValidJobDirection(direction) || questions.length !== maxTailoredQuestions || !focusValid) {
     const code = !profileValid ? "INVALID_PROFILE" : questions.length !== maxTailoredQuestions ? "INVALID_QUESTIONS" : !focusValid ? "INVALID_FOCUS" : "INVALID_RESPONSE";
     // Keep the public code stable ("INVALID_RESPONSE"); the specific reason travels only in the diagnostic.
@@ -93,5 +94,6 @@ export async function requestResumeDirection(file, fetcher, endpoint = "http://l
     throw new ResumeDirectionRequestError("INVALID_RESPONSE", response.status);
   }
   emit(onDiagnostic, { resumeStage: "success", elapsedMs: elapsed(), httpStatus: response.status, receivedQuestions: received.length, validQuestions: questions.length });
-  return { ...direction, ...(suggestedFocus ? { suggestedFocus } : {}) };
+  direction.suggestedSeniority = normalizeSeniority(direction.suggestedSeniority);
+  return { ...direction, ...(suggestedFocus ? { suggestedFocus: normalizeFocus(suggestedFocus) } : {}) };
 }

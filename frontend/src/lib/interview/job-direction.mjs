@@ -1,14 +1,14 @@
+import { normalizeFocus, normalizeSeniority } from "./interview-normalization.mjs";
 export const jobDescriptionMinLength = 120;
 export const jobDescriptionMaxLength = 20_000;
 
-const seniorities = ["junior", "mid-level", "senior", "staff"];
 const limits = {
   targetRole: 100,
   mainInterviewEmphasis: 240,
   productTeamContext: 280,
   competency: 100,
 };
-const focuses = ["technical-depth", "communication", "behavioral", "mixed"];
+const focuses = ["technical-depth", "mixed"];
 const keys = ["targetRole", "suggestedSeniority", "mainInterviewEmphasis", "priorityCompetencies", "productTeamContext", "tailoredQuestions"];
 /** Both automatic interview sources return a full eight-question plan. */
 export const maxTailoredQuestions = 8;
@@ -42,7 +42,7 @@ function validText(value, maxLength) {
 export function isValidJobDirection(value) {
   if (!isRecord(value) || Object.keys(value).some((key) => !keys.includes(key))) return false;
   return validText(value.targetRole, limits.targetRole)
-    && seniorities.includes(value.suggestedSeniority)
+    && typeof value.suggestedSeniority === "string"
     && validText(value.mainInterviewEmphasis, limits.mainInterviewEmphasis)
     && Array.isArray(value.priorityCompetencies)
     && value.priorityCompetencies.length >= 1
@@ -91,27 +91,28 @@ export async function requestJobDirection(jobDescription, roleContext, fetcher, 
   const { suggestedFocus, tailoredQuestions: rawTailored, ...result } = isRecord(body) ? body : {};
   const tailoredQuestions = [...new Set((Array.isArray(rawTailored) ? rawTailored : []).filter(isValidTailoredQuestion).map((item) => item.trim()))].slice(0, maxJobTailoredQuestions);
   if (!isValidJobDirection(result) || tailoredQuestions.length !== maxJobTailoredQuestions
-    || (suggestedFocus !== undefined && !focuses.includes(suggestedFocus))) throw new JobDirectionRequestError("INVALID_RESPONSE", response.status);
+    || (suggestedFocus !== undefined && !focuses.includes(normalizeFocus(suggestedFocus)))) throw new JobDirectionRequestError("INVALID_RESPONSE", response.status);
   return {
     targetRole: result.targetRole.trim(),
-    suggestedSeniority: result.suggestedSeniority,
+    suggestedSeniority: normalizeSeniority(result.suggestedSeniority),
     mainInterviewEmphasis: result.mainInterviewEmphasis.trim(),
     priorityCompetencies: result.priorityCompetencies.map((item) => item.trim()),
     productTeamContext: result.productTeamContext.trim(),
     tailoredQuestions,
-    ...(suggestedFocus ? { suggestedFocus } : {}),
+    ...(suggestedFocus ? { suggestedFocus: normalizeFocus(suggestedFocus) } : {}),
   };
 }
 
 /** Applies an analysis to the setup config: fills role, seniority and (when provided) focus; the snapshot excludes the focus. */
 export function applyJobAnalysis(config, analysis) {
   const { suggestedFocus, ...direction } = analysis;
+  const normalizedDirection = { ...direction, suggestedSeniority: normalizeSeniority(direction.suggestedSeniority) };
   return {
     ...config,
-    role: direction.targetRole,
-    seniority: direction.suggestedSeniority,
-    ...(suggestedFocus ? { focus: suggestedFocus } : {}),
-    jobDirection: direction,
+    role: normalizedDirection.targetRole,
+    seniority: normalizedDirection.suggestedSeniority,
+    ...(suggestedFocus ? { focus: normalizeFocus(suggestedFocus) } : {}),
+    jobDirection: normalizedDirection,
   };
 }
 
@@ -129,7 +130,7 @@ export function switchSetupMode(state, mode) {
   const parked = state.parkedDirection;
   if (!parked) return { ...state, mode };
   const role = state.config.role.trim();
-  const direction = { ...parked, targetRole: role || parked.targetRole, suggestedSeniority: state.config.seniority };
+  const direction = { ...parked, targetRole: role || parked.targetRole, suggestedSeniority: normalizeSeniority(state.config.seniority) };
   return { mode, config: { ...state.config, role: role || parked.targetRole, jobDirection: direction }, parkedDirection: undefined };
 }
 

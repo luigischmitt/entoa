@@ -5,7 +5,7 @@ import { defaultInterviewRoomPreferences, getInterviewSetupSummary, getInterview
 const baseConfig = {
   role: "Staff Platform Engineer",
   seniority: "senior",
-  focus: "communication",
+  focus: "mixed",
   duration: "15",
   playInterviewerAudio: true,
   showQuestionCaptions: true,
@@ -24,11 +24,11 @@ test("spoken interviewer audio is the default and the explicit text mode is reve
 });
 
 test("session summary reports interviewer audio, captions, microphone, camera, duration, and long role text", () => {
-  const summary = getInterviewSetupSummary(baseConfig, { senior: "Sênior" }, { communication: "Comunicação e clareza" });
+  const summary = getInterviewSetupSummary(baseConfig, { senior: "Sênior" }, { mixed: "Equilibrada" });
   assert.deepEqual(summary, [
     { label: "Cargo", value: "Staff Platform Engineer" },
     { label: "Senioridade", value: "Sênior" },
-    { label: "Foco", value: "Comunicação e clareza" },
+    { label: "Foco", value: "Equilibrada" },
     { label: "Duração", value: "Até 15 min" },
     { label: "Como o entrevistador fala", value: "Com áudio" },
     { label: "Voz", value: "Andrew" },
@@ -53,7 +53,7 @@ test("the voice row is left out in text-only mode", () => {
 });
 
 test("the resume setup summary hides the inferred role, seniority and focus", () => {
-  const summary = getInterviewSetupSummary({ ...baseConfig, interviewSource: "resume" }, { senior: "Sênior" }, { communication: "Comunicação e clareza" });
+  const summary = getInterviewSetupSummary({ ...baseConfig, interviewSource: "resume" }, { senior: "Sênior" }, { mixed: "Equilibrada" });
   assert.equal(summary[0].value, "Prática pelo currículo");
   assert.deepEqual(summary.map((row) => row.label).filter((label) => ["Senioridade", "Foco"].includes(label)), []);
 });

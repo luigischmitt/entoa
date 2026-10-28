@@ -45,7 +45,7 @@ test("resume reports use the asked questions and answers without vacancy framing
 });
 
 test("job and manual reports keep the role context", () => {
-  for (const focus of ["technical-depth", "communication", "behavioral", "mixed"]) {
+  for (const focus of ["technical-depth", "mixed"]) {
     const result = buildInterviewReportRequest({ ...config, focus }, { turns: [] });
     assert.deepEqual(result.roleContext, { targetRole: config.role, seniority: config.seniority, focus });
   }

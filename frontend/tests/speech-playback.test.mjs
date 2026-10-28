@@ -11,11 +11,9 @@ test("the first interviewer playback combines the introduction and the first que
 });
 
 test("the opening is one concise, natural sentence for every seniority and focus", () => {
-  const seniorityLabels = { junior: "junior", "mid-level": "mid-level", senior: "senior", staff: "staff-level" };
+  const seniorityLabels = { intern: "intern", junior: "junior", "mid-level": "mid-level", senior: "senior" };
   const focusClauses = {
     "technical-depth": ", with a focus on technical depth",
-    communication: ", with a focus on clear communication",
-    behavioral: ", with a focus on behavioral questions",
     mixed: "",
   };
   const question = "Tell me about a project.";

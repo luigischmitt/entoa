@@ -2,8 +2,8 @@ import type { JobDirection } from "./job-direction.mjs";
 
 export type InterviewConfig = {
   role: string;
-  seniority: string;
-  focus: string;
+  seniority: "intern" | "junior" | "mid-level" | "senior";
+  focus: "mixed" | "technical-depth";
   duration: string;
   questionCount: string | null;
   playInterviewerAudio: boolean;
@@ -28,6 +28,7 @@ export type InterviewQuestion = {
   id: string;
   prompt: string;
   cue: string;
+  kind?: "technical" | "behavioral" | "background";
   /** Stable fixed-bank topic id retained when a curated alternate prompt is used. */
   topicId?: string;
   coverage?: "broad-project";

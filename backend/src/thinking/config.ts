@@ -13,7 +13,9 @@ export const defaultReportReasoningEffort: ReportReasoningEffort = "medium";
 export const reasoningReportTokenAllowance = 6_000;
 export const defaultReasoningInterviewReportTimeoutMs = 90_000;
 /** Resume analysis can use one provider retry while staying within this single overall deadline. */
-export const defaultResumeDirectionTimeoutMs = 30_000;
+export const defaultResumeDirectionTimeoutMs = 35_000;
+export const defaultJobDirectionTimeoutMs = 25_000;
+export const defaultInterviewDirectionModel = "anthropic/claude-haiku-5.5";
 /** A second, provider-excluding resume attempt starts in parallel when the first has not answered after this long. */
 // Healthy resume analyses take ~10.5–14.5 s, so a 13 s hedge rarely duplicates a healthy call and still leaves ~17 s of the 30 s budget.
 export const defaultResumeDirectionHedgeAfterMs = 13_000;
@@ -33,6 +35,8 @@ export function isReasoningReportModel(model: string): boolean {
 export type ThinkingConfig = {
   openRouterApiKey: string | null;
   model: string;
+  interviewDirectionModel?: string;
+  jobDirectionTimeoutMs?: number;
   /** Model for the final report; defaults to Claude Haiku 5.5 (`INTERVIEW_REPORT_MODEL` overrides it). */
   reportModel?: string;
   /** Reasoning effort sent to reasoning report models; defaults to medium. */
@@ -88,7 +92,7 @@ function parseReportReasoningEffort(value: string | undefined): ReportReasoningE
 
 function parseResumeDirectionTimeout(value: string | undefined): number {
   const timeout = parsePositiveNumber(value, defaultResumeDirectionTimeoutMs);
-  if (timeout < 25_000 || timeout > 30_000) throw new Error("Resume direction timeout must be between 25000 and 30000 milliseconds.");
+  if (timeout < 25_000 || timeout > 60_000) throw new Error("Resume direction timeout must be between 25000 and 60000 milliseconds.");
   return timeout;
 }
 
@@ -118,9 +122,11 @@ function parseSpeculativeHandoff(value: string | undefined): boolean {
 export function loadThinkingConfig(environment = process.env): ThinkingConfig {
   const model = environment.INTERVIEW_REASONING_MODEL?.trim() || defaultThinkingModel;
   const reportModel = environment.INTERVIEW_REPORT_MODEL?.trim() || defaultInterviewReportModel;
+  const interviewDirectionModel = environment.INTERVIEW_DIRECTION_MODEL?.trim() || defaultInterviewDirectionModel;
   return {
     openRouterApiKey: environment.OPENROUTER_API_KEY?.trim() || null,
     model,
+    interviewDirectionModel,
     reportModel,
     reportReasoningEffort: parseReportReasoningEffort(environment.INTERVIEW_REPORT_REASONING_EFFORT),
     timeoutMs: parsePositiveNumber(environment.INTERVIEW_REASONING_TIMEOUT_MS, defaultThinkingTimeoutMs),
@@ -130,6 +136,7 @@ export function loadThinkingConfig(environment = process.env): ThinkingConfig {
     bridgeMode: parseBridgeMode(environment.INTERVIEW_BRIDGE_MODE),
     reportTimeoutMs: parseReportTimeout(environment.INTERVIEW_REPORT_TIMEOUT_MS, reportModel),
     resumeDirectionTimeoutMs: parseResumeDirectionTimeout(environment.INTERVIEW_RESUME_DIRECTION_TIMEOUT_MS),
+    jobDirectionTimeoutMs: parsePositiveNumber(environment.INTERVIEW_JOB_DIRECTION_TIMEOUT_MS, defaultJobDirectionTimeoutMs),
     resumeDirectionHedgeAfterMs: parseResumeDirectionHedgeAfter(environment.INTERVIEW_RESUME_DIRECTION_HEDGE_AFTER_MS),
     diagnosticsEnabled: environment.INTERVIEW_REASONING_DIAGNOSTICS?.trim().toLowerCase() === "true",
     speculativeHandoffEnabled: parseSpeculativeHandoff(environment.INTERVIEW_SPECULATIVE_HANDOFF),

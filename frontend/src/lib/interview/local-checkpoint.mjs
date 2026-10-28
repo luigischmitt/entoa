@@ -1,4 +1,5 @@
 import { isValidJobDirection } from "./job-direction.mjs";
+import { normalizeFocus, normalizeSeniority } from "./interview-normalization.mjs";
 
 export const LOCAL_CHECKPOINT_VERSION = 1;
 export const LOCAL_CHECKPOINT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -26,11 +27,11 @@ function safeConfig(config) {
   if (strings.some((key) => typeof config[key] !== "string") || booleans.some((key) => typeof config[key] !== "boolean")) return null;
   const direction = isValidJobDirection(config.jobDirection)
     && config.jobDirection.targetRole === config.role
-    && config.jobDirection.suggestedSeniority === config.seniority
-    ? config.jobDirection
+    && normalizeSeniority(config.jobDirection.suggestedSeniority) === normalizeSeniority(config.seniority)
+    ? { ...config.jobDirection, suggestedSeniority: normalizeSeniority(config.jobDirection.suggestedSeniority) }
     : undefined;
   return {
-    role: config.role.trim(), seniority: config.seniority, focus: config.focus, duration: config.duration,
+    role: config.role.trim(), seniority: normalizeSeniority(config.seniority), focus: normalizeFocus(config.focus), duration: config.duration,
     questionCount: config.questionCount === null || typeof config.questionCount === "string" ? config.questionCount : null,
     playInterviewerAudio: config.playInterviewerAudio,
     showInterviewerCharacter: config.showInterviewerCharacter,

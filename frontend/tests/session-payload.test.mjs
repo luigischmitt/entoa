@@ -10,7 +10,7 @@ const direction = {
   productTeamContext: "A payments product team",
 };
 const config = {
-  role: "Backend Engineer", seniority: "mid-level", focus: "reliability", duration: "15", questionCount: "8",
+  role: "Backend Engineer", seniority: "mid-level", focus: "mixed", duration: "15", questionCount: "8",
   jobDirection: direction,
   jobDescription: "PRIVATE_RAW_JOB_DESCRIPTION_SENTINEL",
 };
@@ -18,7 +18,7 @@ const config = {
 test("session payload stores only the approved direction snapshot, never raw job description", () => {
   const payload = buildInterviewSessionPayload(config, "user-1", "2026-10-05T00:00:00.000Z");
   assert.deepEqual(payload, {
-    user_id: "user-1", target_role: "Backend Engineer", seniority: "mid-level", focus: "reliability",
+    user_id: "user-1", target_role: "Backend Engineer", seniority: "mid-level", focus: "mixed",
     job_direction: direction, duration_minutes: 15, question_count: 8, status: "in_progress", started_at: "2026-10-05T00:00:00.000Z",
   });
   assert.equal(JSON.stringify(payload).includes("PRIVATE_RAW_JOB_DESCRIPTION_SENTINEL"), false);
@@ -48,5 +48,5 @@ test("resume sessions save a neutral label instead of the inferred role, seniori
   assert.equal(payload.seniority, null);
   assert.equal(payload.focus, null);
   const job = buildInterviewSessionPayload({ ...config, interviewSource: "job" }, "user-1", "now");
-  assert.deepEqual([job.target_role, job.seniority, job.focus], ["Backend Engineer", "mid-level", "reliability"]);
+  assert.deepEqual([job.target_role, job.seniority, job.focus], ["Backend Engineer", "mid-level", "mixed"]);
 });

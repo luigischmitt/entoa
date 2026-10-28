@@ -50,7 +50,7 @@ test("handoff includes only the approved direction and drops it when role or sen
   assert.equal(handoff.jobDirection.suggestedSeniority, config.seniority);
   assert.equal(JSON.stringify(handoff).includes(description), false);
   assert.equal(parseRoomHandoff(serializeRoomHandoff({ ...config, role: "Different role" }, 1), 2).jobDirection, undefined);
-  assert.equal(parseRoomHandoff(serializeRoomHandoff({ ...config, seniority: "staff" }, 1), 2).jobDirection, undefined);
+  assert.equal(parseRoomHandoff(serializeRoomHandoff({ ...config, seniority: "staff" }, 1), 2).seniority, "senior");
 });
 
 test("handoff preserves a validated resume source without carrying the PDF", () => {
@@ -65,9 +65,9 @@ test("handoff preserves a validated resume source without carrying the PDF", () 
 
 test("keeps the practice focus out of the snapshot and tolerates older backends without it", async () => {
   const withFocus = await requestJobDirection(description, { targetRole: "" }, async () => new Response(JSON.stringify({ ...generatedDirection, suggestedFocus: "behavioral" }), { status: 200 }));
-  assert.equal(withFocus.suggestedFocus, "behavioral");
+  assert.equal(withFocus.suggestedFocus, "mixed");
   const applied = applyJobAnalysis({ ...config, jobDirection: undefined }, withFocus);
-  assert.equal(applied.focus, "behavioral");
+  assert.equal(applied.focus, "mixed");
   assert.equal(applied.role, direction.targetRole);
   assert.equal(applied.seniority, "senior");
   assert.equal("suggestedFocus" in applied.jobDirection, false);
@@ -75,7 +75,8 @@ test("keeps the practice focus out of the snapshot and tolerates older backends 
 
   const legacy = await requestJobDirection(description, { targetRole: "" }, async () => new Response(JSON.stringify(generatedDirection), { status: 200 }));
   assert.equal(applyJobAnalysis(config, legacy).focus, config.focus);
-  await assert.rejects(requestJobDirection(description, { targetRole: "" }, async () => new Response(JSON.stringify({ ...direction, suggestedFocus: "everything" }), { status: 200 })), { code: "INVALID_RESPONSE" });
+  const unknownFocus = await requestJobDirection(description, { targetRole: "" }, async () => new Response(JSON.stringify({ ...generatedDirection, suggestedFocus: "everything" }), { status: 200 }));
+  assert.equal(unknownFocus.suggestedFocus, "mixed");
 });
 
 test("switching modes parks and restores the direction without losing edits", () => {
@@ -88,7 +89,7 @@ test("switching modes parks and restores the direction without losing edits", ()
 
   const edited = switchSetupMode({ ...manual, config: { ...manual.config, role: "Platform Engineer", seniority: "staff" } }, "auto");
   assert.equal(edited.config.jobDirection.targetRole, "Platform Engineer");
-  assert.equal(edited.config.jobDirection.suggestedSeniority, "staff");
+  assert.equal(edited.config.jobDirection.suggestedSeniority, "senior");
   assert.equal(edited.config.jobDirection.mainInterviewEmphasis, direction.mainInterviewEmphasis);
   assert.equal(edited.parkedDirection, undefined);
 

@@ -5,6 +5,7 @@ import { ArrowLeft, Check, CloudOff, LoaderCircle, Mic } from "lucide-react";
 import { inAppMicBody, inAppMicTitle, useInAppBrowser } from "../hooks/use-in-app-browser";
 import { MicrophoneCapture, micDeniedMessage, type FollowUpCandidateStatus, type FollowUpCandidateUpdate, type MicControls, type PlannedQuestionStatus, type PlannedStartContext, type VoiceAssessmentState, type VoiceCaptureState, type VoiceTranscriptionState } from "@/components/interview/microphone-capture";
 import { getFixedInterviewQuestions } from "@/lib/interview/questions";
+import { normalizeFocus, normalizeSeniority } from "@/lib/interview/interview-normalization.mjs";
 import { readDashboardCache } from "@/lib/dashboard-data-cache.mjs";
 import { buildLearnerQuestionProfile, createTechnicalQuestionSnapshot } from "@/lib/interview/personalization.mjs";
 import type { ProgressRecord } from "@/lib/interview/progress-insights.mjs";
@@ -1477,8 +1478,9 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
 
   const isAdvancing = phase === "advancing";
   const resumePractice = isResumePractice(config);
-  const seniorityLabel = config.seniority === "junior" ? t("Júnior") : config.seniority === "mid-level" ? t("Pleno") : config.seniority === "senior" ? t("Sênior") : "Staff / Lead";
-  const focusLabel = t(config.focus === "technical-depth" ? "Profundidade técnica" : config.focus === "communication" ? "Comunicação e clareza" : config.focus === "behavioral" ? "Respostas comportamentais" : "Prática equilibrada");
+  const seniority = normalizeSeniority(config.seniority);
+  const seniorityLabel = t(seniority === "intern" ? "Estágio" : seniority === "junior" ? "Júnior" : seniority === "mid-level" ? "Pleno" : "Sênior");
+  const focusLabel = t(normalizeFocus(config.focus) === "technical-depth" ? "Técnica" : "Equilibrada");
   const persistenceLabel = persistenceState === "saved" ? "Sessão salva na conta" : persistenceState === "local" ? "Sessão salva neste navegador; sincronização pendente" : persistenceState === "unsafe" ? "Sessão ainda não salva" : "Salvando sessão na conta…";
   const capturedReportTurns = pairInterviewTurns(reportTurns);
   const isOpeningQuestion = currentIndex === 0 && questionSequenceNumber === 1 && !followUpUsed;

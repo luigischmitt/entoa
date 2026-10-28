@@ -9,7 +9,7 @@ export const defaultInterviewConfig: InterviewConfig = {
   seniority: "mid-level",
   voice: DEFAULT_INTERVIEWER_VOICE,
   speechSpeed: DEFAULT_INTERVIEWER_SPEECH_SPEED,
-  focus: "technical-depth",
+  focus: "mixed",
   duration: "15",
   questionCount: null,
   ...defaultCandidateVoicePreferences,

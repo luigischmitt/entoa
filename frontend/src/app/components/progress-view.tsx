@@ -18,6 +18,7 @@ import { formatPracticeDuration, ProgressContent } from "./progress/progress-con
 import { InterviewReport } from "./interview-report";
 import type { ReportState } from "./interview-report";
 import { currentReportAnalysisVersion, requestPersistedInterviewReport } from "@/lib/interview/persisted-report";
+import { normalizeFocus, normalizeSeniority } from "@/lib/interview/interview-normalization.mjs";
 
 const emptyAzureSummary: AzureMetricSummary = {
   accuracy: { mean: null, sampleCount: 0 },
@@ -154,8 +155,8 @@ export function ProgressView({
   const historicalAssessmentCount = Math.max(0, ...[historicalAzureSummary.accuracy, historicalAzureSummary.fluency, historicalAzureSummary.prosody].map((metric) => metric.sampleCount));
   const historicalConfig: InterviewConfig | null = selectedSession ? {
     role: selectedSession.targetRole,
-    seniority: selectedSession.seniority ?? "",
-    focus: selectedSession.focus ?? "mixed",
+    seniority: normalizeSeniority(selectedSession.seniority),
+    focus: normalizeFocus(selectedSession.focus),
     duration: "",
     questionCount: null,
     playInterviewerAudio: false,
