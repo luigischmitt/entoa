@@ -123,6 +123,22 @@ describe("persisted interview reports", () => {
     expect(generate).toHaveBeenCalledOnce();
   });
 
+  it("accepts a fractional assessed duration in the Azure summary", async () => {
+    const generate = vi.fn(async () => ({ status: "ready", report }));
+    const verifier: AccessTokenVerifier = { verify: vi.fn(async () => ({ userId: "user-private-id" })) };
+    const app = express();
+    app.use(express.json());
+    app.use("/api", requireAccessToken(verifier));
+    app.post("/api/report/:interviewId", createPersistedInterviewReportController({ generate }));
+    const metric = { mean: 88.4, sampleCount: 5, totalDurationMs: 17208.875 };
+    const azureSummary = { accuracy: metric, fluency: metric, prosody: metric };
+
+    const response = await request(app).post(`/api/report/${interviewId}`).set("authorization", `Bearer ${token}`).send({ locale: "pt-BR", azureSummary });
+    expect(response.status).toBe(200);
+    const negative = await request(app).post(`/api/report/${interviewId}`).set("authorization", `Bearer ${token}`).send({ azureSummary: { ...azureSummary, fluency: { ...metric, totalDurationMs: -1 } } });
+    expect(negative.status).toBe(400);
+  });
+
   it("shares concurrent generation for one interview and persists pending then ready once", async () => {
     const data = store();
     let finish!: (value: InterviewReport & { model: string; analysisVersion: "v2" }) => void;

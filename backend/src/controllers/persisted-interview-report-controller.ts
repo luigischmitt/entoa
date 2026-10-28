@@ -15,7 +15,8 @@ function validAzureSummary(value: unknown): boolean {
     const metric = dimension as Record<string, unknown>;
     return (metric.mean === null || (typeof metric.mean === "number" && Number.isFinite(metric.mean) && metric.mean >= 0 && metric.mean <= 100))
       && Number.isSafeInteger(metric.sampleCount) && (metric.sampleCount as number) >= 0
-      && (metric.totalDurationMs === undefined || metric.totalDurationMs === null || (Number.isSafeInteger(metric.totalDurationMs) && (metric.totalDurationMs as number) >= 0));
+      // Azure word timings can make the assessed duration fractional (e.g. 17208.875 ms), so any finite length is accepted.
+      && (metric.totalDurationMs === undefined || metric.totalDurationMs === null || (typeof metric.totalDurationMs === "number" && Number.isFinite(metric.totalDurationMs) && metric.totalDurationMs >= 0));
   });
 }
 

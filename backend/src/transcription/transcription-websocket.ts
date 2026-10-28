@@ -854,7 +854,7 @@ export function attachTranscriptionWebSocket(
           const phrases = timing ? buildAnswerPhrases(reviewedTranscript, azureWords, { allowIntonation: scores.prosody !== null && scores.prosody < 70 }) : [];
           const delivery = calculateDeliveryMetrics(timing?.words ?? []);
           const clips = Object.values(scores).some((score) => score !== null) ? await createPhraseClips(audio, phrases) : [];
-          const assessedDurationMs = assessments.reduce((sum, item) => sum + (item.assessment ? item.durationMs : 0), 0);
+          const assessedDurationMs = Math.round(assessments.reduce((sum, item) => sum + (item.assessment ? item.durationMs : 0), 0));
           const diagnostics = { transcriptionDurationMs, azureQueueWaitMs: queueWaitMs, azureServiceDurationMs: serviceDurationMs, totalDurationMs };
           if (Object.values(scores).some((score) => score !== null)) {
             logAzureAssessment({ status: "available", timingSource, timingOrigin, timingRetryOutcome, blockCount: blocks.length, assessedBlockCount: assessed, failedBlockCount: blocks.length - assessed, phraseCount: phrases.length, clipCount: clips.length, audioDurationMs: Math.round(durationMs), assessedDurationMs, ...diagnostics });

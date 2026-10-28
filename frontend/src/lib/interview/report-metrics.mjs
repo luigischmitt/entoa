@@ -26,7 +26,7 @@ export function summarizeAzureAssessments(assessments) {
     summary[dimension] = {
       mean: values.length ? Math.round((values.reduce((sum, entry) => sum + entry.score * weightOf(entry), 0) / totalWeight) * 10) / 10 : null,
       sampleCount: values.length,
-      totalDurationMs: durationKnown ? totalWeight : null,
+      totalDurationMs: durationKnown ? Math.round(totalWeight) : null,
     };
   }
   return summary;
