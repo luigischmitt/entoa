@@ -216,7 +216,7 @@ function Navigation({
             {primaryNavigationItems.map(renderNavigationItem)}
           </ul>
         </nav>
-        <div className="mt-auto pt-4">
+        <div className="shl-nav-utility mt-auto pt-4">
           <nav aria-label={t("Navegação utilitária")}>
             <ul className="shl-nav-list">
               {utilityNavigationItems.map(renderNavigationItem)}

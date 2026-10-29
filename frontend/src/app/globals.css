@@ -243,7 +243,18 @@
   --ds-text-2: #44604f;       /* secondary text         6.2:1 on cream/field */
   --ds-text-3: #5c7a6a;       /* tertiary state labels */
   --ds-placeholder: #75897d;  /* placeholder only (3.3:1): never for real content */
-  --ds-sidebar: #f1f3ec;      /* sidebar ground (= field in light) */
+  --ds-sidebar: #eef1e6;      /* sidebar ground: leaf wash (sage-50) */
+  /* Tropical palette sampled from the landing engravings (sage leaf, moss shade, parchment light). Soft surfaces only:
+     actions, links and focus stay on --ds-green. Text on sage-50/100: ink 13:1, text-2 >= 5.6:1, moss >= 4.8:1. */
+  --ds-sage-50: #eef1e6;      /* leaf wash: highlight cards, sidebar */
+  --ds-sage-100: #e4eadb;     /* tinted card, hover on sage */
+  --ds-sage-200: #cfdac4;     /* hairline / divider on sage surfaces */
+  --ds-moss: #4f6b4d;         /* small detail text and leaf marks on sage */
+  --ds-linen: url("/textures/linen.webp");  /* fine woven texture, decorative surfaces only (never behind long text or charts) */
+  --ds-linen-opacity: 0.12;
+  --ds-linen-filter: none;
+  --ds-art-filter: saturate(1.08) contrast(1.04);  /* engraving inside the app: crisp, natural colour */
+  --ds-art-opacity: 1;
   --ds-popover: #ffffff;      /* popovers, combobox list */
   --ds-thumb: #ffffff;        /* raised thumb in tracks, tabs, nav */
   --ds-field-focus: #ffffff;  /* field background while focused */
@@ -289,7 +300,7 @@
   --ds-shadow-dialog: 0 1px 2px rgba(14, 42, 31, 0.08), 0 12px 28px -14px rgba(14, 42, 31, 0.3);
   --ds-shadow-pip: 0 1px 2px rgba(14, 42, 31, 0.08), 0 6px 16px -8px rgba(14, 42, 31, 0.24);
   --ds-line: rgba(14, 42, 31, 0.09);        /* inset hairline on fields and popovers */
-  --ds-hairline: rgba(14, 42, 31, 0.1);     /* 1px card borders and separators (landing: rgba(14,42,31,.1)) */
+  --ds-hairline: rgba(14, 42, 31, 0.075);   /* 1px card borders and separators: soft, the surfaces carry the grouping */
   --ds-line-strong: #9bb3a5;                /* unchecked radio ring */
   --ds-hover-wash: rgba(14, 42, 31, 0.06);
   --ds-hover-wash-faint: rgba(14, 42, 31, 0.04);
@@ -314,10 +325,11 @@
   --ds-r-xl: 1.125rem;
   --ds-r-card: 1.5rem;
   --ds-r-panel: 1.75rem;
-  --ds-r-pill: 9999px;
+  --ds-r-pill: 9999px;       /* chips, badges, segmented thumbs: never actions */
+  --ds-r-btn: 0.75rem;        /* action buttons: a rectangle with quiet corners */
 
   /* Elevation: short, light shadows (the landing's). Never long dark drops. */
-  --ds-shadow-card: 0 1px 2px rgba(14, 42, 31, 0.06), 0 4px 12px -6px rgba(14, 42, 31, 0.1);
+  --ds-shadow-card: 0 1px 2px rgba(14, 42, 31, 0.04), 0 6px 16px -10px rgba(14, 42, 31, 0.1);
   --ds-shadow-pop: 0 1px 2px rgba(14, 42, 31, 0.06), 0 8px 20px -10px rgba(14, 42, 31, 0.18);
   --ds-shadow-thumb: 0 1px 2px rgba(14, 42, 31, 0.1), 0 2px 8px -2px rgba(14, 42, 31, 0.12);
   --ds-shadow-panel: 0 1px 2px rgba(14, 42, 31, 0.06), 0 4px 12px -6px rgba(14, 42, 31, 0.1);
@@ -362,6 +374,14 @@
   --ds-text-3: #8d938d;
   --ds-placeholder: #858a85;   /* 4.3:1 on field */
   --ds-sidebar: #17191d;
+  --ds-sage-50: #1c201c;
+  --ds-sage-100: #222821;
+  --ds-sage-200: rgba(214, 230, 205, 0.12);
+  --ds-moss: #a9c2a3;
+  --ds-linen-opacity: 0.07;
+  --ds-linen-filter: invert(1);
+  --ds-art-filter: brightness(0.62) saturate(0.85);
+  --ds-art-opacity: 0.85;
   --ds-popover: #23262c;
   --ds-thumb: #3a3e46;
   --ds-field-focus: #2a2d34;

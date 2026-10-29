@@ -173,3 +173,13 @@ html:has(.vv-session[open]) { overflow: hidden; }
   .vv-session, .vv-session[open], .vv-session::backdrop, .vv-session[open]::backdrop { transform: none; transition: opacity 150ms ease, overlay 150ms allow-discrete, display 150ms allow-discrete; }
   @starting-style { .vv-session[open] { transform: none; } }
 }
+
+/* Subtle colour (the tropical direction, without the dark panels): the overview and the training cards sit on a leaf
+   wash with sage hairlines; the lesson and the evolution chart stay on the plain surface so data reads cleanly. */
+.ds-card.vv-metric-grid { position: relative; isolation: isolate; background: var(--ds-sage-50); border-color: var(--ds-sage-200); box-shadow: none; }
+/* a whisper of linen on the two highlight surfaces only */
+.ds-card.vv-metric-grid::after, .vv-pair-row > .ds-block.vv-pair-card:first-child::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; background: var(--ds-linen); opacity: calc(var(--ds-linen-opacity) * 0.55); filter: var(--ds-linen-filter); }
+.vv-metric + .vv-metric { border-color: var(--ds-sage-200); }
+.vv-personalized { background: var(--ds-sage-50); }
+.ds-block.vv-pair-card, .ds-block.vv-track { background: var(--ds-sage-50); border-color: var(--ds-sage-200); }
+.vv-pair-row > .ds-block.vv-pair-card:first-child { position: relative; isolation: isolate; background: var(--ds-sage-100); }

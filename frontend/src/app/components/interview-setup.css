@@ -3,7 +3,7 @@
  * switch, segmented, combobox, reveal, type scale, motion) live in src/app/design-system.css (`ds-*`),
  * tokens in src/app/globals.css (`--ds-*`). Scoped under .isu-root so no other page is affected.
  */
-.isu-root { color: var(--ds-ink); }
+.isu-root { position: relative; isolation: isolate; color: var(--ds-ink); }
 
 /* Keep a focused card (and its open combobox popover) above the cards that follow it. */
 .isu-root .ds-card:focus-within { position: relative; z-index: 5; }
@@ -98,6 +98,10 @@
 
 /* Summary panel: a plain card, kept on screen beside the form while it scrolls on desktop. */
 .isu-aside { padding: 1.25rem 1.5rem; }
+/* The session summary is the screen's one highlight: leaf wash in linen, sage hairlines between rows. */
+.ds-card.isu-aside { position: relative; isolation: isolate; background: var(--ds-sage-50); border-color: var(--ds-sage-200); box-shadow: none; }
+.ds-card.isu-aside::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; background: var(--ds-linen); opacity: calc(var(--ds-linen-opacity) * 0.55); filter: var(--ds-linen-filter); }
+.isu-aside-list > div + div { border-color: var(--ds-sage-200); }
 .isu-aside-title { margin-top: 0.5rem; font-size: 1.5rem; line-height: 1.1; overflow-wrap: anywhere; }
 .isu-aside-list { margin: 0.75rem 0 0; font-size: 0.8125rem; }
 .isu-aside-list > div { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding: 0.45rem 0; }

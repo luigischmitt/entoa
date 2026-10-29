@@ -161,3 +161,10 @@
   .pg-example-toggle svg { transition: none; }
 }
 .pg-focus::before { content: ""; width: 6px; height: 6px; flex: none; background: var(--ds-green); }
+
+/* Tropical touches, kept off the charts: the voice tiles and the radar explanation sit on the leaf wash, the first tile
+   gets a whisper of linen. Scales, legends and plots stay on the plain surface. */
+.pg-metric, .pg-side-detail { background: var(--ds-sage-50); }
+.pg-metric { position: relative; isolation: isolate; }
+.pg-metric[data-focus="true"] { background: var(--ds-sage-100); }
+.pg-metric[data-focus="true"]::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; background: var(--ds-linen); opacity: calc(var(--ds-linen-opacity) * 0.55); filter: var(--ds-linen-filter); }
