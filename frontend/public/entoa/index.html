@@ -91,7 +91,7 @@ html{scroll-padding-top:72px}
 /* the first screen is only the pitch: the headline sits in the middle, the facts close the screen, and the art starts below the fold */
 .hero{position:relative;isolation:isolate;display:flex;min-height:calc(100vh - 66px);min-height:calc(100svh - 66px);padding:clamp(24px,4vh,48px) 0 0;text-align:center}
 .hero>.wrap{display:flex;flex-direction:column;align-items:center}
-.hero{background:linear-gradient(to bottom,var(--cream) 0%,#eef1e6 55%,#e5ebdb 100%)}
+.hero{background:linear-gradient(to bottom,var(--cream) 0%,#eef1e6 50%,#e9eee0 84%,var(--cream) 100%)}
 .hero::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:url("/textures/linen.webp");opacity:.1}
 /* the closing art, sharp but faint, fills the lower hero (palms at both sides, the bay in the middle) and settles into the green ground below */
 .hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:min(70%,620px);z-index:-2;pointer-events:none;
@@ -361,10 +361,14 @@ main{overflow-x:clip}
 .compact{padding:clamp(40px,5vw,72px) 0}
 #problema{position:relative;isolation:isolate;overflow:hidden}
 /* right after the hero: the hero's green ground continues as linen and settles into the cream (no second forest) */
-#problema{background:linear-gradient(to bottom,#e5ebdb,var(--cream) 72px);padding-top:clamp(28px,3.5vw,52px)}
-#problema::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:url("/textures/linen.webp");opacity:.08}
+/* plain ground; threads only in the side margins, like the report (vertical here, horizontal there) */
+#problema{padding-top:clamp(28px,3.5vw,52px)}
+#problema::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:repeating-linear-gradient(90deg,rgba(31,107,69,.2) 0 1px,transparent 1px 7px);
+  -webkit-mask-image:linear-gradient(to right,#000,transparent calc(50% - 600px),transparent calc(50% + 600px),#000),linear-gradient(to bottom,transparent,#000 18%,#000 82%,transparent);
+  mask-image:linear-gradient(to right,#000,transparent calc(50% - 600px),transparent calc(50% + 600px),#000),linear-gradient(to bottom,transparent,#000 18%,#000 82%,transparent);
+  -webkit-mask-composite:source-in;mask-composite:intersect}
 #problema .pair-box{position:relative;isolation:isolate}
-#problema .pair-box::after{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;pointer-events:none;background:url("/textures/linen.webp");opacity:.08}
+
 /* ===== você × nativo ===== */
 .seg{border:0;background:none;font:inherit;color:inherit;padding:0 .1em;margin:0 -.04em;border-radius:.28em;cursor:pointer;transition:background .2s,color .2s,box-shadow .2s}
 /* each card spans two rows of the pair grid (box, caption), so both boxes share one height and both captions start on the same line */
