@@ -168,7 +168,7 @@ select.ds-field {
 .ds-switch:checked:active::after { transform: translateX(0.75rem); }
 .ds-switch:disabled { background: var(--ds-switch-disabled); }
 
-/* ---- Buttons. Base `.ds-btn` + one variant. Pill shaped, 44px min target, scale(0.97) on press. ---- */
+/* ---- Buttons. Base `.ds-btn` + one variant. A rectangle with quiet corners (pills are for chips and thumbs), 44px min target, scale(0.97) on press. ---- */
 .ds-btn {
   display: inline-flex;
   min-height: 2.75rem;
@@ -176,7 +176,7 @@ select.ds-field {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  border-radius: var(--ds-r-pill);
+  border-radius: var(--ds-r-btn);
   padding: 0 1.25rem;
   font-size: 0.9375rem;
   font-weight: 600;
@@ -390,7 +390,7 @@ select.ds-field {
 
 /* Kicker: small caps label with a 7px green square. data-tone="voice" swaps the square to terra. */
 .ds-kicker { display: inline-flex; align-items: center; gap: 0.55rem; margin: 0; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; line-height: 1.2; text-transform: uppercase; color: var(--ds-green-deep); }
-.ds-kicker::before { content: ""; width: 7px; height: 7px; flex: none; background: var(--ds-green); }
+.ds-kicker::before { content: ""; width: 10px; height: 10px; flex: none; background: var(--ds-green); -webkit-mask: var(--ds-leaf-mask) center / contain no-repeat; mask: var(--ds-leaf-mask) center / contain no-repeat; } /* a leaf, the app's one botanical mark */
 .ds-kicker[data-tone="voice"]::before { background: var(--ds-green); } /* voice stays green (2026-10-24): no terra in the UI */
 
 /* Titles: Instrument Serif 400, -0.02em, ~1.1. Page title > section title. */
@@ -439,4 +439,9 @@ select.ds-field {
  * data-tone="good" = the corrected / right version (tint + green hairline).
  */
 .ds-block { border: 1px solid var(--ds-hairline); border-radius: 24px; background: var(--ds-field); padding: clamp(1.25rem, 3vw, 2rem); }
+/* Leaf-wash surface: a soft sage card for highlights (never for every card on a screen). */
+.ds-sage { background: var(--ds-sage-50); border-color: var(--ds-sage-200); }
+/* Linen: a fine woven texture under a decorative surface. Short text only; never behind long reading or charts. */
+.ds-linen { position: relative; isolation: isolate; }
+.ds-linen::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; background: var(--ds-linen); opacity: var(--ds-linen-opacity); filter: var(--ds-linen-filter); }
 .ds-block[data-tone="good"] { background: var(--ds-tint); border-color: color-mix(in srgb, var(--ds-green) 25%, transparent); }

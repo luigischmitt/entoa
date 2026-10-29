@@ -53,7 +53,7 @@ section{padding:clamp(44px,6vw,80px) 0}
 html{scroll-padding-top:72px}
 
 /* buttons */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-height:48px;padding:0 1.4rem;border-radius:999px;border:0;font-weight:600;text-decoration:none;
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-height:48px;padding:0 1.4rem;border-radius:12px;border:0;font-weight:600;text-decoration:none;
   background:var(--green);color:var(--cream);transition:transform .12s var(--ease),background .16s;box-shadow:0 1px 2px rgba(14,42,31,.16)}
 .btn:active{transform:scale(.97)}
 .btn.soft{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
@@ -83,14 +83,15 @@ html{scroll-padding-top:72px}
 .brand{display:flex;align-items:center;gap:.6rem;font-weight:600;font-size:.95rem;text-decoration:none;white-space:nowrap}
 .brand img{width:26px}
 @media(hover:hover){.nav-links a:hover{color:var(--ink)}}
-.nav .btn{min-height:40px;padding:0 1.1rem;font-size:.9rem;color:var(--cream)}
+.nav .btn{min-height:40px;padding:0 1.1rem;font-size:.9rem;color:var(--cream);border-radius:999px} /* concentric with the pill bar */
 @media(max-width:860px){.nav-links{display:none}.nav .wrap{grid-template-columns:minmax(0,1fr) auto}.nav .btn{white-space:nowrap}}
 @media(max-width:720px){.nav .wrap{grid-template-columns:minmax(0,1fr) auto;gap:.75rem;padding:10px calc(var(--pad) + .5rem) 0 calc(var(--pad) + 1rem)}.nav.stuck .wrap{padding:0 .5rem 0 1rem}.nav-links{display:none}.brand{font-size:.8rem}.brand img{width:22px}.nav .btn{padding:0 .8rem;font-size:.82rem;white-space:nowrap}}
 
 /* hero: centred copy; the demo, framed on the forest art, follows right below */
 /* the first screen is only the pitch: the headline sits in the middle, the facts close the screen, and the art starts below the fold */
-.hero{position:relative;display:flex;min-height:calc(100vh - 66px);min-height:calc(100svh - 66px);padding:clamp(24px,4vh,48px) 0 0;text-align:center}
+.hero{position:relative;isolation:isolate;display:flex;min-height:calc(100vh - 66px);min-height:calc(100svh - 66px);padding:clamp(24px,4vh,48px) 0 0;text-align:center}
 .hero>.wrap{display:flex;flex-direction:column;align-items:center}
+.hero::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:url("/textures/linen.webp");opacity:.1}
 .hero-main{margin-block:auto;padding-block:clamp(16px,3vh,32px)}
 .hero h1{font-size:clamp(2.8rem,6vw,5rem);margin:0 auto 1.2rem;max-width:15ch;text-wrap:balance}
 .hero h1 em{font-style:italic;color:var(--green);position:relative}
@@ -151,7 +152,7 @@ main{overflow-x:clip}
 .ta .ph{color:#75897d}.ta.has .ph{display:none}
 .tameta{display:flex;justify-content:space-between;gap:1rem;margin-top:.4rem;flex-wrap:wrap}
 .btns{display:flex;gap:.5rem;align-items:center;margin-top:.9rem;min-height:38px}
-.sbtn{display:inline-flex;align-items:center;gap:.5rem;background:var(--field);padding:.5rem 1rem;border-radius:99px;font-size:.84rem;font-weight:600;transition:transform .12s,background .2s}
+.sbtn{display:inline-flex;align-items:center;gap:.5rem;background:var(--field);padding:.5rem 1rem;border-radius:10px;font-size:.84rem;font-weight:600;transition:transform .12s,background .2s}
 .sbtn.press,.cta.press{transform:scale(.95)}
 .spin{display:none;width:13px;height:13px;border-radius:50%;border:2px solid var(--green);border-right-color:transparent;animation:rot .8s linear infinite}
 .sbtn.load .spin{display:block}
@@ -167,7 +168,7 @@ main{overflow-x:clip}
 .pf{margin-top:.7rem;opacity:0;transform:translateY(6px);transition:opacity .45s var(--ease),transform .45s var(--ease)}
 .pf.on{opacity:1;transform:none}
 .pf .v{background:var(--field);border-radius:12px;padding:.5rem .8rem;font-size:.84rem;line-height:1.45;margin-top:.3rem;white-space:pre-line}
-.cta{display:inline-flex;margin-top:1.2rem;background:var(--green);color:var(--cream);font-weight:600;padding:.8rem 1.6rem;border-radius:99px;font-size:.92rem;transition:transform .12s}
+.cta{display:inline-flex;margin-top:1.2rem;background:var(--green);color:var(--cream);font-weight:600;padding:.8rem 1.6rem;border-radius:10px;font-size:.92rem;transition:transform .12s}
 /* room (mirrors the product call surface) */
 .room{padding:clamp(10px,2vw,18px) clamp(10px,2vw,20px) 0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;row-gap:10px}
 .mt-top{position:relative;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 4px 12px}
@@ -224,14 +225,14 @@ main{overflow-x:clip}
 .dlg.on{opacity:1;visibility:visible;transition-delay:0s}
 .dlg>div{background:var(--surface);border-radius:20px;padding:1.3rem;width:min(90%,340px);display:grid;gap:.5rem;box-shadow:var(--shadow)}
 .dlg h5{font-size:1.35rem;margin-bottom:.3rem}
-.dlg span{border-radius:99px;padding:.6rem 1rem;font-size:.86rem;font-weight:600;text-align:center;background:var(--field);transition:transform .12s}
+.dlg span{border-radius:10px;padding:.6rem 1rem;font-size:.86rem;font-weight:600;text-align:center;background:var(--field);transition:transform .12s}
 .dlg span.pri{background:var(--green);color:var(--cream)}
 .dlg span.press{transform:scale(.95)}
 /* report */
 /* report scene: a file bar with the export button, and the paper scrolling under it */
 .sc.dp{display:flex;flex-direction:column;background:#e8ede4}
 .dp-bar{flex:none;position:relative;z-index:2;display:flex;justify-content:space-between;align-items:center;gap:.8rem;padding:10px 16px;background:var(--surface);border-bottom:1px solid rgba(14,42,31,.08);font-size:.8rem;color:var(--text2)}
-.dp-pdf{display:inline-flex;align-items:center;gap:.45rem;background:var(--green);color:var(--cream);border-radius:99px;padding:.45rem 1rem;font-size:.82rem;font-weight:600;white-space:nowrap;transition:transform .12s,background .3s}
+.dp-pdf{display:inline-flex;align-items:center;gap:.45rem;background:var(--green);color:var(--cream);border-radius:9px;padding:.45rem 1rem;font-size:.82rem;font-weight:600;white-space:nowrap;transition:transform .12s,background .3s}
 .dp-pdf svg{width:14px;height:14px;flex:none}
 .dp-pdf b{font-weight:600}
 .dp-pdf.press{transform:scale(.94)}
@@ -286,8 +287,7 @@ main{overflow-x:clip}
   .dctl p{display:none}}
 /* ===== relatório sobre a mata (from the current site) ===== */
 .rstage{position:relative;isolation:isolate;overflow:hidden;padding:clamp(32px,4vw,64px) 0}
-.stage-art{position:absolute;inset:0;z-index:-1;pointer-events:none;
-  mask-image:linear-gradient(to bottom,transparent,#000 14px,#000 calc(100% - 14px),transparent);-webkit-mask-image:linear-gradient(to bottom,transparent,#000 14px,#000 calc(100% - 14px),transparent)}
+.stage-art{position:absolute;inset:0;z-index:-1;pointer-events:none}
 .stage-art img{width:100%;height:100%;object-fit:cover;object-position:center 70%;filter:saturate(1.3) contrast(1.06)}
 /* Phones get a portrait crop (bay framed by palms, no empty sky) and equal room above and below the card. */
 @media(max-width:767px){.rstage{padding:36px 0}.stage-art img{object-position:center}}
@@ -345,6 +345,11 @@ main{overflow-x:clip}
 @media(prefers-reduced-motion:reduce){.radar .poly{transform:none;opacity:1}.radar .pt,.radar .lab{opacity:1}.radar .poly,.radar .pt,.radar .lab,.rep.in .radar .poly,.rep.in .radar .pt,.rep.in .radar .lab{transition:none}}
 
 .compact{padding:clamp(40px,5vw,72px) 0}
+#problema{position:relative;isolation:isolate;overflow:hidden}
+.prob-tree{position:absolute;right:-72px;top:4px;z-index:-1;width:min(640px,62vw);max-width:none;height:auto;opacity:.27;pointer-events:none;transform:scaleX(-1);
+  -webkit-mask-image:linear-gradient(to left,transparent 4%,#000 34%,#000 70%,transparent),linear-gradient(to bottom,transparent,#000 16%,#000 55%,transparent 92%);mask-image:linear-gradient(to left,transparent 4%,#000 34%,#000 70%,transparent),linear-gradient(to bottom,transparent,#000 16%,#000 55%,transparent 92%);
+  -webkit-mask-composite:source-in;mask-composite:intersect}
+@media(max-width:767px){.prob-tree{right:-40px;top:-8px;width:88vw;opacity:.16}}
 /* ===== você × nativo ===== */
 .seg{border:0;background:none;font:inherit;color:inherit;padding:0 .1em;margin:0 -.04em;border-radius:.28em;cursor:pointer;transition:background .2s,color .2s,box-shadow .2s}
 /* each card spans two rows of the pair grid (box, caption), so both boxes share one height and both captions start on the same line */
@@ -824,6 +829,7 @@ AWS e observabilidade</div></div>
 
 <!-- PROBLEMA -->
 <section id="problema" class="compact">
+  <img class="prob-tree" src="/landing/footer-mata-alpha-828.webp" srcset="/landing/footer-mata-alpha-828.webp 828w, /landing/footer-mata-alpha-1400.webp 1400w" sizes="(max-width:767px) 88vw, 640px" alt="" aria-hidden="true" width="828" height="276" loading="lazy" decoding="async">
   <div class="wrap">
     <div class="shead">
       <div><p class="kicker">O problema</p><h2 data-fill>Seu conteúdo é bom. O inglês esconde.</h2></div>

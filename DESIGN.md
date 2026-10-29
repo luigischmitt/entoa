@@ -54,6 +54,20 @@ Contrast (WCAG): ink on cream 13.9:1; text-2 on cream 6.3:1, on surface 6.7:1, o
 
 Tailwind: `bg-surface`, `bg-field`, `bg-tint`, `bg-track`, `bg-cream`, `text-ink`, `text-text-2`, `text-green`, `text-danger`, `bg-danger-tint`, `bg-warn-tint`, `shadow-card`, `shadow-pop`, `shadow-panel`. shadcn variables (`--primary`, `--card`, `--muted-foreground`, ...) and the DaisyUI `interview-light` theme (`btn`, `alert`, `text-error`, ...) are mapped to the same palette, so `text-muted-foreground` is text-2, `text-error` is `#8a3a21`, `bg-primary` is green.
 
+### Tropical surfaces (2026-10-29)
+
+Greens sampled from the landing engravings, used only for soft surfaces; actions, links and focus stay on `--ds-green`.
+
+| Token | Light | Role |
+| --- | --- | --- |
+| `--ds-sage-50` | `#eef1e6` | Leaf wash: sidebar, Home highlight card, setup summary, Sua voz overview and training cards |
+| `--ds-sage-100` | `#e4eadb` | First training card |
+| `--ds-sage-200` | `#cfdac4` | Hairlines on sage surfaces |
+| `--ds-moss` | `#4f6b4d` | Small detail text on sage (5.2:1 on sage-50) |
+| `--ds-linen` | `/textures/linen.webp` | Fine woven texture (`.ds-linen`, opacity `--ds-linen-opacity` 0.15), only under decorative surfaces with short text: sidebar, Home highlight, landing hero. Never behind long reading or charts. |
+
+Engravings inside the app (`footer-mata-alpha`, transparent sky) appear at full definition in three places only: the sidebar above the settings control, the lower right of the Home highlight card, and the empty space to the right of the setup title (desktop). No control or card sits on them. Progress keeps its charts clean; its forest reference is the leaf kicker mark (`--ds-leaf-mask`). Dark mode maps sage to green-tinted graphite and dims the art with `--ds-art-filter`.
+
 ## Dark mode
 
 Two schemes, one set of tokens. `<html data-color-scheme="light|dark">` (and `data-theme="interview-light|interview-dark"` for DaisyUI) selects the scheme; every `--ds-*`, shadcn and DaisyUI value has a dark counterpart, so components never branch on the scheme. Light is unchanged. The Tailwind `dark:` variant is wired to the attribute.
@@ -122,7 +136,7 @@ Rule: tracking tightens as size grows and opens slightly as it shrinks. Use `tex
 
 ## Radii
 
-`--ds-r-sm` 0.625rem (list option), `--ds-r-md` 0.75rem (segmented thumb), `--ds-r-field` 0.875rem (inputs), `--ds-r-lg` 1rem (track, popover), `--ds-r-xl` 1.125rem (option cards, panels in cards), `--ds-r-card` 1.5rem (cards), `--ds-r-panel` 1.75rem (dark summary panel), `--ds-r-pill` (buttons, switches). Nested radii shrink as they nest.
+`--ds-r-sm` 0.625rem (list option), `--ds-r-md` 0.75rem (segmented thumb), `--ds-r-field` 0.875rem (inputs), `--ds-r-lg` 1rem (track, popover), `--ds-r-xl` 1.125rem (option cards, panels in cards), `--ds-r-card` 1.5rem (cards), `--ds-r-panel` 1.75rem (dark summary panel), `--ds-r-btn` 0.75rem (action buttons: a rectangle with quiet corners, landing `.btn` 12px), `--ds-r-pill` (chips, badges, switches, segmented thumbs, and the landing nav buttons that sit inside the floating pill bar). Nested radii shrink as they nest.
 
 ## Elevation
 
