@@ -251,7 +251,7 @@
   --ds-sage-200: #cfdac4;     /* hairline / divider on sage surfaces */
   --ds-moss: #4f6b4d;         /* small detail text and leaf marks on sage */
   --ds-linen: url("/textures/linen.webp");  /* fine woven texture, decorative surfaces only (never behind long text or charts) */
-  --ds-linen-opacity: 0.1;
+  --ds-linen-opacity: 0.12;
   --ds-linen-filter: none;
   --ds-art-filter: saturate(1.08) contrast(1.04);  /* engraving inside the app: crisp, natural colour */
   --ds-art-opacity: 1;

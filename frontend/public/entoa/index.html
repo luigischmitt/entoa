@@ -94,17 +94,18 @@ html{scroll-padding-top:72px}
 .hero{background:linear-gradient(to bottom,var(--cream) 0%,#eef1e6 55%,#e5ebdb 100%)}
 .hero::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:url("/textures/linen.webp");opacity:.1}
 /* the closing art, sharp but faint, fills the lower hero (palms at both sides, the bay in the middle) and settles into the green ground below */
-.hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:min(66%,580px);z-index:-2;pointer-events:none;
-  background:url("/landing/footer-mata-alpha.webp") center bottom/cover no-repeat;opacity:.36;
-  -webkit-mask-image:linear-gradient(to bottom,transparent,#000 16%,#000 84%,transparent);mask-image:linear-gradient(to bottom,transparent,#000 16%,#000 84%,transparent)}
-@media(max-width:767px){.hero::after{height:56%;opacity:.36;background-position:80% bottom}}
+.hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:min(50%,450px);z-index:-2;pointer-events:none;
+  background:url("/landing/footer-mata-alpha.webp") center bottom/cover no-repeat;opacity:.4;
+  -webkit-mask-image:linear-gradient(to bottom,transparent,#000 7%,#000 88%,transparent);mask-image:linear-gradient(to bottom,transparent,#000 7%,#000 88%,transparent)}
+@media(max-width:767px){.hero::after{height:46%;opacity:.4;background-position:80% bottom}}
 /* section textures, varied like threads: vertical warp in the demo gutters, horizontal weft in the report gutters */
 .demo-stage,.pp-sec{position:relative;isolation:isolate}
 .demo-stage::before,.pp-sec::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
   -webkit-mask-image:linear-gradient(to right,#000,transparent calc(50% - 600px),transparent calc(50% + 600px),#000),linear-gradient(to bottom,transparent,#000 18%,#000 82%,transparent);
   mask-image:linear-gradient(to right,#000,transparent calc(50% - 600px),transparent calc(50% + 600px),#000),linear-gradient(to bottom,transparent,#000 18%,#000 82%,transparent);
   -webkit-mask-composite:source-in;mask-composite:intersect}
-.demo-stage::before{background:repeating-linear-gradient(90deg,rgba(31,107,69,.2) 0 1px,transparent 1px 7px)}
+.demo-stage{background:linear-gradient(to bottom,var(--cream),#e8eddf 18%,#e8eddf 82%,var(--cream))}
+.demo-stage::before{background:url("/textures/linen.webp");opacity:.16;-webkit-mask-image:linear-gradient(to bottom,transparent,#000 14%,#000 86%,transparent);mask-image:linear-gradient(to bottom,transparent,#000 14%,#000 86%,transparent);-webkit-mask-composite:source-over;mask-composite:add}
 .pp-sec::before{background:repeating-linear-gradient(0deg,rgba(31,107,69,.2) 0 1px,transparent 1px 7px)}
 /* FAQ: a band of linen across the section, faded at the top and bottom */
 .faqs::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:url("/textures/linen.webp");opacity:.16;
@@ -360,9 +361,8 @@ main{overflow-x:clip}
 .compact{padding:clamp(40px,5vw,72px) 0}
 #problema{position:relative;isolation:isolate;overflow:hidden}
 /* right after the hero: the hero's green ground continues as linen and settles into the cream (no second forest) */
-#problema{background:linear-gradient(to bottom,#e5ebdb,#edf0e5 55%,var(--cream))}
-#problema::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:url("/textures/linen.webp");opacity:.14;
-  -webkit-mask-image:linear-gradient(to bottom,#000 60%,transparent);mask-image:linear-gradient(to bottom,#000 60%,transparent)}
+#problema{background:linear-gradient(to bottom,#e5ebdb,var(--cream) 72px);padding-top:clamp(28px,3.5vw,52px)}
+#problema::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:url("/textures/linen.webp");opacity:.08}
 #problema .pair-box{position:relative;isolation:isolate}
 #problema .pair-box::after{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;pointer-events:none;background:url("/textures/linen.webp");opacity:.08}
 /* ===== você × nativo ===== */
