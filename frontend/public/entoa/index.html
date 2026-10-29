@@ -94,10 +94,10 @@ html{scroll-padding-top:72px}
 .hero{background:linear-gradient(to bottom,var(--cream) 0%,#eef1e6 55%,#e5ebdb 100%)}
 .hero::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:url("/textures/linen.webp");opacity:.1}
 /* the closing art, sharp but faint, fills the lower hero (palms at both sides, the bay in the middle) and settles into the green ground below */
-.hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:min(50%,450px);z-index:-2;pointer-events:none;
-  background:url("/landing/footer-mata-alpha.webp") center bottom/cover no-repeat;opacity:.4;
-  -webkit-mask-image:linear-gradient(to bottom,transparent,#000 7%,#000 88%,transparent);mask-image:linear-gradient(to bottom,transparent,#000 7%,#000 88%,transparent)}
-@media(max-width:767px){.hero::after{height:46%;opacity:.4;background-position:80% bottom}}
+.hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:min(70%,620px);z-index:-2;pointer-events:none;
+  background:url("/landing/footer-mata-alpha.webp") center bottom/cover no-repeat;opacity:.42;
+  -webkit-mask-image:linear-gradient(to bottom,transparent,rgba(0,0,0,.35) 14%,#000 34%,#000 88%,transparent);mask-image:linear-gradient(to bottom,transparent,rgba(0,0,0,.35) 14%,#000 34%,#000 88%,transparent)}
+@media(max-width:767px){.hero::after{height:58%;opacity:.42;background-position:80% bottom}}
 /* section textures, varied like threads: vertical warp in the demo gutters, horizontal weft in the report gutters */
 .demo-stage,.pp-sec{position:relative;isolation:isolate}
 .demo-stage::before,.pp-sec::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
