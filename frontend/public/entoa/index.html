@@ -93,12 +93,11 @@ html{scroll-padding-top:72px}
 .hero>.wrap{display:flex;flex-direction:column;align-items:center}
 .hero{background:linear-gradient(to bottom,var(--cream) 0%,#eef1e6 50%,#e9eee0 84%,var(--cream) 100%)}
 .hero::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:url("/textures/linen.webp");opacity:.1}
-/* the framed engraving (palms on both sides, open sky behind the headline, the bay below) starts at the very top of the page, so no crown is ever cut; it settles into the ground at the bottom */
-.hero::after{content:"";position:absolute;left:0;right:0;top:-66px;bottom:0;z-index:-2;pointer-events:none;
-  background:url("/landing/hero-mata.webp") center top/cover no-repeat;opacity:.36;mix-blend-mode:multiply;
-  -webkit-mask-image:linear-gradient(to bottom,#000 86%,transparent);mask-image:linear-gradient(to bottom,#000 86%,transparent)}
-@media(max-width:767px){.hero::after{background-position:20% top;opacity:.34}}
-.hero .lead{text-shadow:0 0 14px var(--cream),0 0 4px var(--cream)}
+/* the closing art, sharp but faint, fills the lower hero (palms at both sides, the bay in the middle), with a short fade at the top and the bottom */
+.hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:min(66%,580px);z-index:-2;pointer-events:none;
+  background:url("/landing/footer-mata-alpha.webp") center bottom/cover no-repeat;opacity:.36;
+  -webkit-mask-image:linear-gradient(to bottom,transparent,#000 16%,#000 84%,transparent);mask-image:linear-gradient(to bottom,transparent,#000 16%,#000 84%,transparent)}
+@media(max-width:767px){.hero::after{height:56%;opacity:.36;background-position:80% bottom}}
 /* section textures, varied like threads: vertical warp in the demo gutters, horizontal weft in the report gutters */
 .demo-stage,.pp-sec{position:relative;isolation:isolate}
 .demo-stage::before,.pp-sec::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
