@@ -7,15 +7,15 @@
 /* Height of the fixed mobile nav (top padding + two-line-safe track + bottom safe-area padding). */
 :root { --shl-bottom-nav-h: calc(4.25rem + max(0.5rem, env(safe-area-inset-bottom))); }
 
-/* ---- Sidebar (desktop). Leaf-wash ground in fine linen; the engraving (toucan and palms, the left edge of the landing's
-   closing art) rises from above the settings control, so no control sits on it. Active item: a surface chip. ---- */
+/* ---- Sidebar (desktop). Leaf-wash ground in very fine linen; the engraving (toucan and palms, the left edge of the landing's
+   closing art) rises from the very bottom, faint, because it stays on every screen. Active item: a surface chip. ---- */
 .shl-sidebar { isolation: isolate; background: var(--ds-sidebar); box-shadow: 1px 0 0 var(--ds-sage-200); }
-.shl-sidebar::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: var(--ds-linen); opacity: var(--ds-linen-opacity); filter: var(--ds-linen-filter); }
+.shl-sidebar::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: var(--ds-linen); opacity: calc(var(--ds-linen-opacity) * 0.6); filter: var(--ds-linen-filter); }
 .shl-sidebar::after {
-  content: ""; position: absolute; left: 0; right: 0; bottom: 4.25rem; z-index: -1; height: min(17rem, 34dvh); pointer-events: none;
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; z-index: -1; height: min(24rem, 48dvh); pointer-events: none;
   background: url("/landing/footer-mata-alpha-828.webp") left bottom / auto 100% no-repeat;
-  filter: var(--ds-art-filter); opacity: var(--ds-art-opacity);
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 38%, #000 86%, transparent); mask-image: linear-gradient(to bottom, transparent, #000 38%, #000 86%, transparent);
+  filter: var(--ds-art-filter); opacity: calc(var(--ds-art-opacity) * 0.34);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 55%); mask-image: linear-gradient(to bottom, transparent, #000 55%);
 }
 @media (max-height: 640px) { .shl-sidebar::after { display: none; } }
 
@@ -164,12 +164,15 @@
   padding: clamp(1.25rem, 2.6vw, 2rem);
 }
 .ds-block.shl-home-card { background: var(--ds-sage-50); border-color: var(--ds-sage-200); }
-.shl-home-card::before { content: ""; position: absolute; inset: 0; z-index: -2; pointer-events: none; background: var(--ds-linen); opacity: calc(var(--ds-linen-opacity) * 0.75); filter: var(--ds-linen-filter); }
+.shl-home-card::before { content: ""; position: absolute; inset: 0; z-index: -2; pointer-events: none; background: var(--ds-linen); opacity: calc(var(--ds-linen-opacity) * 0.6); filter: var(--ds-linen-filter); }
 .shl-home-card::after {
-  content: ""; position: absolute; right: 0; bottom: 0; z-index: -1; width: 100%; height: 58%; pointer-events: none;
+  content: ""; position: absolute; right: 0; bottom: 0; z-index: -1; width: 100%; height: 66%; pointer-events: none;
   background: url("/landing/footer-mata-alpha-1400.webp") right bottom / auto 100% no-repeat;
   filter: var(--ds-art-filter); opacity: var(--ds-art-opacity);
-  -webkit-mask-image: linear-gradient(to right, transparent 8%, #000 52%); mask-image: linear-gradient(to right, transparent 8%, #000 52%);
+  /* soft on the left and the top, so the picture melts into the wash instead of ending on a straight line */
+  -webkit-mask-image: linear-gradient(to right, transparent 6%, #000 58%), linear-gradient(to bottom, transparent, #000 42%);
+  mask-image: linear-gradient(to right, transparent 6%, #000 58%), linear-gradient(to bottom, transparent, #000 42%);
+  -webkit-mask-composite: source-in; mask-composite: intersect;
 }
 .shl-home-card > * { min-width: 0; }
 .shl-home-card .ds-hairline-top { border-color: var(--ds-sage-200); }

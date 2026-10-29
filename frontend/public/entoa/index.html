@@ -91,7 +91,21 @@ html{scroll-padding-top:72px}
 /* the first screen is only the pitch: the headline sits in the middle, the facts close the screen, and the art starts below the fold */
 .hero{position:relative;isolation:isolate;display:flex;min-height:calc(100vh - 66px);min-height:calc(100svh - 66px);padding:clamp(24px,4vh,48px) 0 0;text-align:center}
 .hero>.wrap{display:flex;flex-direction:column;align-items:center}
+.hero{background:linear-gradient(to bottom,var(--cream) 0%,#eef1e6 55%,#e5ebdb 100%)}
 .hero::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:url("/textures/linen.webp");opacity:.1}
+/* the closing art, softly out of focus, rises behind the facts: palms at both sides, the bay in the middle */
+.hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:min(52%,440px);z-index:-2;pointer-events:none;
+  background:url("/landing/footer-mata-alpha-1400.webp") center bottom/cover no-repeat;opacity:.26;filter:blur(1.6px) saturate(.9);
+  -webkit-mask-image:linear-gradient(to bottom,transparent,#000 45%);mask-image:linear-gradient(to bottom,transparent,#000 45%)}
+@media(max-width:767px){.hero::after{height:48%;opacity:.28}}
+/* section textures, varied like threads: vertical warp in the demo gutters, horizontal weft in the report gutters */
+.demo-stage,.pp-sec{position:relative;isolation:isolate}
+.demo-stage::before,.pp-sec::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+  -webkit-mask-image:linear-gradient(to right,#000,transparent calc(50% - 600px),transparent calc(50% + 600px),#000),linear-gradient(to bottom,transparent,#000 18%,#000 82%,transparent);
+  mask-image:linear-gradient(to right,#000,transparent calc(50% - 600px),transparent calc(50% + 600px),#000),linear-gradient(to bottom,transparent,#000 18%,#000 82%,transparent);
+  -webkit-mask-composite:source-in;mask-composite:intersect}
+.demo-stage::before{background:repeating-linear-gradient(90deg,rgba(31,107,69,.11) 0 1px,transparent 1px 7px)}
+.pp-sec::before{background:repeating-linear-gradient(0deg,rgba(31,107,69,.1) 0 1px,transparent 1px 7px)}
 .hero-main{margin-block:auto;padding-block:clamp(16px,3vh,32px)}
 .hero h1{font-size:clamp(2.8rem,6vw,5rem);margin:0 auto 1.2rem;max-width:15ch;text-wrap:balance}
 .hero h1 em{font-style:italic;color:var(--green);position:relative}
@@ -346,10 +360,13 @@ main{overflow-x:clip}
 
 .compact{padding:clamp(40px,5vw,72px) 0}
 #problema{position:relative;isolation:isolate;overflow:hidden}
-.prob-tree{position:absolute;right:-72px;top:4px;z-index:-1;width:min(640px,62vw);max-width:none;height:auto;opacity:.27;pointer-events:none;transform:scaleX(-1);
-  -webkit-mask-image:linear-gradient(to left,transparent 4%,#000 34%,#000 70%,transparent),linear-gradient(to bottom,transparent,#000 16%,#000 55%,transparent 92%);mask-image:linear-gradient(to left,transparent 4%,#000 34%,#000 70%,transparent),linear-gradient(to bottom,transparent,#000 16%,#000 55%,transparent 92%);
+/* the palms and the parrot grow from the bottom of the section in the right margin, beside the content, never behind it */
+#problema::after{content:"";position:absolute;right:0;bottom:0;z-index:-1;width:max(0px,calc((100% - 1120px)/2 + 40px));height:92%;pointer-events:none;
+  background:url("/landing/footer-mata-alpha-1400.webp") right bottom/auto 100% no-repeat;opacity:.55;
+  -webkit-mask-image:linear-gradient(to right,transparent,#000 45%),linear-gradient(to bottom,transparent,#000 30%);mask-image:linear-gradient(to right,transparent,#000 45%),linear-gradient(to bottom,transparent,#000 30%);
   -webkit-mask-composite:source-in;mask-composite:intersect}
-@media(max-width:767px){.prob-tree{right:-40px;top:-8px;width:88vw;opacity:.16}}
+#problema .pair-box{position:relative;isolation:isolate}
+#problema .pair-box::after{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;pointer-events:none;background:url("/textures/linen.webp");opacity:.08}
 /* ===== você × nativo ===== */
 .seg{border:0;background:none;font:inherit;color:inherit;padding:0 .1em;margin:0 -.04em;border-radius:.28em;cursor:pointer;transition:background .2s,color .2s,box-shadow .2s}
 /* each card spans two rows of the pair grid (box, caption), so both boxes share one height and both captions start on the same line */
@@ -829,7 +846,6 @@ AWS e observabilidade</div></div>
 
 <!-- PROBLEMA -->
 <section id="problema" class="compact">
-  <img class="prob-tree" src="/landing/footer-mata-alpha-828.webp" srcset="/landing/footer-mata-alpha-828.webp 828w, /landing/footer-mata-alpha-1400.webp 1400w" sizes="(max-width:767px) 88vw, 640px" alt="" aria-hidden="true" width="828" height="276" loading="lazy" decoding="async">
   <div class="wrap">
     <div class="shead">
       <div><p class="kicker">O problema</p><h2 data-fill>Seu conteúdo é bom. O inglês esconde.</h2></div>
