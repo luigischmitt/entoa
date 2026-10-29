@@ -83,7 +83,7 @@ html{scroll-padding-top:72px}
 .brand{display:flex;align-items:center;gap:.6rem;font-weight:600;font-size:.95rem;text-decoration:none;white-space:nowrap}
 .brand img{width:26px}
 @media(hover:hover){.nav-links a:hover{color:var(--ink)}}
-.nav .btn{min-height:40px;padding:0 1.1rem;font-size:.9rem;color:var(--cream);border-radius:999px} /* concentric with the pill bar */
+.nav .btn{min-height:40px;padding:0 1.1rem;font-size:.9rem;color:var(--cream)}
 @media(max-width:860px){.nav-links{display:none}.nav .wrap{grid-template-columns:minmax(0,1fr) auto}.nav .btn{white-space:nowrap}}
 @media(max-width:720px){.nav .wrap{grid-template-columns:minmax(0,1fr) auto;gap:.75rem;padding:10px calc(var(--pad) + .5rem) 0 calc(var(--pad) + 1rem)}.nav.stuck .wrap{padding:0 .5rem 0 1rem}.nav-links{display:none}.brand{font-size:.8rem}.brand img{width:22px}.nav .btn{padding:0 .8rem;font-size:.82rem;white-space:nowrap}}
 
@@ -93,11 +93,12 @@ html{scroll-padding-top:72px}
 .hero>.wrap{display:flex;flex-direction:column;align-items:center}
 .hero{background:linear-gradient(to bottom,var(--cream) 0%,#eef1e6 50%,#e9eee0 84%,var(--cream) 100%)}
 .hero::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:url("/textures/linen.webp");opacity:.1}
-/* the closing art, sharp but faint, fills the lower hero (palms at both sides, the bay in the middle) and settles into the green ground below */
-.hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:min(70%,620px);z-index:-2;pointer-events:none;
-  background:url("/landing/footer-mata-alpha.webp") center bottom/cover no-repeat;opacity:.42;
-  -webkit-mask-image:linear-gradient(to bottom,transparent,#000 8%,#000 88%,transparent);mask-image:linear-gradient(to bottom,transparent,#000 8%,#000 88%,transparent)}
-@media(max-width:767px){.hero::after{height:58%;opacity:.42;background-position:80% bottom}}
+/* the framed engraving (palms on both sides, open sky behind the headline, the bay below) starts at the very top of the page, so no crown is ever cut; it settles into the ground at the bottom */
+.hero::after{content:"";position:absolute;left:0;right:0;top:-66px;bottom:0;z-index:-2;pointer-events:none;
+  background:url("/landing/hero-mata.webp") center top/cover no-repeat;opacity:.36;mix-blend-mode:multiply;
+  -webkit-mask-image:linear-gradient(to bottom,#000 86%,transparent);mask-image:linear-gradient(to bottom,#000 86%,transparent)}
+@media(max-width:767px){.hero::after{background-position:20% top;opacity:.34}}
+.hero .lead{text-shadow:0 0 14px var(--cream),0 0 4px var(--cream)}
 /* section textures, varied like threads: vertical warp in the demo gutters, horizontal weft in the report gutters */
 .demo-stage,.pp-sec{position:relative;isolation:isolate}
 .demo-stage::before,.pp-sec::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;

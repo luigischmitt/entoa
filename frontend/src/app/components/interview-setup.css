@@ -4,18 +4,6 @@
  * tokens in src/app/globals.css (`--ds-*`). Scoped under .isu-root so no other page is affected.
  */
 .isu-root { position: relative; isolation: isolate; color: var(--ds-ink); }
-/* The bay and palms of the landing's closing art fill the empty space to the right of the title (desktop only), fading
-   into the page before the form starts, so no field or summary ever sits on it. */
-@media (min-width: 1024px) {
-  .isu-root::before {
-    content: ""; position: absolute; top: 1.5rem; right: 3rem; z-index: -1; width: min(42%, 30rem); height: 12rem; pointer-events: none;
-    background: url("/landing/footer-mata-alpha.webp") right bottom / auto 100% no-repeat;
-    filter: var(--ds-art-filter) saturate(0.75); opacity: calc(var(--ds-art-opacity) * 0.38);
-    -webkit-mask-image: linear-gradient(to right, transparent, #000 42%, #000 90%, transparent), linear-gradient(to bottom, transparent, #000 18%, #000 68%, transparent);
-    mask-image: linear-gradient(to right, transparent, #000 42%, #000 90%, transparent), linear-gradient(to bottom, transparent, #000 18%, #000 68%, transparent);
-    -webkit-mask-composite: source-in; mask-composite: intersect;
-  }
-}
 
 /* Keep a focused card (and its open combobox popover) above the cards that follow it. */
 .isu-root .ds-card:focus-within { position: relative; z-index: 5; }
