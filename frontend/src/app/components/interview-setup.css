@@ -8,9 +8,9 @@
    into the page before the form starts, so no field or summary ever sits on it. */
 @media (min-width: 1024px) {
   .isu-root::before {
-    content: ""; position: absolute; top: 0.5rem; right: 3rem; z-index: -1; width: min(50%, 36rem); height: 15.5rem; pointer-events: none;
-    background: url("/landing/footer-mata-alpha-1400.webp") right bottom / auto 100% no-repeat;
-    filter: var(--ds-art-filter); opacity: var(--ds-art-opacity);
+    content: ""; position: absolute; top: 1.5rem; right: 3rem; z-index: -1; width: min(42%, 30rem); height: 12rem; pointer-events: none;
+    background: url("/landing/footer-mata-alpha.webp") right bottom / auto 100% no-repeat;
+    filter: var(--ds-art-filter) saturate(0.75); opacity: calc(var(--ds-art-opacity) * 0.38);
     -webkit-mask-image: linear-gradient(to right, transparent, #000 42%, #000 90%, transparent), linear-gradient(to bottom, transparent, #000 18%, #000 68%, transparent);
     mask-image: linear-gradient(to right, transparent, #000 42%, #000 90%, transparent), linear-gradient(to bottom, transparent, #000 18%, #000 68%, transparent);
     -webkit-mask-composite: source-in; mask-composite: intersect;
