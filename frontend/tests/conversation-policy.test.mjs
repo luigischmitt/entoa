@@ -124,3 +124,7 @@ test("a failed turn for a meaning question asks the person to repeat the word, n
   assert.deepEqual(fallbackConversationTurn({ plan, usedPathIds: [], phase: "explore", transcript: "What does cheers mean?" }), { say: "Sorry, I missed that word. Can you say it one more time?", move: "FOLLOW", pathId: null });
   assert.deepEqual(fallbackConversationTurn({ plan, usedPathIds: [], phase: "explore", transcript: "Yes, on Sunday." }), { say: plan.paths[0].line, move: "NEW_PATH", pathId: "p1" });
 });
+
+test("meaning questions without the auxiliary verb are recognized", () => {
+  for (const text of ["what cheers mean", "what means cheers", "What cheers means?"]) assert.equal(isMeaningQuestion(text), true);
+});

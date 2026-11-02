@@ -376,3 +376,10 @@ describe("POST /api/v1/thinking/conversation-plan", () => {
     expect(plan).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("meaning questions as people say them under pressure", () => {
+  it("recognizes them without the auxiliary verb", () => {
+    for (const text of ["what cheers mean", "what means cheers", "What cheers means?", "what the word cheers mean"]) expect(isMeaningQuestion(text)).toBe(true);
+    expect(isMeaningQuestion("what you mean by that is great")).toBe(false);
+  });
+});

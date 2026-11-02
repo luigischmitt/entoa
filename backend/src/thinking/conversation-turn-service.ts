@@ -57,6 +57,9 @@ const meaningMaxWords = 8;
 /** Keep in sync with isMeaningQuestion in frontend/src/lib/interview/conversation-policy.mjs (same patterns, same tests). */
 const meaningPatterns = [
   /^what does (.+) mean$/u,
+  /^what (.+) means?$/u,
+  /^what means (.+)$/u,
+  /^what (?:is|does) the word (.+?)(?: mean)?$/u,
   /^what do you mean(?: by)? (.+)$/u,
   /^what(?:'s| is) the meaning of (.+)$/u,
   /^what(?:'s| is) (.+)$/u,

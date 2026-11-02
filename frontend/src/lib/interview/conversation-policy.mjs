@@ -64,6 +64,9 @@ const MEANING_MAX_WORDS = 8;
 // Keep in sync with isMeaningQuestion in backend/src/thinking/conversation-turn-service.ts (same patterns, same tests).
 const MEANING_PATTERNS = [
   /^what does (.+) mean$/u,
+  /^what (.+) means?$/u,
+  /^what means (.+)$/u,
+  /^what (?:is|does) the word (.+?)(?: mean)?$/u,
   /^what do you mean(?: by)? (.+)$/u,
   /^what(?:'s| is) the meaning of (.+)$/u,
   /^what(?:'s| is) (.+)$/u,
