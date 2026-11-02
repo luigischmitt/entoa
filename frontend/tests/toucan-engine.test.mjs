@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  analyseSamples, beakTargetAt, clamp, createClockInterpolator, createToucanEngine, genericBeakTarget, JAW, JawModel, mouthWedgePath,
+  analyseSamples, beakTargetAt, clamp, createClockInterpolator, createToucanEngine, genericBeakTarget, HeadPoser, JAW, JawModel, mouthWedgePath,
   NodScheduler, PhraseListener, sat, Spring, toucanStateFor, valueNoise,
 } from "../src/components/interview/toucan/toucan-engine.mjs";
 
@@ -92,20 +92,46 @@ test("nod scheduler: down 260 ms then up 360 ms for a single nod; double nod is 
   const n = new NodScheduler();
   n.add(10, "single");
   assert.equal(n.rotation(9.9), 0);
-  assert.ok(Math.abs(n.rotation(10.26) - 4.6) < 1e-6, "peak after 260 ms");
-  assert.ok(n.rotation(10.13) > 0 && n.rotation(10.13) < 4.6);
+  assert.ok(Math.abs(n.rotation(10.26) - 7) < 1e-6, "peak after 260 ms");
+  assert.ok(n.rotation(10.13) > 0 && n.rotation(10.13) < 7);
   assert.ok(Math.abs(n.rotation(10.62)) < 0.3, "back up after 260 + 360 ms");
-  assert.ok(n.rotation(10.4) > 0.5 && n.rotation(10.4) < 4.6, "returning");
+  assert.ok(n.rotation(10.4) > 0.5 && n.rotation(10.4) < 7, "returning");
   assert.equal(n.count, 1);
   const d = new NodScheduler();
   d.add(0, "double");
-  assert.ok(Math.abs(d.rotation(0.22) - 4.0) < 1e-6);
+  assert.ok(Math.abs(d.rotation(0.22) - 6) < 1e-6);
   assert.ok(d.rotation(0.55) < 0.1, "head is back between the two nods");
-  assert.ok(Math.abs(d.rotation(0.6 + 0.2) - 2.6) < 1e-6);
+  assert.ok(Math.abs(d.rotation(0.6 + 0.2) - 4) < 1e-6);
   let max = 0;
   for (let t = 0; t < 2; t += 0.01) max = Math.max(max, Math.abs(d.rotation(t)));
-  assert.ok(max <= 4.0 + 1e-6, "a nod never exceeds a few degrees");
+  assert.ok(max <= 6 + 1e-6, "a nod never exceeds a few degrees");
   assert.equal(d.rotation(5), 0);
+});
+
+test("head poser: holds one pose between changes, anticipates each change, zeros when reduced, stays in each state's range", () => {
+  const RANGE = { idle: { r: [-5, 5], x: [-3, 3], y: [-1.5, 1.5] }, listening: { r: [-3, 4], x: [0, 2.5], y: [-1, 1] }, speaking: { r: [-3.5, 3.5], x: [-2, 2], y: [-1.2, 1.2] }, thinking: { r: [-2, 2], x: [-1, 1], y: [-1, 0] } };
+  for (const state of Object.keys(RANGE)) {
+    const p = new HeadPoser(seeded(4));
+    const runs = [];
+    let last = null;
+    for (let i = 0; i < 60 * 40; i += 1) {
+      const q = p.update(i / 60, state, false);
+      const key = `${q.r} ${q.x} ${q.y}`;
+      if (last && last.key === key) last.frames += 1;
+      else { last = { key, frames: 1, pose: q }; runs.push(last); }
+    }
+    // Runs longer than the 0.07 s anticipation are holds: constant between changes, inside the state's range.
+    const holds = runs.filter((r) => r.frames > 5);
+    assert.ok(holds.length > 5, `${state}: changes happen (${holds.length})`);
+    for (const h of holds) {
+      const secs = h.frames / 60;
+      // The anticipation (about 0.07 s) is part of the hold, so a speaking hold of 0.8 s leaves about 0.73 s of rest pose.
+      assert.ok(secs >= (state === "speaking" ? 0.72 : 0.8), `${state}: holds ${secs.toFixed(2)} s`);
+      for (const k of ["r", "x", "y"]) assert.ok(h.pose[k] >= RANGE[state][k][0] - 1e-9 && h.pose[k] <= RANGE[state][k][1] + 1e-9, `${state} ${k} ${h.pose[k]}`);
+    }
+  }
+  const still = new HeadPoser(seeded(9));
+  for (let i = 0; i < 600; i += 1) assert.deepEqual(still.update(i / 60, "idle", true), { r: 0, x: 0, y: 0 });
 });
 
 test("phrase listener nods only after a phrase of 1.6 s or more ends, 350 ms after the voice drops, and only while listening", () => {
@@ -244,5 +270,34 @@ test("engine: breathing is irregular and state changes blend smoothly (no pose s
   assert.ok(peaks.length >= 4, `breaths ${peaks.length}`);
   const gaps = peaks.slice(1).map((p, i) => p - peaks[i]);
   assert.ok(Math.max(...gaps) - Math.min(...gaps) > 0.2, "breath intervals vary");
-  assert.ok(maxStep < 0.6, `head rotation changes smoothly (${maxStep})`);
+  assert.ok(maxStep < 0.7, `head rotation changes smoothly (${maxStep})`);
+});
+
+test("engine: thinking turns the head at least 4.5 degrees (the limiter no longer crushes it to 2.5)", () => {
+  const root = fakeRoot();
+  const engine = createToucanEngine({ root, rng: seeded(13) });
+  engine.setState("thinking", 0);
+  let maxRot = 0;
+  for (let i = 0; i < 60 * 4; i += 1) {
+    engine.frame(i / 60);
+    maxRot = Math.max(maxRot, Math.abs(Number(/rotate\((-?[\d.]+)/.exec(root.nodes.get("head").attrs.transform)[1])));
+  }
+  assert.ok(maxRot >= 4.5, `thinking head rotation ${maxRot}`);
+});
+
+test("engine: lower lid and glint write finite transforms; the upper lid stays within its travel", () => {
+  const root = fakeRoot();
+  const engine = createToucanEngine({ root, rng: seeded(17) });
+  engine.setState("listening", 0);
+  for (let i = 0; i < 300; i += 1) {
+    engine.frame(i / 60);
+    const lowlid = root.nodes.get("lowlid").attrs.transform;
+    const glint = root.nodes.get("glint").attrs.transform;
+    const lowY = Number(/translate\(0 (-?[\d.]+)\)/.exec(lowlid)[1]);
+    const [gx, gy] = /translate\((-?[\d.]+) (-?[\d.]+)\)/.exec(glint).slice(1).map(Number);
+    const lid = Number(/translate\(0 (-?[\d.]+)\)/.exec(root.nodes.get("lid").attrs.transform)[1]);
+    assert.ok(Number.isFinite(lowY), `lowlid ${lowlid}`);
+    assert.ok(Number.isFinite(gx) && Number.isFinite(gy), `glint ${glint}`);
+    assert.ok(lid >= -11 - 1e-9 && lid <= 11 + 1e-9, `lid travel ${lid}`);
+  }
 });

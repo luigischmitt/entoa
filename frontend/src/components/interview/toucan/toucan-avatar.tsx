@@ -103,7 +103,7 @@ export function ToucanAvatar({ state, speechFeed = null, candidateLevelRef, clas
         <defs>
           <radialGradient id={id("wall")} cx=".5" cy=".42" r=".75"><stop offset="0" style={{ stopColor: "var(--tc-wall-a)" }} /><stop offset="1" style={{ stopColor: "var(--tc-wall-b)" }} /></radialGradient>
           <radialGradient id={id("floor")} cx=".5" cy=".5" r=".5"><stop offset="0" style={{ stopColor: "var(--tc-floor)" }} /><stop offset="1" style={{ stopColor: "var(--tc-floor)", stopOpacity: 0 }} /></radialGradient>
-          <clipPath id={id("eye")}><circle r="7" /></clipPath>
+          <clipPath id={id("eye")}><circle r="9.8" /></clipPath>
           <clipPath id={id("up")}><path d="M211,52 C248,29 332,33 372,88 C330,80 272,86 219,92 C207,86 203,66 211,52Z" /></clipPath>
         </defs>
         <rect x="-400" y="-300" width="1200" height="900" fill={`url(#${id("wall")})`} />
@@ -130,14 +130,16 @@ export function ToucanAvatar({ state, speechFeed = null, candidateLevelRef, clas
             <circle cx="178" cy="78" r="40" fill="var(--tc-body)" />
             <path d="M186,40.5 C198,43 207,48 210,55 C214,66 221,82 222,96 C219,103 206,106 190,106 C176,100 174,70 186,40.5Z" fill="var(--tc-body)" />
             <path data-tc="bib" d={REST_BIB_PATH} fill="var(--tc-bib)" />
-            <g transform="translate(190 66)">
-              <circle r="11.5" fill="var(--tc-ring)" stroke="var(--tc-ringedge)" strokeWidth="1.5" />
+            <g transform="translate(186 70)">
+              <circle r="14.5" fill="var(--tc-ring)" stroke="var(--tc-ringedge)" strokeWidth="1.5" />
               <g clipPath={`url(#${id("eye")})`}>
-                <circle r="7" fill="var(--tc-iris)" />
-                <g data-tc="pup"><circle r="3.6" fill="#050706" /><circle cx="-1.6" cy="-1.8" r="1.4" fill="#fff" /></g>
-                <g data-tc="lid"><rect x="-9" y="-24" width="18" height="24" fill="var(--tc-ring)" /><line x1="-9" y1="0" x2="9" y2="0" stroke="var(--tc-ringedge)" strokeWidth="1.6" /></g>
+                <circle r="9.8" fill="var(--tc-iris)" />
+                <g data-tc="pup"><circle r="6" fill="#050706" /></g>
+                <g data-tc="glint"><circle cx="-3" cy="-3.4" r="2.5" fill="#fff" /><circle cx="3" cy="3" r="1.1" fill="#fff" opacity=".75" /></g>
+                <g data-tc="lid"><path d="M-13,-30 H13 V-1.5 Q0,3 -13,-1.5 Z" fill="var(--tc-ring)" /><path d="M-13,-1.5 Q0,3 13,-1.5" fill="none" stroke="var(--tc-ringedge)" strokeWidth="1.8" strokeLinecap="round" /></g>
+                <g data-tc="lowlid"><path d="M-13,30 H13 V4 Q0,0 -13,4 Z" fill="var(--tc-ring)" /></g>
               </g>
-              <path data-tc="lash" d="M-5,1 Q0,5 5,1" fill="none" stroke="var(--tc-ringedge)" strokeWidth="1.8" strokeLinecap="round" opacity="0" />
+              <path data-tc="lash" d="M-7,1.5 Q0,6.5 7,1.5" fill="none" stroke="var(--tc-ringedge)" strokeWidth="2" strokeLinecap="round" opacity="0" />
             </g>
             <g data-tc="beak">
               <path data-tc="wedge" d="" className="toucan-wedge" />

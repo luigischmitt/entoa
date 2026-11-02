@@ -50,6 +50,10 @@ export function genericBeakTarget(t: number): number;
 export class JawModel { mouth: number; level: number; step(dt: number, target: number, chatter?: number): number }
 export const NOD: { single: { A: number; dn: number; up: number }; double: { A: number; dn: number; up: number; at: number }[] };
 export class NodScheduler { count: number; add(t0: number, kind: "single" | "double"): void; rotation(t: number): number }
+export class HeadPoser {
+  constructor(rng?: () => number);
+  update(t: number, state: ToucanState, reduced: boolean): { r: number; x: number; y: number };
+}
 export class PhraseListener {
   constructor(rng?: () => number);
   update(t: number, level: number, listening: boolean): { kind: "single" | "double" | "tilt"; at: number; a?: number } | null;
