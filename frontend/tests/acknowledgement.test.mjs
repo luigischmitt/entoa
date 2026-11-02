@@ -22,7 +22,7 @@ test("the acknowledgement rotates through the phrases without repeating the last
 
 test("the acknowledgement skips families the interviewer used in a recent bridge and phrases with no audio", () => {
   const hmmLetMeThink = "Hmm, let me think.";
-  const mmHmGotIt = "Mm-hm... okay, got it.";
+  const mmHmGotIt = "Mm-hm, okay, got it.";
   const okayLetMeSee = "Okay, let me see.";
   assert.equal(pickAcknowledgement({ lastPhrase: hmmLetMeThink, recent: ["Okay, thanks for that."] }), mmHmGotIt, "okay is recent: the okay phrase is skipped");
   assert.equal(pickAcknowledgement({ recent: ["Hmm, so."] }), mmHmGotIt, "every hmm phrase is skipped");

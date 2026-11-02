@@ -7,9 +7,9 @@ import { errorNameOf } from "./client-environment.mjs";
 import { applyPlaybackRate, createRateDeadline, fetchSpeechBlob, followPlaybackRate } from "./speech-playback.mjs";
 
 /** The ones that fit right before a goodbye: no "let's see" or "let's go". */
-export const CLOSING_ACKNOWLEDGEMENTS = ["Mm-hm... okay, got it.", "Hmm... right, I see."];
+export const CLOSING_ACKNOWLEDGEMENTS = ["Mm-hm, okay, got it.", "Hmm, right, I see."];
 
-export const ACKNOWLEDGEMENT_PHRASES = ["Hmm... hmm... okay, let's see.", "Hmm, let me think.", "Mm-hm... okay, got it.", "Hmm... right, I see.", "Okay, let me see.", "Hmm... alright, let's go."];
+export const ACKNOWLEDGEMENT_PHRASES = ["Hmm, hmm, okay, let's see.", "Hmm, let me think.", "Mm-hm, okay, got it.", "Hmm, right, I see.", "Okay, let me see.", "Hmm, alright, let's go."];
 
 /** A natural beat between the end of the answer and the acknowledgement, and between the acknowledgement and the question. */
 export const ACKNOWLEDGEMENT_LEAD_MS = 450;

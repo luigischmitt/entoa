@@ -232,7 +232,7 @@ describe("server chunking is identical to the client's", () => {
     expect(composeInterviewClosing("So you traced it to the cache TTL.", INTERVIEW_CLOSINGS[2])).toBe(client.composeInterviewClosing("So you traced it to the cache TTL.", INTERVIEW_CLOSINGS[2]));
     expect(composeInterviewClosing()).toBe(client.composeInterviewClosing());
     expect([...ACKNOWLEDGEMENT_PHRASES]).toEqual([...clientAck.ACKNOWLEDGEMENT_PHRASES]);
-    expect([...ACKNOWLEDGEMENT_PHRASES]).toEqual(["Hmm... hmm... okay, let's see.", "Hmm, let me think.", "Mm-hm... okay, got it.", "Hmm... right, I see.", "Okay, let me see.", "Hmm... alright, let's go."]);
+    expect([...ACKNOWLEDGEMENT_PHRASES]).toEqual(["Hmm, hmm, okay, let's see.", "Hmm, let me think.", "Mm-hm, okay, got it.", "Hmm, right, I see.", "Okay, let me see.", "Hmm, alright, let's go."]);
   });
 });
 

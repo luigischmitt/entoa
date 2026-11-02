@@ -6,13 +6,13 @@ import { CONVERSATION_REACTIONS, loadStaticReaction, reactionAudioPath, reaction
 import { DEFAULT_INTERVIEWER_VOICE, INTERVIEWER_VOICE_OPTIONS } from "../src/lib/interview/voices.mjs";
 
 test("reaction file names are lowercase, dash-separated and mp3", () => {
-  assert.equal(reactionFileName("Mm-hm... okay, got it."), "mm-hm-okay-got-it.mp3");
+  assert.equal(reactionFileName("Mm-hm, okay, got it."), "mm-hm-okay-got-it.mp3");
   assert.equal(reactionFileName("  Oh, really?  "), "oh-really.mp3");
 });
 
 test("ellipses and punctuation runs give valid, unique reaction file names", () => {
-  assert.equal(reactionFileName("Hmm... hmm... okay, let's see."), "hmm-hmm-okay-let-s-see.mp3");
-  assert.equal(reactionFileName("Hmm... alright, let's go."), "hmm-alright-let-s-go.mp3");
+  assert.equal(reactionFileName("Hmm, hmm, okay, let's see."), "hmm-hmm-okay-let-s-see.mp3");
+  assert.equal(reactionFileName("Hmm, alright, let's go."), "hmm-alright-let-s-go.mp3");
   const phrases = [...new Set([...ACKNOWLEDGEMENT_PHRASES, ...CONVERSATION_REACTIONS])];
   const names = phrases.map((phrase) => reactionFileName(phrase));
   for (const name of names) assert.match(name, /^[a-z0-9]+(?:-[a-z0-9]+)*\.mp3$/u, name);

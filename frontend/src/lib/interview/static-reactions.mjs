@@ -4,7 +4,7 @@
 
 import { resolveInterviewerVoice } from "./voices.mjs";
 
-export const CONVERSATION_REACTIONS = ["Oh, really?", "Hm, interesting.", "Oh, I see.", "Hmm... hmm... okay, let's see.", "Hmm, let me think.", "Mm-hm... okay, got it.", "Hmm... right, I see.", "Okay, let me see.", "Hmm... alright, let's go."];
+export const CONVERSATION_REACTIONS = ["Oh, really?", "Hm, interesting.", "Oh, I see.", "Hmm, hmm, okay, let's see.", "Hmm, let me think.", "Mm-hm, okay, got it.", "Hmm, right, I see.", "Okay, let me see.", "Hmm, alright, let's go."];
 
 /** "Mm-hm, okay." -> "mm-hm-okay.mp3": lowercase, every other run of characters becomes "-", no leading or trailing "-". */
 export function reactionFileName(phrase) {
