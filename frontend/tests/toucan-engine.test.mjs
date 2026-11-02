@@ -308,6 +308,26 @@ test("engine: thinking turns the head at least 4.5 degrees (the limiter no longe
   assert.ok(maxRot >= 4.5, `thinking head rotation ${maxRot}`);
 });
 
+test("engine: crest, wing, feet and tail tip write finite transforms over 10 s; reduced motion keeps the crest still", () => {
+  const root = fakeRoot();
+  const engine = createToucanEngine({ root, rng: seeded(23) });
+  engine.setState("idle", 0);
+  for (let i = 0; i < 60 * 10; i += 1) engine.frame(i / 60);
+  for (const name of ["tuft0", "wing", "footL", "tailtip"]) {
+    const nums = root.nodes.get(name).attrs.transform.match(/-?[\d.]+/g).map(Number);
+    assert.ok(nums.length > 0 && nums.every(Number.isFinite), `${name} ${root.nodes.get(name).attrs.transform}`);
+  }
+  const stillRoot = fakeRoot();
+  const still = createToucanEngine({ root: stillRoot, rng: seeded(23), reducedMotion: () => true });
+  still.setState("idle", 0);
+  let maxCrest = 0;
+  for (let i = 0; i < 60 * 10; i += 1) {
+    still.frame(i / 60);
+    maxCrest = Math.max(maxCrest, Math.abs(Number(/rotate\((-?[\d.]+)/.exec(stillRoot.nodes.get("tuft0").attrs.transform)[1])));
+  }
+  assert.ok(maxCrest < 0.05, `reduced motion: crest rotation ${maxCrest}`);
+});
+
 test("engine: lower lid and glint write finite transforms; the upper lid stays within its travel", () => {
   const root = fakeRoot();
   const engine = createToucanEngine({ root, rng: seeded(17) });

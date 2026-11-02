@@ -112,21 +112,28 @@ export function ToucanAvatar({ state, speechFeed = null, candidateLevelRef, clas
           <path d="M30 268 C96 250 170 248 266 238" fill="none" stroke="var(--tc-branch)" strokeWidth="9" strokeLinecap="round" />
           <path d="M232 241 C246 228 252 218 250 206" fill="none" stroke="var(--tc-branch)" strokeWidth="5" strokeLinecap="round" />
           <g fill="none" stroke="var(--tc-feet)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M152,228 L152,240 M152,240 C150,247 144,250 139,248 M152,240 C155,247 161,250 166,247 M152,240 L152,251" />
-            <path d="M180,224 L180,238 M180,238 C178,246 172,249 167,247 M180,238 C183,246 189,249 194,246 M180,238 L180,250" />
+            <path data-tc="footL" d="M152,228 L152,240 M152,240 C150,247 144,250 139,248 M152,240 C155,247 161,250 166,247 M152,240 L152,251" />
+            <path data-tc="footR" d="M180,224 L180,238 M180,238 C178,246 172,249 167,247 M180,238 C183,246 189,249 194,246 M180,238 L180,250" />
           </g>
           <g data-tc="tail">
             <path d="M106,200 C106,236 103,262 99,284 Q112,294 126,284 C136,264 146,246 154,222Z" fill="var(--tc-body)" />
+            <g data-tc="tailtip">
             <path d="M100,272 Q113,280 125,272 L126,279 Q113,288 99,280Z" fill="var(--tc-wingline)" opacity=".92" />
+            </g>
           </g>
           <g data-tc="body">
             <path d="M118,112 C100,150 98,190 108,214 L152,234 L180,228 C206,214 226,186 226,152 C226,134 222,118 208.6,103.7Z" fill="var(--tc-body)" />
+            <g data-tc="wing">
             <path d="M104,170 C106,150 128,142 146,152 C160,162 166,184 164,198 C162,222 150,238 138,250 C120,228 106,200 104,170Z" fill="var(--tc-wing)" />
             <path d="M112,188 C128,184 148,194 154,216 C150,232 144,242 138,250 C124,232 114,210 112,188Z" fill="var(--tc-wing2)" />
             <path d="M114,188 C120,210 128,232 138,250 L134,250 C124,232 116,212 111,192Z" fill="var(--tc-wingline)" />
+            </g>
           </g>
           <path data-tc="skin" d={REST_SKIN_PATH} fill="var(--tc-body)" />
           <g data-tc="head">
+            <path data-tc="tuft0" d="M148,52 C141,47 136,46 131,48 C133,52 137,57 144,60Z" fill="var(--tc-body)" strokeLinejoin="round" stroke="var(--tc-body)" strokeWidth="2.5" />
+            <path data-tc="tuft1" d="M154,46 C149,38 143,35 137,36 C138,42 143,49 149,53Z" fill="var(--tc-body)" strokeLinejoin="round" stroke="var(--tc-body)" strokeWidth="2.5" />
+            <path data-tc="tuft2" d="M162,42 C159,34 154,30 148,30 C148,36 151,42 156,46Z" fill="var(--tc-body)" strokeLinejoin="round" stroke="var(--tc-body)" strokeWidth="2.5" />
             <circle cx="178" cy="78" r="40" fill="var(--tc-body)" />
             <path d="M186,40.5 C198,43 207,48 210,55 C214,66 221,82 222,96 C219,103 206,106 190,106 C176,100 174,70 186,40.5Z" fill="var(--tc-body)" />
             <path data-tc="bib" d={REST_BIB_PATH} fill="var(--tc-bib)" />
