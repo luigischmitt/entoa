@@ -186,7 +186,7 @@ export class NodScheduler {
 const POSE = {
   idle: { hold: [1.1, 3.2], r: [-5, 5], x: [-3, 3], y: [-1.5, 1.5] },
   listening: { hold: [1.6, 3.8], r: [-3, 4], x: [0, 2.5], y: [-1, 1] },
-  speaking: { hold: [0.8, 2.0], r: [-3.5, 3.5], x: [-2, 2], y: [-1.2, 1.2] },
+  speaking: { hold: [0.8, 2.0], r: [-4.5, 1.2], x: [-2, 2], y: [-1.4, 0.4] },
   thinking: { hold: [1.8, 3.4], r: [-2, 2], x: [-1, 1], y: [-1, 0] },
 };
 /** Holds the current pose until its change time, then picks the next one for the current state; zeros when reduced. */
@@ -375,7 +375,8 @@ function bibPath({ H, B }, p) {
     const w = w0 * w0 * (3 - 2 * w0);
     const a = H(q[0], q[1]); const b = B(q[0], q[1]);
     const m = [a[0] * (1 - w) + b[0] * w, a[1] * (1 - w) + b[1] * w];
-    return rot(m[0] - p.hX, m[1] - p.hY, -p.headRot, 165, 150);
+    const u = rot(m[0] - p.hX, m[1] - p.hY, -p.headRot, 165, 150);
+    return [178 + (u[0] - 178) / p.sqx, 78 + (u[1] - 78) / p.sqy];
   });
   const P = (i) => `${f2(pts[i][0])} ${f2(pts[i][1])}`;
   return `M${P(0)}C${P(1)} ${P(2)} ${P(3)}C${P(4)} ${P(5)} ${P(6)}C${P(7)} ${P(8)} ${P(9)}C${P(10)} ${P(11)} ${P(12)}C${P(13)} ${P(14)} ${P(15)}Z`;
@@ -398,7 +399,7 @@ export function mouthWedgePath(mouth) {
   return `M${P(top[0])}${cv(top)}Q${P([s[0] + 24, s[1]])} ${P(tip)}Q${P([Rs[0] + 24, Rs[1]])} ${P(Rs)}${rv(bot)}Z`;
 }
 
-const REST = { headRot: 0, hX: 0, hY: 0, nT: 0, nX: 0, nY: 0, bT: 0, bX: 0, sx: 1, sy: 1 };
+const REST = { headRot: 0, hX: 0, hY: 0, nT: 0, nX: 0, nY: 0, bT: 0, bX: 0, sx: 1, sy: 1, sqx: 1, sqy: 1 };
 /** Paths for the first (server) render, before the engine runs. */
 export const REST_SKIN_PATH = skinPath(transforms(REST));
 export const REST_BIB_PATH = BIB_PATH_REST;
@@ -525,7 +526,7 @@ export function createToucanEngine({ root, rng = Math.random, reducedMotion = ()
     // Head toss while idle: the head rises and settles over 0.9 s, the tail bobs (see pose()).
     if (shown === "idle" && t > nextToss) { tossAt = t; warmUntil = t + 0.9; S.tl.v += 40 * M(); nextToss = t + rnd(14, 28); }
     // Wing shuffle (not while speaking) and a small weight shift from one foot to the other while idle or listening.
-    if (shown !== "speaking" && t > nextShuffle) { S.wing.v += rnd(16, 30) * (rng() < 0.5 ? -1 : 1) * M(); nextShuffle = t + rnd(7, 16); }
+    if (shown !== "speaking" && t > nextShuffle) { S.wing.v += rnd(10, 18) * (rng() < 0.5 ? -1 : 1) * M(); nextShuffle = t + rnd(7, 16); }
     if ((shown === "idle" || shown === "listening") && t > nextStep) { stepAt = t; stepFoot = rng() < 0.5 ? 0 : 1; S.bX.v += (stepFoot ? 6 : -6) * M(); nextStep = t + rnd(9, 20); }
   }
 
@@ -594,10 +595,10 @@ export function createToucanEngine({ root, rng = Math.random, reducedMotion = ()
     const m = M();
     let tilt = 0; let hx = 0; let hy = 0; let turn = 0; let lid = 0; let lookBaseX = 0; let lookBaseY = 0;
     switch (shown) {
-      case "idle": tilt = idleTilt; lid = 0.1; break;
-      case "listening": tilt = idleTilt * 0.5 + 1; hx = 0.8; lid = 0.08; lookBaseY = 0.04; break;
+      case "idle": tilt = idleTilt; lid = 0; break;
+      case "listening": tilt = idleTilt * 0.5 + 1; hx = 0.8; lid = 0; lookBaseY = 0.04; break;
       case "thinking": tilt = -6; hx = -3; turn = 1; lid = 0.22; lookBaseX = -0.8; lookBaseY = -0.8; break;
-      case "speaking": tilt = 0; hy = 0; lid = 0.12; break;
+      case "speaking": tilt = -1.5; hy = -0.5; lid = 0; break;
       default: break;
     }
     const gx = lookHold || shown === "thinking" ? look.x : 0;
@@ -614,7 +615,7 @@ export function createToucanEngine({ root, rng = Math.random, reducedMotion = ()
     const spk = shown === "speaking";
     S.tilt.w = S.hx.w = S.hy.w = spk ? 5.2 : 6.5; S.nT.w = S.nX.w = S.nY.w = spk ? 3.4 : 4.5; S.bT.w = S.bX.w = spk ? 2.6 : 3.4;
     S.nT.t = HP.r * 0.8; S.nX.t = HP.x * 0.8; S.nY.t = HP.y * 0.8; // the neck follows the head's total motion, one frame behind
-    S.bT.t = S.nT.x * 0.5; S.bX.t = S.nX.x * 0.55;
+    S.bT.t = S.nT.x * (spk ? 0.28 : 0.5); S.bX.t = S.nX.x * (spk ? 0.3 : 0.55);
     const pz = poser.update(t, shown, reducedMotion());
     S.poseR.t = pz.r; S.poseX.t = pz.x; S.poseY.t = pz.y;
     S.tl.t = (-S.bT.x * 2 + noise(t, 5) * 1.8) * m;
@@ -646,9 +647,9 @@ export function createToucanEngine({ root, rng = Math.random, reducedMotion = ()
     const na = (0.8 + 0.7 * (1 - ws)) * m * (1 - 0.35 * wt);
     // Everything that moves the head is summed, then smoothly saturated, so noise, gaze, phrase turns and emphasis never stack into a big excursion.
     const tu = t - tossAt; const tossV = tu >= 0 && tu < 0.9 ? Math.sin((tu / 0.9) * Math.PI) : 0;
-    const rawR = S.tilt.x + S.sway.x * 2.4 - S.att.x * 0.5 + micro.rotation(t) * 0.4 * m + noise(t, 2) * 0.35 * na - PHR.x * 1.3 * m + S.beat.x * 1.1 * emphSign * m + S.ql.x * -2.2 * m + S.glance.x * 0.7 * m + (PHR2.x - 0.25) * -2.2 * m + S.poseR.x - 5 * tossV * m;
+    const rawR = S.tilt.x + S.sway.x * 2.4 - S.att.x * 0.5 + micro.rotation(t) * 0.4 * m + noise(t, 2) * 0.35 * na - PHR.x * 1.3 * m + S.beat.x * 0.7 * emphSign * m + S.ql.x * -2.2 * m + S.glance.x * 0.7 * m + (PHR2.x - 0.25) * -2.2 * m + S.poseR.x - 5 * tossV * m;
     const rawX = S.hx.x + S.lean.x * 1.8 + noise(t, 3) * 0.4 * na + S.glance.x * 1.4 * m + S.poseX.x;
-    const rawY = S.hy.x + noise(t, 4) * 0.3 * na + PHR.x * 1.1 * m + PHR2.x * 0.7 * m - S.ql.x * 1.2 * m + S.beat.x * 1.6 * m - brk * 1.0 * m - S.att.x * 0.4 + S.poseY.x - 4 * tossV * m;
+    const rawY = S.hy.x + noise(t, 4) * 0.3 * na + PHR.x * 0.35 * m + PHR2.x * 0.2 * m - S.ql.x * 1.2 * m + S.beat.x * 0.7 * m - brk * 1.0 * m - S.att.x * 0.4 + S.poseY.x - 4 * tossV * m;
     let headRot = sat(rawR, LIM.r);
     const hX = sat(rawX, LIM.x);
     const hY = sat(rawY, LIM.y);
@@ -663,16 +664,16 @@ export function createToucanEngine({ root, rng = Math.random, reducedMotion = ()
     S.tf2.t = clamp(-vR * 1.5 + vY * 0.8, -22, 22) * m;
     S.tip.t = -S.tl.x * 1.1 * m;
     S.wing.t = (-S.bT.x * 1.5 + brk * 0.8) * m;
-    S.sq.t = clamp(-vY * 0.004, -0.03, 0.03) * m;
+    S.sq.t = clamp(-vY * 0.004, -0.02, 0.02) * m;
+    const sqy = 1 + S.sq.x; const sqx = 1 - S.sq.x * 0.6;
     const p = {
-      headRot, hX, hY,
+      headRot, hX, hY, sqx, sqy,
       nT: S.nT.x + nodR * 0.15, nX: S.nX.x, nY: S.nY.x,
-      bT: sat(S.bT.x + S.lean.x * 0.5, LIM.bt) + nodR * 0.05, bX: sat(S.bX.x + S.lean.x * 0.4 + noise(t * 0.4, 41) * 0.35 * m, LIM.bx),
+      bT: sat(S.bT.x + S.lean.x * 0.5 - ws * 0.6 * m, LIM.bt) + nodR * 0.05, bX: sat(S.bX.x + S.lean.x * 0.4 + noise(t * 0.4, 41) * 0.35 * m, LIM.bx),
       sx: 1 + brk * 0.02 * m, sy: 1 + brk * 0.018 * m,
     };
     const tl = S.tl.x;
     const tf = transforms(p);
-    const sqy = 1 + S.sq.x; const sqx = 1 - S.sq.x * 0.6;
     attr(el.head, "transform", `translate(${f2(hX)} ${f2(hY)}) rotate(${f2(headRot)} 165 150) translate(178 78) scale(${sqx.toFixed(4)} ${sqy.toFixed(4)}) translate(-178 -78)`);
     attr(el.tuft0, "transform", `rotate(${f2(S.tf0.x)} 150 52)`);
     attr(el.tuft1, "transform", `rotate(${f2(S.tf1.x)} 152 48)`);
@@ -706,7 +707,7 @@ export function createToucanEngine({ root, rng = Math.random, reducedMotion = ()
     const bt = t - blinkStart;
     const [cd, od] = blinkDur;
     if (bt >= 0 && bt < cd + od) { const q = (bt - cd) / od; b = bt < cd ? (bt / cd) ** 2 : 1 - q * q * (3 - 2 * q); }
-    const cl = clamp(Math.max(b, S.lid.x - S.lr.x), 0, 1);
+    const cl = clamp(Math.max(b, S.lid.x - Math.max(0, S.lr.x)), 0, 1);
     attr(el.lid, "transform", `translate(0 ${f2(-11 + cl * 22)})`);
     attr(el.lowlid, "transform", `translate(0 ${f2(11 - S.warm.x * 4.5 - cl * 2)})`);
     if (el.lash) attr(el.lash, "opacity", clamp((cl - 0.8) * 5, 0, 1).toFixed(2));
