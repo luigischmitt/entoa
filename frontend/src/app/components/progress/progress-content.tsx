@@ -280,7 +280,7 @@ function PatternItem({ row, total }: { row: PatternRow; total: number }) {
         </div>
       </div>
       {row.share !== null && (
-        <span className="ds-meter pg-pattern-meter" data-tone="error" role="img" aria-label={getCurrentLocale() === "en" ? `This issue appeared in ${share}% of answers` : `Este erro apareceu em ${share}% das respostas`} style={{ "--p": `${Math.max(share, 2)}%` } as CSSProperties} />
+        <span className="ds-meter pg-pattern-meter" data-tone="green" role="img" aria-label={getCurrentLocale() === "en" ? `This issue appeared in ${share}% of answers` : `Este erro apareceu em ${share}% das respostas`} style={{ "--p": `${Math.max(share, 2)}%` } as CSSProperties} />
       )}
       <div className="pg-pattern-foot">
         {trend && <span className="pg-trend" data-trend={row.error?.trend}><trend.Icon className="size-3.5" aria-hidden="true" />{t(trend.text)}</span>}

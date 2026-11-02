@@ -96,7 +96,7 @@ function AttemptResult({ attempts, focus, beforeAccuracy = null }: { attempts: V
       const delta = value !== null && before !== null ? Math.round(value) - Math.round(before) : null;
       return <div className="vv-score" data-focus={key === focus} key={key}>
         <span className="vv-score-name">{t(metricLabel[key])}</span>
-        <span className="vv-score-value">{value === null ? "—" : <CountUp value={Math.round(value)} duration={700} />}</span>
+        <span className="vv-score-value">{value === null ? "—" : <CountUp value={Math.round(value)} duration={500} />}</span>
         {delta !== null && <span className="vv-score-delta" data-direction={delta > 0 ? "up" : delta < 0 ? "down" : "same"}>{delta > 0 ? `+${delta}` : delta === 0 ? t("igual") : delta}</span>}
         <span className="vv-score-bar" aria-hidden="true"><i style={{ "--vv-score": Math.max(0.02, Math.min(1, (value ?? 0) / 100)) } as CSSProperties} /></span>
       </div>;
@@ -527,7 +527,7 @@ export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
             <h3 className="ds-label">{t(metric.label)}</h3>
             {metric.key === insights.focus && <span className="ds-focus-mark">{t("Seu foco agora")}</span>}
           </div>
-          <p className="vv-metric-value"><span className="ds-num">{metric.value === null ? "—" : <CountUp value={Math.round(metric.value)} duration={1100} />}</span><span>/ 100</span></p>
+          <p className="vv-metric-value"><span className="ds-num">{metric.value === null ? "—" : <CountUp value={Math.round(metric.value)} duration={600} />}</span><span>/ 100</span></p>
           <span className="ds-meter" aria-hidden="true" style={{ "--p": `${metric.value === null ? 0 : Math.round(metric.value)}%` } as CSSProperties} />
           <p className="ds-small mt-3">{t(metric.measure)}</p>
         </article>)}</div>

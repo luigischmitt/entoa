@@ -427,6 +427,7 @@ select.ds-field {
 /* Thin meter (3–4px). Set --p (0%–100%) on the element. data-tone: default green (English), "voice" terra, "error" err, "muted" text-2. */
 .ds-meter { display: block; height: 4px; border-radius: 999px; background: linear-gradient(var(--ds-meter, var(--ds-green)), var(--ds-meter, var(--ds-green))) 0 0 / var(--p, 0%) 100% no-repeat, var(--ds-track); }
 .ds-meter[data-tone="voice"] { --ds-meter: var(--ds-green); }
+.ds-meter[data-tone="green"] { --ds-meter: var(--ds-green); }
 .ds-meter[data-tone="error"] { --ds-meter: var(--ds-error); }
 .ds-meter[data-tone="muted"] { --ds-meter: var(--ds-text-2); }
 

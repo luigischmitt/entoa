@@ -8,9 +8,9 @@ import "./interview-report.css";
 const dimensions: AzureReportDimension[] = ["accuracy", "fluency", "prosody"];
 
 /** Timing of the metric entrance, shared by the number (JS) and its bar (CSS, see interview-report.css). */
-const countStartMs = 700;
-const countStepMs = 260;
-const countDurationMs = 2200;
+const countStartMs = 200;
+const countStepMs = 120;
+const countDurationMs = 800;
 const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 const prefersStatic = () => typeof window === "undefined" || !("IntersectionObserver" in window) || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
