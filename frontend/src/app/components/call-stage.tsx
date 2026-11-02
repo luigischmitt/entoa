@@ -283,7 +283,11 @@ export function CallDock(props: {
   onCamera: () => void;
   skipDisabled: boolean;
   onSkip: () => void;
+  /** Hides the skip control (a conversation has no questions to skip). */
+  hideSkip?: boolean;
   onEnd: () => void;
+  /** Label of the end control; the interview default is kept when absent. */
+  endLabel?: string;
   /** Interviewer voice speed; null hides the control (voice off). */
   speechSpeed?: number | null;
   onSpeechSpeed?: (speed: number) => void;
@@ -329,10 +333,12 @@ export function CallDock(props: {
         <button type="button" className="mt-btn" data-off={!props.cameraOn ? "true" : undefined} data-tip={props.cameraOn ? cameraLabel : props.cameraState === "requesting" ? cameraLabel : t("Ligar câmera (prévia local, não é enviada nem salva)")} aria-label={cameraLabel} aria-pressed={props.cameraOn} disabled={props.cameraDisabled} onClick={props.onCamera}>
           {props.cameraState === "requesting" ? <LoaderCircle className="size-5 motion-safe:animate-spin" aria-hidden="true" /> : props.cameraOn ? <Video className="size-5" aria-hidden="true" /> : <VideoOff className="size-5" aria-hidden="true" />}
         </button>
-        <button type="button" className="mt-btn" data-tip={t("Pular pergunta")} aria-label={t("Pular sem enviar")} onClick={props.onSkip} disabled={props.skipDisabled}>
-          <SkipForward className="size-5" aria-hidden="true" />
-        </button>
-        <button type="button" className="mt-btn mt-btn-end" data-tip={t("Encerrar entrevista")} aria-label={t("Encerrar entrevista")} aria-haspopup="dialog" onClick={props.onEnd}>
+        {!props.hideSkip && (
+          <button type="button" className="mt-btn" data-tip={t("Pular pergunta")} aria-label={t("Pular sem enviar")} onClick={props.onSkip} disabled={props.skipDisabled}>
+            <SkipForward className="size-5" aria-hidden="true" />
+          </button>
+        )}
+        <button type="button" className="mt-btn mt-btn-end" data-tip={t(props.endLabel ?? "Encerrar entrevista")} aria-label={t(props.endLabel ?? "Encerrar entrevista")} aria-haspopup="dialog" onClick={props.onEnd}>
           <PhoneOff className="size-5" aria-hidden="true" />
           <span>{t("Encerrar")}</span>
         </button>

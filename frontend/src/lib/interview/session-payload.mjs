@@ -27,5 +27,10 @@ export function buildInterviewSessionPayload(config, userId, startedAt = new Dat
     question_count: nullableQuestionCount(config.questionCount),
     status: "in_progress",
     started_at: startedAt,
+    // Only conversations add these columns, so interview inserts stay exactly as before.
+    ...(config.mode === "conversation" ? {
+      mode: "conversation",
+      conversation_topic: typeof config.conversationPlan?.title === "string" ? config.conversationPlan.title.trim().slice(0, 80) : null,
+    } : {}),
   };
 }

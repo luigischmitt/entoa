@@ -22,6 +22,10 @@ export type InterviewConfig = {
   jobDirection?: JobDirection;
   /** How the approved interview plan was created. The original job description or resume is never stored here. */
   interviewSource?: "manual" | "job" | "resume";
+  /** Free conversation with Tuck (absent or "interview" for interviews). */
+  mode?: "interview" | "conversation";
+  /** Plan of a conversation (only with mode "conversation"): the topic title, Tuck's opening and the paths he can take. */
+  conversationPlan?: { title: string; opening: string; paths: Array<{ id: string; line: string }> };
 };
 
 export type InterviewQuestion = {

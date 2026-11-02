@@ -32,6 +32,7 @@ export function createLocalSessionId(): string;
 export function localCheckpointKey(userId: string): string;
 export function readLocalCheckpoint(storage: Storage | null, userId: string, now?: number): LocalInterviewCheckpoint | null;
 export function readResumableCheckpoint(storage: Storage | null, userId: string, now?: number): LocalInterviewCheckpoint | null;
+export function discardConversationCheckpoint(storage: Storage | null, userId: string, now?: number): boolean;
 export function readLocalCheckpointForSession(storage: Storage | null, userId: string, localSessionId: string, now?: number): LocalInterviewCheckpoint | null;
 export function writeLocalCheckpoint(storage: Storage | null, input: Partial<LocalInterviewCheckpoint> & Pick<LocalInterviewCheckpoint, "userId" | "config" | "snapshot">, now?: number): boolean;
 export function upsertLocalCheckpointTurn(storage: Storage | null, userId: string, turn: InterviewReportTurnSource, now?: number): boolean;

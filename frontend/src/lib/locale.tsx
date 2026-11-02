@@ -1321,6 +1321,21 @@ const englishCopy: Record<string, string> = {
   "Erros de inglês nesta resposta: {k}": "English mistakes in this answer: {k}",
   "Palavras para revisar a pronúncia": "Words to review for pronunciation",
   "Treinar minha voz": "Train my voice",
+  "Modo livre": "Free mode",
+  "Escolha um tema e converse em inglês com o Tuck, sem roteiro de entrevista.": "Pick a topic and talk in English with Tuck, without an interview script.",
+  "Sobre o que você quer conversar?": "What would you like to talk about?",
+  "Não foi possível escolher um tema agora. Digite um tema para começar.": "We couldn't pick a topic right now. Type a topic to start.",
+  "Não consegui preparar essa conversa agora. Tente de novo ou escolha um tema aleatório.": "I couldn't prepare this conversation right now. Try again or pick a random topic.",
+  "Não foi possível abrir a sala de conversa neste navegador. Libere o armazenamento do site e tente novamente.": "The conversation couldn't open in this browser. Free up the site's storage and try again.",
+  "Tema aleatório": "Random topic",
+  "Começar conversa": "Start conversation",
+  "Preparando a conversa…": "Preparing the conversation…",
+  "Confira se o microfone certo está selecionado e se não está mudo.": "Check that the right microphone is selected and that it isn't muted.",
+  "Aguardando sua vez": "Waiting for your turn",
+  "Não consegui ouvir sua resposta. Tente falar de novo.": "I couldn't hear your answer. Try speaking again.",
+  "O tempo chegou ao fim. Responda esta fala e a conversa termina.": "Time is up. Answer this line and the conversation ends.",
+  "Conversa encerrada": "Conversation ended",
+  "Encerrar conversa": "End conversation",
 };
 
 const interpolate = (text: string, values?: Record<string, string | number>) => values

@@ -10,4 +10,6 @@ export function buildInterviewSessionPayload(config: InterviewConfig, userId: st
   question_count: number | null;
   status: "in_progress";
   started_at: string;
+  mode?: "conversation";
+  conversation_topic?: string | null;
 };
