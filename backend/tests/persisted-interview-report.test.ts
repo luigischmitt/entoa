@@ -77,7 +77,7 @@ describe("persisted interview reports", () => {
     await persistence.loadTurns(token, interviewId);
 
     expect(calls).toHaveLength(2);
-    expect(calls[0]?.url).toContain(`/rest/v1/interviews?select=id,target_role,seniority,focus,job_direction,status&id=eq.${interviewId}`);
+    expect(calls[0]?.url).toContain(`/rest/v1/interviews?select=id,target_role,seniority,focus,job_direction,status,mode,conversation_topic&id=eq.${interviewId}`);
     expect(calls[1]?.url).toContain(`/rest/v1/interview_turns?select=sequence_number,speaker,content&interview_id=eq.${interviewId}&order=sequence_number.asc`);
     for (const call of calls) {
       expect(call.headers.get("apikey")).toBe("sb_publishable_test");

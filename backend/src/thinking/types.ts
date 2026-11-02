@@ -88,6 +88,10 @@ export type InterviewReportInput = {
 };
 
 export type InterviewReport = {
+  /** Set on free conversations, whose report has no technical analysis; absent on interviews. */
+  reportKind?: "conversation";
+  /** Conversations only: sentences that were correct but can sound more natural. */
+  keepPhrases?: Array<{ sequenceNumber: number; said: string; natural: string; note: string }>;
   /** Language used for user-facing report text; absent on legacy reports. */
   locale?: "pt-BR" | "en";
   /** Exact bounded setup snapshot used to direct this report; absent on legacy sessions. */
@@ -158,6 +162,7 @@ export type InterviewTurnAnalysisInput = {
 export type InterviewReportConsolidationInput = InterviewReportInput & { turnAnalyses: InterviewTurnAnalysis[] };
 
 export const reportAnalysisVersion = "v3" as const;
+export const conversationReportVersion = "c1" as const;
 
 export interface InterviewReportService {
   generate(input: InterviewReportInput): Promise<InterviewReport & { model: string; analysisVersion: typeof reportAnalysisVersion }>;
@@ -165,6 +170,8 @@ export interface InterviewReportService {
   analyzeTurn(input: InterviewTurnAnalysisInput): Promise<InterviewTurnAnalysis & { model: string }>;
   /** Re-validate per-answer findings and produce the final report with one small call. */
   consolidate(input: InterviewReportConsolidationInput): Promise<InterviewReport & { model: string; analysisVersion: typeof reportAnalysisVersion }>;
+  /** One call over a whole free conversation. */
+  generateConversation?(input: Pick<InterviewReportInput, "locale" | "turns"> & { topic: string }): Promise<InterviewReport & { model: string; analysisVersion: typeof conversationReportVersion }>;
 }
 
 /** The kind of clarification request a deterministic detector found in a short candidate utterance. */
