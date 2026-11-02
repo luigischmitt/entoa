@@ -107,7 +107,21 @@ export class OpenRouterSpeechProvider implements SpeechProvider {
     return error;
   }
 
-  private attempt(request: SpeechSynthesisRequest, upstream: string, signal: AbortSignal, timeoutMs: number): Promise<SynthesizedSpeech> {
+  private async attempt(request: SpeechSynthesisRequest, upstream: string, signal: AbortSignal, timeoutMs: number): Promise<SynthesizedSpeech> {
+    const startedAt = Date.now();
+    try {
+      return await this.request(request, upstream, signal, timeoutMs);
+    } catch (error) {
+      // A cancelled attempt is not an upstream failure: the other attempt won or the caller left. Content-free.
+      if (!signal.aborted) {
+        const status = error instanceof SpeechProviderUnavailableError ? error.status : undefined;
+        this.log(JSON.stringify({ event: "speech_upstream_failure", provider: "openrouter", upstream, ...(status === undefined ? {} : { status }), durationMs: Math.max(0, Date.now() - startedAt) }));
+      }
+      throw error;
+    }
+  }
+
+  private request(request: SpeechSynthesisRequest, upstream: string, signal: AbortSignal, timeoutMs: number): Promise<SynthesizedSpeech> {
     return requestSpeechProvider({
       label: "OpenRouter speech",
       url: this.url,
@@ -131,7 +145,7 @@ export class OpenRouterSpeechProvider implements SpeechProvider {
         if (!response.ok) {
           // The error body may echo the synthesized text, so only the status is kept.
           await response.body?.cancel().catch(() => undefined);
-          throw new SpeechProviderUnavailableError(`OpenRouter speech returned HTTP ${response.status}.`);
+          throw new SpeechProviderUnavailableError(`OpenRouter speech returned HTTP ${response.status}.`, { status: response.status });
         }
         const audio = await readAudioBody(response, requestSignal);
         if (audio.length === 0) throw new SpeechProviderUnavailableError("OpenRouter speech returned no audio.");

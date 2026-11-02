@@ -28,6 +28,8 @@ type HybridSpeechProviderOptions = {
   timeoutMs: number;
   /** Start the secondary after this delay without primary audio; 0 disables the timed hedge (fast failures still fall back). */
   hedgeAfterMs: number;
+  /** A pinned primary keeps its voice but gets this long before the other voice joins; 0 waits for its failure. Keep it well under timeoutMs. */
+  pinnedFallbackAfterMs?: number;
   /**
    * Wake-up call for the scale-to-zero primary, e.g. an authenticated GET /health. A rejection or a
    * resolved `{ status: "unavailable" }` counts as a failed attempt; `{ status: "warming" }` means
@@ -139,8 +141,9 @@ export class HybridSpeechProvider implements SpeechProvider {
       if (preferSecondary) startSecondary();
       else {
         startPrimary();
-        // An interview already pinned to the primary voice never races the other voice; it falls back only on failure.
-        if (hedgeAfterMs > 0 && request.preferredSource !== primarySource) hedgeTimer = setTimeout(startSecondary, hedgeAfterMs);
+        // An interview pinned to the primary voice does not race the other voice early: only a failure or a real stall brings it in.
+        const fallbackAfterMs = request.preferredSource === primarySource ? this.options.pinnedFallbackAfterMs ?? 0 : hedgeAfterMs;
+        if (fallbackAfterMs > 0) hedgeTimer = setTimeout(startSecondary, fallbackAfterMs);
       }
     });
   }

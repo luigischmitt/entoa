@@ -565,9 +565,16 @@ export function groupInterviewerSentences(segments) {
   }));
 }
 
+/** A 5xx or a lost connection may pass; aborts and other statuses (such as an expired session) will not. */
+function isTransientSpeechFailure(error) {
+  if (error?.name === "AbortError") return false;
+  return error?.isSpeechResponseError ? error.status >= 500 : error instanceof TypeError;
+}
+
 /**
  * Requests the chunks together, in order, at most `maxConcurrentChunkRequests` in flight, a finished request letting the
- * next pending chunk start. Leases dedupe against prewarmed blobs.
+ * next pending chunk start. Leases dedupe against prewarmed blobs. A chunk that fails transiently is requested once more
+ * before it ends playback.
  */
 function requestChunks(chunks, options) {
   let active = 0;
@@ -579,12 +586,18 @@ function requestChunks(chunks, options) {
     entry.promise.catch(() => {});
     return entry;
   });
+  const request = (entry, retries) => {
+    entry.lease = acquireSpeechBlob(options, entry.chunk.text);
+    return entry.lease.promise.catch((error) => {
+      if (stopped || retries === 0 || !isTransientSpeechFailure(error)) throw error;
+      return request(entry, retries - 1);
+    });
+  };
   const pump = () => {
     while (!stopped && active < maxConcurrentChunkRequests && next < entries.length) {
       const entry = entries[next++];
       active += 1;
-      entry.lease = acquireSpeechBlob(options, entry.chunk.text);
-      entry.lease.promise.then(entry.resolve, (error) => { stopped = true; entry.reject(error); }).then(() => { active -= 1; pump(); });
+      request(entry, 1).then(entry.resolve, (error) => { stopped = true; entry.reject(error); }).then(() => { active -= 1; pump(); });
       if (next === 1) options.onSynthesisStarted?.();
     }
   };
@@ -602,8 +615,9 @@ function requestChunks(chunks, options) {
 /**
  * Plays an utterance chunk by chunk (see `groupInterviewerSentences`). All chunks are requested together (at most
  * `maxConcurrentChunkRequests` at once), chunk 1 starts as soon as it arrives and the next chunk is decoded ahead
- * (preloaded Audio) so it starts the moment the current one ends. Playback order never depends on arrival order. A failed
- * chunk ends playback as "unavailable" and the caller keeps the text visible; cancelling aborts pending requests.
+ * (preloaded Audio) so it starts the moment the current one ends. Playback order never depends on arrival order. A chunk
+ * that still fails after its retry ends playback as "unavailable" and the caller keeps the text visible; cancelling aborts
+ * pending requests.
  */
 export function playInterviewerSegments(segments, options) {
   const chunks = groupInterviewerSentences(segments);

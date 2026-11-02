@@ -310,4 +310,14 @@ describe("createSpeechProvider", () => {
     expect(createSpeechProvider(loadSpeechConfig({ SPEECH_PROVIDER: "kokoro" }))).toBeInstanceOf(KokoroSpeechProvider);
     expect(createSpeechProvider(loadSpeechConfig({}))).toBeInstanceOf(FakeSpeechProvider);
   });
+
+  it("logs the upstream status of a failed attempt, never the text", async () => {
+    const log = vi.fn();
+    const speech = new OpenRouterSpeechProvider({ apiKey: "test-key", url, model: "hexgrad/kokoro-82m", timeoutMs: 1_000, log, fetchImplementation: async () => new Response("", { status: 429 }) });
+    await expect(speech.synthesize(base)).rejects.toMatchObject({ status: 429 });
+    expect(log).toHaveBeenCalledTimes(1);
+    const line = log.mock.calls[0][0] as string;
+    expect(JSON.parse(line)).toMatchObject({ event: "speech_upstream_failure", upstream: "DeepInfra", status: 429 });
+    expect(line).not.toContain(base.text);
+  });
 });

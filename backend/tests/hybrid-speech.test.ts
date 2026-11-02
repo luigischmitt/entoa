@@ -100,13 +100,14 @@ function controllable(name: string) {
 }
 const audio = (text = "a") => ({ audio: Buffer.from(text), contentType: "audio/mpeg" });
 
-function hybrid(overrides: { hedgeAfterMs?: number; timeoutMs?: number } = {}) {
+function hybrid(overrides: { hedgeAfterMs?: number; timeoutMs?: number; pinnedFallbackAfterMs?: number } = {}) {
   const primary = controllable("kokoro");
   const secondary = controllable("openrouter");
   const provider = new HybridSpeechProvider({
     primary: primary.provider, secondary: secondary.provider,
     primaryVoice: "af_bella+af_heart", secondaryVoice: "af_heart",
     timeoutMs: overrides.timeoutMs ?? 15_000, hedgeAfterMs: overrides.hedgeAfterMs ?? 2_500,
+    ...(overrides.pinnedFallbackAfterMs === undefined ? {} : { pinnedFallbackAfterMs: overrides.pinnedFallbackAfterMs }),
   });
   return { provider, primary, secondary };
 }
@@ -457,6 +458,20 @@ describe("hybrid voice source preference", () => {
     expect(secondary.calls).toHaveLength(0);
     primary.calls[0].resolve(audio("p"));
     expect((await pending).diagnostics).toMatchObject({ hedge: "not_needed", voiceSource: "kokoro" });
+  });
+
+  it("brings in the other voice when the pinned primary stalls past the pinned limit", async () => {
+    vi.useFakeTimers();
+    const { provider, primary, secondary } = hybrid({ hedgeAfterMs: 5_000, pinnedFallbackAfterMs: 7_000 });
+    const pending = provider.synthesize({ ...req, preferredSource: "kokoro" });
+    await vi.advanceTimersByTimeAsync(6_999);
+    expect(secondary.calls).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(secondary.calls).toHaveLength(1);
+    expect(primary.calls[0].signal?.aborted).toBe(false);
+    secondary.calls[0].resolve(audio("s"));
+    expect((await pending).diagnostics).toMatchObject({ hedge: "hedge_won", voiceSource: "openrouter" });
+    expect(primary.calls[0].signal?.aborted).toBe(true);
   });
 
   it("still falls back to the other voice when the pinned primary fails", async () => {

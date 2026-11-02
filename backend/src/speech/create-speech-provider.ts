@@ -19,6 +19,7 @@ export function createSpeechProvider(config: SpeechConfig): SpeechProvider {
       secondarySource: "azure",
       timeoutMs: Math.max(config.azure.timeoutMs, config.kokoroTimeoutMs),
       hedgeAfterMs: config.hybrid.hedgeAfterMs,
+      pinnedFallbackAfterMs: config.hybrid.pinnedFallbackAfterMs,
     });
   }
   if (config.provider === "azure-openrouter") {

@@ -83,9 +83,34 @@ test("a failed request resolves unavailable right away, without waiting for the 
   const playback = playInterviewerSegments(["One sentence that is long enough."], options);
   await flush();
   pending.get("One sentence that is long enough.").fail();
+  await flush();
+  pending.get("One sentence that is long enough.").fail();
   const result = await playback.promise;
   assert.deepEqual(result, { status: "unavailable", message: speechUnavailableMessage });
   assert.ok(!/provider/u.test(result.message));
+});
+
+test("a chunk that fails with a 5xx is requested once more and plays", async () => {
+  const { pending, audios, options } = harness();
+  const playback = playInterviewerSegments([chunkA], options);
+  await flush();
+  pending.get(chunkA).fail();
+  await flush();
+  pending.get(chunkA).ok();
+  await flush();
+  audios[0].emit("playing");
+  audios[0].emit("ended");
+  assert.deepEqual(await playback.promise, { status: "completed", voice: "network" });
+});
+
+test("a chunk that fails twice ends as unavailable", async () => {
+  const { pending, options } = harness();
+  const playback = playInterviewerSegments([chunkA], options);
+  await flush();
+  pending.get(chunkA).fail();
+  await flush();
+  pending.get(chunkA).fail();
+  assert.equal((await playback.promise).status, "unavailable");
 });
 
 test("a chunk that stalls after chunk 1 played ends the utterance as unavailable and never plays late audio", async () => {
@@ -128,6 +153,8 @@ test("retrying the same utterance after a failure requests the speech again and 
   const first = playInterviewerSegments([chunkA], options);
   await flush();
   pending.get(chunkA).fail();
+  await flush();
+  pending.get(chunkA).fail();
   assert.equal((await first.promise).status, "unavailable");
 
   pending.clear();
@@ -158,6 +185,8 @@ test("a prewarmed utterance still plays over the network", async () => {
 test("prewarm is no longer skipped after a failed utterance", async () => {
   const { pending, options } = harness();
   const failed = playInterviewerSegments([chunkA], options);
+  await flush();
+  pending.get(chunkA).fail();
   await flush();
   pending.get(chunkA).fail();
   await failed.promise;

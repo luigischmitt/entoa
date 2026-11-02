@@ -59,6 +59,7 @@ performed by the authenticated frontend client. The speech service accepts:
 | `KOKORO_TIMEOUT_MS` | `15000` | Positive request timeout in milliseconds (also used by `openrouter` and as the overall deadline of `kokoro-openrouter`). |
 | `INTERVIEWER_VOICE` | `af_bella+af_heart` (with `openrouter`: `OPENROUTER_SPEECH_VOICE`, then `am_echo`) | Voice passed to the provider. Blends containing `+` are rejected at startup with `openrouter`. |
 | `OPENROUTER_SPEECH_MODEL` | `hexgrad/kokoro-82m` | Speech model when `SPEECH_PROVIDER=openrouter`. Requires `OPENROUTER_API_KEY`, otherwise the backend fails at startup. |
+| `HYBRID_SPEECH_PINNED_FALLBACK_AFTER_MS` | `7000` | Integer 0-14000, used with `openrouter-azure`. An interview pinned to the OpenRouter voice keeps it, but Azure joins if no audio arrived after this delay. `0` waits for an OpenRouter failure, which arrives only at the shared deadline. |
 | `OPENROUTER_SPEECH_HEDGE_AFTER_MS` | `2000` | Integer 0-10000. With `openrouter`, synthesis goes to DeepInfra first; if it has not answered after this delay (or fails sooner), a second request routed to Together starts and the first successful response wins. `0` disables hedging. |
 | `SPEECH_CACHE_TTL_MS` | `60000` | 0-600000. Finished audio and in-flight syntheses are shared by identical `/speech` requests (key: normalized text + voice + speed + format); `0` turns the cache and prefetch off. |
 | `SPEECH_STATIC_CACHE_TTL_MS` | `3600000` | Lifetime of the fixed phrases (acknowledgements, closing line). |
