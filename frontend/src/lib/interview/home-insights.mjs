@@ -46,20 +46,29 @@ function patternFrom(analysis) {
   return { type: type ? patternTypeLabels[type] ?? type : null, suggestion: cleanText(pattern.suggestion) };
 }
 
-/** Derives the small, truthful home summary from records already loaded for Progress. */
+const isConversation = (record) => record?.mode === "conversation";
+
+/**
+ * Derives the small, truthful home summary from records already loaded for Progress.
+ * Interview fields (last interview date, report, takeaway, priority) read only interviews; conversations are practice
+ * and count in practiceCount, but they never stand in for "your last interview". topPattern may come from any session.
+ */
 export function buildHomeInsights(input) {
   const records = (Array.isArray(input) ? input : [])
     .filter((record) => record?.status === "completed")
     .slice()
     .sort((first, second) => timeOf(second) - timeOf(first));
   const latest = records[0] ?? null;
+  const latestInterview = records.find((record) => !isConversation(record)) ?? null;
   return {
-    interviewCount: records.length,
-    lastInterviewAt: timeOf(latest) ? new Date(timeOf(latest)).toISOString() : null,
-    lastReportReady: latest?.feedback?.status === "ready",
-    lastTakeaway: takeawayFrom(latest?.feedback?.analysis),
-    lastInterviewId: latest?.id ?? null,
-    lastPriority: priorityFrom(latest?.feedback?.analysis),
+    interviewCount: records.filter((record) => !isConversation(record)).length,
+    conversationCount: records.filter(isConversation).length,
+    practiceCount: records.length,
+    lastInterviewAt: timeOf(latestInterview) ? new Date(timeOf(latestInterview)).toISOString() : null,
+    lastReportReady: latestInterview?.feedback?.status === "ready",
+    lastTakeaway: takeawayFrom(latestInterview?.feedback?.analysis),
+    lastInterviewId: latestInterview?.id ?? null,
+    lastPriority: priorityFrom(latestInterview?.feedback?.analysis),
     topPattern: patternFrom(latest?.feedback?.analysis),
   };
 }

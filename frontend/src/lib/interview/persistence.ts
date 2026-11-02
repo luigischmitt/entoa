@@ -28,6 +28,8 @@ type InterviewRow = {
   job_direction: JobDirection | null;
   duration_minutes: number | null;
   question_count: number | null;
+  mode: string | null;
+  conversation_topic: string | null;
   status: InterviewSessionStatus;
   started_at: string | null;
   completed_at: string | null;
@@ -51,7 +53,7 @@ export type InterviewTurnInput = {
   content: string | null;
 };
 
-const sessionColumns = "id,user_id,target_role,title,seniority,focus,job_direction,duration_minutes,question_count,status,started_at,completed_at,created_at,updated_at";
+const sessionColumns = "id,user_id,target_role,title,seniority,focus,job_direction,duration_minutes,question_count,mode,conversation_topic,status,started_at,completed_at,created_at,updated_at";
 const turnColumns = "id,interview_id,sequence_number,speaker,content,created_at";
 
 const toSession = (row: InterviewRow): InterviewSession & { title: string | null } => ({
@@ -273,6 +275,9 @@ async function loadProgressRecordsUncached(): Promise<PersistenceResult<Progress
         startedAt: session.startedAt,
         completedAt: session.completedAt,
         createdAt: session.createdAt,
+        // Anything other than "conversation" is an interview, so rows saved before the column existed stay interviews.
+        mode: (row.mode === "conversation" ? "conversation" : "interview") as "interview" | "conversation",
+        conversationTopic: row.conversation_topic ?? null,
         answerCount: answerCounts.get(session.id) ?? 0,
         candidateAnswers: (candidateAnswers.get(session.id) ?? []).sort((first, second) => first.sequenceNumber - second.sequenceNumber),
         feedback: embedded ? { status: embedded.status, azureSummary: embedded.azure_summary, analysis: embedded.analysis, analysisVersion: embedded.analysis_version } : null,

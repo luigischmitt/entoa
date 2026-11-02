@@ -324,6 +324,11 @@ function HomeView({
     .filter((item) => item.summary)
     .sort((a, b) => (a.summary?.latest ?? 0) - (b.summary?.latest ?? 0))[0]?.metric ?? null;
   const hasInterviews = insights.interviewCount > 0;
+  // Conversations are practice: the practice blocks show when anything is completed, worded as practice once one exists.
+  const hasPractice = insights.practiceCount > 0;
+  const practiceCountWord = insights.conversationCount > 0
+    ? t(insights.practiceCount === 1 ? "prática concluída" : "práticas concluídas")
+    : t(insights.practiceCount === 1 ? "entrevista concluída" : "entrevistas concluídas");
   const lastInterviewDate = insights.lastInterviewAt
     ? new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", year: "numeric" }).format(new Date(insights.lastInterviewAt))
     : null;
@@ -352,7 +357,7 @@ function HomeView({
           <ul className="ds-facts shl-home-facts">
             {hasInterviews ? (
               <>
-                <li><span><b>{insights.interviewCount}</b> {t(insights.interviewCount === 1 ? "entrevista concluída" : "entrevistas concluídas")}</span></li>
+                <li><span><b>{insights.practiceCount}</b> {practiceCountWord}</span></li>
                 {lastInterviewDate && <li>{t("Última em {date}", { date: lastInterviewDate })}</li>}
                 <li>{t("Sessões de 5 a 25 minutos")}</li>
               </>
@@ -406,19 +411,19 @@ function HomeView({
           </div>
       </section>
 
-      {!isLoading && hasInterviews && (
+      {!isLoading && hasPractice && (
         <section className="shl-home-block" aria-labelledby="practice-history-title">
           <div className="ds-sec-head" data-layout="split">
             <div>
               <p className="ds-kicker">{t("Até aqui")}</p>
               <h2 id="practice-history-title" className="ds-section-title">{t("Prática que já conta")}</h2>
             </div>
-            <p className="ds-lead">{t("Entrevistas por semana, nas últimas 8 semanas.")}</p>
+            <p className="ds-lead">{insights.conversationCount > 0 ? t("Práticas por semana, nas últimas 8 semanas.") : t("Entrevistas por semana, nas últimas 8 semanas.")}</p>
           </div>
           <div className="ds-card shl-home-practice">
             <div>
               <p className="shl-home-count">
-                <span className="ds-num"><CountUp value={insights.interviewCount} /></span> {t(insights.interviewCount === 1 ? "entrevista concluída" : "entrevistas concluídas")}
+                <span className="ds-num"><CountUp value={insights.practiceCount} /></span> {practiceCountWord}
               </p>
               <div
                 className="shl-home-weeks"
@@ -449,7 +454,7 @@ function HomeView({
         </section>
       )}
 
-      {!isLoading && hasInterviews && (
+      {!isLoading && hasPractice && (
         <section className="shl-home-block" aria-labelledby="voice-focus-title">
           <div className="ds-sec-head">
             <div>
