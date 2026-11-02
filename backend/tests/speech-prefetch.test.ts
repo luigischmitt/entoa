@@ -250,7 +250,7 @@ describe("interviewer prefetcher", () => {
     await tick();
     const spoken = composeAcknowledgedQuestion(stripLeadingAcknowledgement(followUp.acknowledgement), followUp.followUpQuestion);
     const first = interviewerChunkTexts(spoken)[0]!;
-    expect(provider.calls).toEqual([{ text: normalizeTextForSpeech(first), voice: "am_michael", speed: 1, format: "mp3" }]);
+    expect(provider.calls).toEqual([{ text: normalizeTextForSpeech(first), voice: "am_michael", speed: 1, format: "mp3", primaryOnly: true }]);
     // The client's later request for that chunk (trimmed, normalized by the controller) is a cache hit.
     expect((await cache.synthesize({ text: normalizeTextForSpeech(first.trim()), voice: "am_michael", speed: 1, format: "mp3" })).source).toBe("hit");
   });
