@@ -53,12 +53,12 @@ function seniorityLabel(value: string | null | undefined) {
 
 function ChangeLabel({ change }: { change: number | null }) {
   if (change === null) return <span className="pg-change">{t("1ª medição")}</span>;
-  if (change === 0) return <span className="pg-change">{t("igual à 1ª entrevista")}</span>;
+  if (change === 0) return <span className="pg-change">{t("igual à 1ª prática")}</span>;
   const up = change > 0;
   return (
     <span className="pg-change" data-direction={up ? "up" : "down"}>
       {up ? <ArrowUpRight className="size-3.5" aria-hidden="true" /> : <ArrowDownRight className="size-3.5" aria-hidden="true" />}
-      {`${up ? "+" : ""}${change}`}<span className="pg-change-text"> {t("desde a 1ª entrevista")}</span>
+      {`${up ? "+" : ""}${change}`}<span className="pg-change-text"> {t("desde a 1ª prática")}</span>
     </span>
   );
 }
@@ -451,7 +451,12 @@ export function SessionHistory({ sessions, onOpenReport }: { sessions: ProgressS
         {visible.map((s) => {
           const content = <>
             <div className="min-w-0">
-              <p className="font-medium text-ink [overflow-wrap:anywhere]">{s.title || s.role || t("Prática de entrevista")}{s.seniority ? ` · ${seniorityLabel(s.seniority)}` : ""}</p>
+              <p className="font-medium text-ink [overflow-wrap:anywhere]">
+                {s.displayName || t("Prática de entrevista")}
+                {s.mode === "conversation"
+                  ? <span className="ds-small"> · {t("Modo livre")}</span>
+                  : s.seniority ? ` · ${seniorityLabel(s.seniority)}` : ""}
+              </p>
               <p className="ds-small">{formatDate(s.date)}</p>
               <p className="pg-row-meta">{[plural(s.answerCount, "resposta", "respostas"), formatPracticeDuration(s.durationMs), s.patternCount !== null ? plural(s.patternCount, "erro de inglês", "erros de inglês") : null].filter(Boolean).join(" · ")}</p>
             </div>
@@ -466,7 +471,7 @@ export function SessionHistory({ sessions, onOpenReport }: { sessions: ProgressS
           return (
             <li key={s.id} className="pg-row">
               {onOpenReport
-                ? <button type="button" className="pg-row-action" aria-label={`${t(s.reportStatus === "ready" ? "Abrir relatório de " : "Recuperar relatório de ")}${s.title || s.role || t("Prática de entrevista")}, ${formatDate(s.date)}`} onClick={() => onOpenReport(s.id)}>{content}</button>
+                ? <button type="button" className="pg-row-action" aria-label={`${t(s.reportStatus === "ready" ? "Abrir relatório de " : "Recuperar relatório de ")}${s.displayName || t("Prática de entrevista")}, ${formatDate(s.date)}`} onClick={() => onOpenReport(s.id)}>{content}</button>
                 : <div className="pg-row-content">{content}</div>}
             </li>
           );

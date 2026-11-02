@@ -126,3 +126,72 @@ test("weekly sessions cover eight Monday-based weeks", () => {
   assert.equal(weeks[6].count, 1); // Sun 27 Sep belongs to the previous week
   assert.equal(weeks.reduce((s, w) => s + w.count, 0), 3 - 1 + 0); // 1 Aug is outside the 8-week window
 });
+
+const conversation = (id, day, { patterns = [], answers = 4, azure = null, topic = "Meu fim de semana" } = {}) => {
+  const base = record(id, day, { patterns, answers, azure, gaps: [] });
+  return {
+    ...base,
+    mode: "conversation",
+    targetRole: "Modo livre",
+    seniority: null,
+    conversationTopic: topic,
+    feedback: { ...base.feedback, analysisVersion: "c1", analysis: { ...base.feedback.analysis, reportKind: "conversation", technicalContent: { summary: "Conversa curta.", strengths: [{ sequenceNumber: 1, evidence: "a story", explanation: "Clear story." }], gaps: [] } } },
+  };
+};
+
+test("conversations add to English errors and voice but never to technical gaps, gap series or study topics", () => {
+  const interview = record("interview", 1, { answers: 4, patterns: [pattern("GRAMMAR", 1, "he go")], gaps: [{ sequenceNumber: 2, explanation: "Give a concrete example." }], priorities: [{ area: "TECHNICAL_CONTENT", sequenceNumber: 2, focus: "Give a concrete example.", exercise: "Practice one example." }], azure: { accuracy: voice(80, 60_000), fluency: voice(70, 60_000), prosody: voice(60, 60_000) } });
+  const chat = conversation("chat", 2, { answers: 4, patterns: [pattern("GRAMMAR", 2, "she do")], azure: { accuracy: voice(60, 60_000), fluency: voice(50, 60_000), prosody: voice(40, 60_000) } });
+  const alone = buildProgressInsights([interview]);
+  const mixed = buildProgressInsights([interview, chat]);
+
+  assert.equal(mixed.commonErrors[0].count, 2);
+  assert.equal(mixed.commonErrors[0].sessionCount, 2);
+  assert.equal(mixed.dimensions.find((d) => d.key === "GRAMMAR").value, 75);
+  assert.equal(mixed.dimensions.find((d) => d.key === "accuracy").value, 70);
+  assert.equal(mixed.series.accuracy.length, 2);
+
+  assert.deepEqual(mixed.series.gaps, alone.series.gaps);
+  assert.equal(mixed.series.gaps.length, 1);
+  assert.equal(mixed.dimensions.filter((d) => d.kind === "technical").length, 0);
+  // The technical topic comes from the interview's own report only; the conversation adds no technical topic.
+  const technicalTopics = (result) => result.studyTopics.filter((topic) => topic.kind === "technical").map(({ title, sessionCount }) => [title, sessionCount]);
+  assert.deepEqual(technicalTopics(mixed), [["Give a concrete example.", 1]]);
+  assert.deepEqual(technicalTopics(mixed), technicalTopics(alone));
+});
+
+test("a conversation is practice in totals, weekly rhythm and session rows, with mode and display name", () => {
+  const interview = record("interview", 1, { answers: 4 });
+  const chat = conversation("chat", 2, { answers: 3, topic: "Viagens de trem" });
+  const result = buildProgressInsights([interview, chat], { now: new Date(2026, 8, 2, 12).getTime() });
+  assert.equal(result.sessionCount, 2);
+  assert.equal(result.answerCount, 7);
+  assert.equal(result.practiceMs, 50 * 60_000);
+  assert.equal(result.weekly.reduce((sum, week) => sum + week.count, 0), 2);
+  const byId = Object.fromEntries(result.sessions.map((s) => [s.id, s]));
+  assert.equal(byId.chat.mode, "conversation");
+  assert.equal(byId.chat.conversationTopic, "Viagens de trem");
+  assert.equal(byId.chat.displayName, "Viagens de trem");
+  assert.equal(byId.chat.seniority, null);
+  assert.equal(byId.interview.mode, "interview");
+  assert.equal(byId.interview.displayName, "Backend Engineer");
+  assert.equal(byId.interview.seniority, "Senior");
+});
+
+test("latest role and seniority come from the latest interview, not a conversation", () => {
+  const interview = record("interview", 1);
+  const chat = conversation("chat", 5);
+  const result = buildProgressInsights([interview, chat]);
+  assert.equal(result.latestRole, "Backend Engineer");
+  assert.equal(result.latestSeniority, "Senior");
+  assert.equal(result.lastPracticeAt, chat.completedAt);
+});
+
+test("records without a mode behave as interviews", () => {
+  const legacy = record("legacy", 1, { answers: 4, patterns: [pattern("GRAMMAR", 1, "he go")], gaps: [{ sequenceNumber: 2, explanation: "Give an example." }] });
+  const result = buildProgressInsights([legacy]);
+  assert.equal(result.sessions[0].mode, "interview");
+  assert.equal(result.sessions[0].conversationTopic, null);
+  assert.equal(result.series.gaps.length, 1);
+  assert.equal(result.commonErrors[0].count, 1);
+});

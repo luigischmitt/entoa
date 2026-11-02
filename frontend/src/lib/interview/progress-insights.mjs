@@ -4,6 +4,10 @@ import { azureMetricReliability } from "./report-metrics.mjs";
  * Pure aggregation for the progress screen. Input is the user's own persisted data only (completed interviews, their
  * answer counts and the saved v2 feedback). Nothing here is estimated: every number is a count, a ratio of counts or a
  * duration-weighted mean of the saved Azure summaries. No overall level, no percentile, no population comparison.
+ *
+ * Free conversations (mode "conversation") are practice: they count in totals, the weekly rhythm, voice metrics and
+ * English errors. They never feed technical findings (gaps, technical study topics, the gap series) and carry no
+ * technical content. Records without a mode are interviews.
  */
 
 export const patternTypes = ["GRAMMAR", "WORD_CHOICE", "FALSE_COGNATE", "STRUCTURE"];
@@ -130,7 +134,11 @@ function normalizeSession(record) {
   const analysis = readAnalysis(record.feedback);
   const patterns = analysis ? validatedPatterns(analysis) : null;
   const answerCount = Number.isFinite(record.answerCount) ? Math.max(0, record.answerCount) : 0;
-  const gaps = analysis?.technicalContent && Array.isArray(analysis.technicalContent.gaps) ? analysis.technicalContent.gaps.filter((gap) => isText(gap?.explanation)) : null;
+  const isConversation = record.mode === "conversation";
+  const mode = isConversation ? "conversation" : "interview";
+  const conversationTopic = isConversation && isText(record.conversationTopic) ? record.conversationTopic.trim() : null;
+  // A conversation's strengths are not technical content, so it never has technical gaps.
+  const gaps = !isConversation && analysis?.technicalContent && Array.isArray(analysis.technicalContent.gaps) ? analysis.technicalContent.gaps.filter((gap) => isText(gap?.explanation)) : null;
   const priorities = analysis && Array.isArray(analysis.priorities) ? analysis.priorities.filter((p) => isText(p?.focus) && isText(p?.exercise)) : [];
   const voice = {};
   for (const dimension of Object.keys(voiceDimensionCopy)) {
@@ -144,7 +152,10 @@ function normalizeSession(record) {
     date: time === null ? null : new Date(time).toISOString(),
     role: record.targetRole || "",
     title: record.title ?? null,
-    seniority: record.seniority || null,
+    mode,
+    conversationTopic,
+    displayName: record.title || conversationTopic || record.targetRole || null,
+    seniority: isConversation ? null : record.seniority || null,
     durationMs: sessionDurationMs(record),
     answerCount,
     reportStatus: record.feedback ? (analysis ? "ready" : record.feedback.status === "pending" ? "pending" : "unavailable") : "none",
@@ -218,6 +229,7 @@ function voiceAggregate(sessions) {
   return result;
 }
 
+/** English pattern and voice dimensions include conversations; there are no technical dimensions in this profile. */
 function buildDimensions(sessions, locale) {
   const patternsCopy = locale === "en" ? patternTypeCopyEn : patternTypeCopy;
   const voiceCopy = locale === "en" ? voiceDimensionCopyEn : voiceDimensionCopy;
@@ -257,6 +269,7 @@ function buildDimensions(sessions, locale) {
   return { dimensions, analyzedAnswers: answers, analyzedSessions: usable.length };
 }
 
+/** Includes conversations: English errors are practice evidence for both modes. Trends compare time windows of the same pattern types. */
 function buildCommonErrors(sessions, locale) {
   const patternsCopy = locale === "en" ? patternTypeCopyEn : patternTypeCopy;
   const usable = sessions.filter((s) => s.patternsUsable);
@@ -379,6 +392,7 @@ function pointsFrom(sessions, valueOf, locale) {
 function buildSeries(sessions, locale) {
   const series = {
     patterns: pointsFrom(sessions, (s) => (s.patternsUsable ? round(s.patterns.length / s.answerCount, 2) : null), locale),
+    // Conversations have gaps === null, so they never add a point to the technical gap series.
     gaps: pointsFrom(sessions, (s) => (s.gaps && s.answerCount > 0 ? round(s.gaps.length / s.answerCount, 2) : null), locale),
   };
   for (const dimension of Object.keys(voiceDimensionCopy)) {
@@ -391,6 +405,8 @@ export function buildProgressInsights(records, { now = Date.now(), locale = "pt-
   const completed = (records ?? []).filter((r) => r && r.status === "completed");
   const sessions = completed.map(normalizeSession).sort(sortAscending);
   const latest = sessions[sessions.length - 1] ?? null;
+  // Role and seniority describe the interview plan; a conversation has neither.
+  const latestInterview = [...sessions].reverse().find((s) => s.mode === "interview") ?? null;
   const known = sessions.filter((s) => s.durationMs !== null);
   const { dimensions, analyzedAnswers, analyzedSessions } = buildDimensions(sessions, locale);
   const patternDimensions = dimensions.filter((d) => d.kind === "pattern");
@@ -400,8 +416,8 @@ export function buildProgressInsights(records, { now = Date.now(), locale = "pt-
     sessionCount: sessions.length,
     practiceMs: known.length > 0 ? known.reduce((sum, s) => sum + s.durationMs, 0) : null,
     answerCount: sessions.reduce((sum, s) => sum + s.answerCount, 0),
-    latestRole: latest?.role || null,
-    latestSeniority: latest?.seniority ?? null,
+    latestRole: latestInterview?.role || null,
+    latestSeniority: latestInterview?.seniority ?? null,
     lastPracticeAt: latest?.date ?? null,
     reportReadyCount: sessions.filter((s) => s.reportStatus === "ready").length,
     analyzedSessions,
@@ -414,7 +430,7 @@ export function buildProgressInsights(records, { now = Date.now(), locale = "pt-
     weekly: weeklySessions(sessions, now, locale),
     sessionsUntilTrends: Math.max(0, minSessionsForTrends - analyzedSessions),
     sessions: [...sessions].reverse().map((s) => ({
-      id: s.id, date: s.date, role: s.role, title: s.title, seniority: s.seniority, durationMs: s.durationMs, answerCount: s.answerCount, reportStatus: s.reportStatus,
+      id: s.id, date: s.date, role: s.role, title: s.title, mode: s.mode, conversationTopic: s.conversationTopic, displayName: s.displayName, seniority: s.seniority, durationMs: s.durationMs, answerCount: s.answerCount, reportStatus: s.reportStatus,
       patternCount: s.patternsUsable ? s.patterns.length : null,
     })),
   };

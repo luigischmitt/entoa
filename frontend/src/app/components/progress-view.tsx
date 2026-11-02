@@ -166,6 +166,11 @@ export function ProgressView({
     autoCaptureVoice: false,
     jobDirection: selectedStoredReport?.jobDirection,
     interviewSource: "manual",
+    // Conversations keep their own report wording; the topic stands in for the title when the session has none.
+    ...(selectedSession.mode === "conversation" ? {
+      mode: "conversation" as const,
+      conversationPlan: selectedSession.conversationTopic ? { title: selectedSession.conversationTopic, opening: "", paths: [] } : undefined,
+    } : {}),
   } : null;
 
   useEffect(() => {
@@ -259,7 +264,7 @@ export function ProgressView({
                 historical
                 onRetry={() => { void generateHistoricalReport(selectedSession.id); }}
                 retrying={retryingSessionId === selectedSession.id}
-                canRegenerate={canRegenerateReports && selectedSession.feedback?.status === "ready" && selectedSession.feedback?.analysisVersion !== currentReportAnalysisVersion}
+                canRegenerate={canRegenerateReports && selectedSession.mode !== "conversation" && selectedSession.feedback?.status === "ready" && selectedSession.feedback?.analysisVersion !== currentReportAnalysisVersion}
                 onRegenerate={() => { void generateHistoricalReport(selectedSession.id, { regenerate: true }); }}
               />
             </div>

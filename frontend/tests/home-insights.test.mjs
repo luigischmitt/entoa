@@ -58,6 +58,8 @@ test("uses the first non-empty priority focus of the latest interview", () => {
 test("keeps the first-practice state empty and does not manufacture voice data", () => {
   assert.deepEqual(buildHomeInsights([]), {
     interviewCount: 0,
+    conversationCount: 0,
+    practiceCount: 0,
     lastInterviewAt: null,
     lastReportReady: false,
     lastTakeaway: null,
@@ -65,4 +67,52 @@ test("keeps the first-practice state empty and does not manufacture voice data",
     lastPriority: null,
     topPattern: null,
   });
+});
+
+const conversation = (id, completedAt, analysis = null) => ({ ...record(id, completedAt, analysis), mode: "conversation", targetRole: "Modo livre", conversationTopic: "Meu fim de semana" });
+
+test("a conversation counts as practice but never supplies the last interview's takeaway, priority, or report link", () => {
+  const interview = record("interview", "2026-02-01T10:00:00.000Z", {
+    interviewerTakeaway: { remember: "Você explicou a decisão com clareza." },
+    priorities: [{ area: "TECHNICAL_CONTENT", focus: "Dê um exemplo concreto." }],
+  });
+  const chat = conversation("chat", "2026-02-10T10:00:00.000Z", {
+    summary: "Você falou do fim de semana.",
+    technicalContent: { summary: "Conversa curta.", strengths: [], gaps: [] },
+    englishCommunication: { clarity: "CLEAR", evidenceStatus: "SUFFICIENT", patterns: [{ type: "WORD_CHOICE", sequenceNumber: 1, evidence: "I was make", suggestion: "Use did", rephrasedExample: "I did" }] },
+  });
+  const result = buildHomeInsights([interview, chat]);
+  assert.equal(result.practiceCount, 2);
+  assert.equal(result.interviewCount, 1);
+  assert.equal(result.conversationCount, 1);
+  assert.equal(result.lastInterviewId, "interview");
+  assert.equal(result.lastInterviewAt, interview.completedAt);
+  assert.equal(result.lastTakeaway, "Você explicou a decisão com clareza.");
+  assert.equal(result.lastPriority, "Dê um exemplo concreto.");
+  assert.deepEqual(result.topPattern, { type: "Escolha de palavras", suggestion: "Use did" });
+});
+
+test("a conversation-only account has no interview card data", () => {
+  const chat = conversation("chat", "2026-02-10T10:00:00.000Z", {
+    summary: "Você falou do fim de semana.",
+    technicalContent: { summary: "Conversa curta.", strengths: [], gaps: [] },
+    priorities: [{ area: "ENGLISH_COMMUNICATION", sequenceNumber: 1, focus: "Use did." }],
+  });
+  const result = buildHomeInsights([chat]);
+  assert.equal(result.interviewCount, 0);
+  assert.equal(result.practiceCount, 1);
+  assert.equal(result.lastInterviewId, null);
+  assert.equal(result.lastInterviewAt, null);
+  assert.equal(result.lastReportReady, false);
+  assert.equal(result.lastTakeaway, null);
+  assert.equal(result.lastPriority, null);
+});
+
+test("records without a mode are interviews", () => {
+  const legacy = record("legacy", "2026-02-10T10:00:00.000Z", { summary: "Resumo." });
+  const result = buildHomeInsights([legacy]);
+  assert.equal(result.interviewCount, 1);
+  assert.equal(result.conversationCount, 0);
+  assert.equal(result.lastInterviewId, "legacy");
+  assert.equal(result.lastTakeaway, "Resumo.");
 });

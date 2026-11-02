@@ -91,3 +91,17 @@ test("snapshots include only exact stable prompts; report focus is hidden for le
   });
   assert.equal(reportTechnicalFocus({ technicalContent: report.technicalContent }, [], "Backend Engineer"), null);
 });
+
+test("free conversations never count toward a learner's technical topics", () => {
+  const topicId = getQuestionBankForRole("Backend Engineer").find((item) => item.kind === "technical").id;
+  const chat = { ...record("chat", "Modo livre", [topicId], "2026-03-01T00:00:00.000Z"), mode: "conversation" };
+  assert.deepEqual(buildLearnerQuestionProfile([chat], "Backend Engineer"), []);
+  const mixed = [record("a", "Backend Engineer", [topicId]), chat];
+  assert.deepEqual(buildLearnerQuestionProfile(mixed, "Backend Engineer").map(({ topicId: id, sessionCount }) => [id, sessionCount]), [[topicId, 1]]);
+  assert.equal(reportTechnicalFocus({ technicalContent: { gaps: [{ sequenceNumber: 1, explanation: "Explain it." }] }, technicalQuestionTopics: [{ sequenceNumber: 1, topicId }] }, [chat], "Backend Engineer", "current").priorSessionCount, 0);
+});
+
+test("records without a mode still feed the profile as interviews", () => {
+  const topicId = getQuestionBankForRole("Backend Engineer").find((item) => item.kind === "technical").id;
+  assert.equal(buildLearnerQuestionProfile([record("legacy", "Backend Engineer", [topicId])], "Backend Engineer")[0].sessionCount, 1);
+});

@@ -22,7 +22,8 @@ export function buildLearnerQuestionProfile(records, targetRole) {
   if (!Array.isArray(records)) return [];
   const byTopic = new Map();
   for (const record of records) {
-    if (record?.status !== "completed" || !roleMatches(record.targetRole, targetRole)) continue;
+    // Free conversations have no technical findings, so they never count toward a technical topic.
+    if (record?.status !== "completed" || record.mode === "conversation" || !roleMatches(record.targetRole, targetRole)) continue;
     const analysis = analysisOf(record);
     const snapshot = analysis?.technicalQuestionTopics;
     const gaps = analysis?.technicalContent?.gaps;
