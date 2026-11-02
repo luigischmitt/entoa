@@ -132,7 +132,7 @@ test("nod scheduler: down 260 ms then up 360 ms for a single nod; double nod is 
 });
 
 test("head poser: holds one pose between changes, anticipates each change, zeros when reduced, stays in each state's range", () => {
-  const RANGE = { idle: { r: [-5, 5], x: [-3, 3], y: [-1.5, 1.5] }, listening: { r: [-3, 4], x: [0, 2.5], y: [-1, 1] }, speaking: { r: [-3.5, 3.5], x: [-2, 2], y: [-1.2, 1.2] }, thinking: { r: [-2, 2], x: [-1, 1], y: [-1, 0] } };
+  const RANGE = { idle: { r: [-5, 5], x: [-3, 3], y: [-1.5, 1.5] }, listening: { r: [-3, 4], x: [0, 2.5], y: [-1, 1] }, speaking: { r: [-4.5, 1.2], x: [-2, 2], y: [-1.4, 0.4] }, thinking: { r: [-2, 2], x: [-1, 1], y: [-1, 0] } };
   for (const state of Object.keys(RANGE)) {
     const p = new HeadPoser(seeded(4));
     const runs = [];
@@ -343,4 +343,51 @@ test("engine: lower lid and glint write finite transforms; the upper lid stays w
     assert.ok(Number.isFinite(gx) && Number.isFinite(gy), `glint ${glint}`);
     assert.ok(lid >= -11 - 1e-9 && lid <= 11 + 1e-9, `lid travel ${lid}`);
   }
+});
+
+/** Engine speaking a 7.2 s clip of the synthetic speech through the feed fake; `frames(6)` drives 6 s and calls back per frame. */
+function speakingRun(seed) {
+  const one = syntheticSpeech();
+  const long = new Float32Array(one.length * 4);
+  for (let k = 0; k < 4; k += 1) long.set(one, k * one.length);
+  const f = analyseSamples(long, SR, seeded(3));
+  const root = fakeRoot();
+  const engine = createToucanEngine({ root, rng: seeded(seed) });
+  let pos = 0;
+  engine.setFeed({ sample: () => ({ id: 1, features: f, failed: false, pos, endsWithQuestion: false }) });
+  engine.setState("speaking", 0);
+  return {
+    root,
+    frames(onFrame) {
+      for (let i = 0; i < 60 * 6; i += 1) {
+        const t = i / 60;
+        pos = t;
+        engine.frame(t);
+        onFrame(t);
+      }
+    },
+    engine,
+  };
+}
+
+test("speaking: the bird sits upright or slightly back, never bowing forward (mean <= 0.5 deg, forward peak <= 2.5 deg over 6 s)", () => {
+  const run = speakingRun(5);
+  let sum = 0; let max = 0; let n = 0;
+  run.frames(() => {
+    const rot = Number(/rotate\((-?[\d.]+)/.exec(run.root.nodes.get("head").attrs.transform)[1]);
+    sum += rot; n += 1; max = Math.max(max, rot);
+  });
+  assert.equal(run.engine.state, "speaking");
+  assert.ok(sum / n <= 0.5, `mean head rotation ${(sum / n).toFixed(3)} deg`);
+  assert.ok(max <= 2.5, `forward peak ${max.toFixed(3)} deg`);
+});
+
+test("speaking: the upper lid stays fully out of the eye except during a blink (y = -11.00 in >= 90% of frames)", () => {
+  const run = speakingRun(5);
+  let open = 0; let n = 0;
+  run.frames(() => {
+    const y = Number(/translate\(0 (-?[\d.]+)\)/.exec(run.root.nodes.get("lid").attrs.transform)[1]);
+    n += 1; if (y === -11) open += 1;
+  });
+  assert.ok(open / n >= 0.9, `lid fully open in ${open}/${n} frames`);
 });
