@@ -33,6 +33,7 @@ export function buildConversationTurnRequest(input: {
   silent?: boolean;
 }): ConversationTurnRequest;
 export function nextUsedPathIds(usedPathIds: string[] | undefined, reply: Pick<ConversationTurnReply, "pathId"> | null | undefined): string[];
-export function fallbackConversationTurn(input: { plan: ConversationPlanInput; usedPathIds?: string[]; phase: ConversationPhaseName }): ConversationTurnReply;
+export function isMeaningQuestion(text: string | null | undefined): boolean;
+export function fallbackConversationTurn(input: { plan: ConversationPlanInput; usedPathIds?: string[]; phase: ConversationPhaseName; transcript?: string }): ConversationTurnReply;
 export function isConversationEnd(reply: Pick<ConversationTurnReply, "move"> | null | undefined): boolean;
 export function shouldReact(transcript: string | null | undefined): boolean;

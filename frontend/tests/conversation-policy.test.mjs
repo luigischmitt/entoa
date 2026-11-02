@@ -6,6 +6,7 @@ import {
   conversationPhase,
   fallbackConversationTurn,
   isConversationEnd,
+  isMeaningQuestion,
   nextUsedPathIds,
   shouldReact,
   MAX_SILENCE_NUDGES,
@@ -108,4 +109,18 @@ test("a silent turn asks the backend with silent true and the silence marker ins
   const spoken = buildConversationTurnRequest({ plan, elapsedSeconds: 30, durationMinutes: 5, transcript: "I like jazz" });
   assert.equal("silent" in spoken, false);
   assert.equal(spoken.transcript, "I like jazz");
+});
+
+test("meaning questions are recognised the same way as on the backend, with or without a question mark", () => {
+  for (const text of ["What does cheers mean?", "what does cheers mean", "What do you mean by cheers", "What's the meaning of cheers?", "What is cheers", "How do you say saudade in English?", "How do you use cheers?", "Can you explain cheers?", "I don't know what cheers means", "I don't understand cheers", "Yes, what does cheers mean?"]) {
+    assert.equal(isMeaningQuestion(text), true, text);
+  }
+  for (const text of ["What do you do on weekends?", "What is your favorite food?", "What is the best part of your day?", "I don't understand you", "What is a very long question about many different things that goes on and on forever?", "Yes, on Sunday.", "", null]) {
+    assert.equal(isMeaningQuestion(text), false, String(text));
+  }
+});
+
+test("a failed turn for a meaning question asks the person to repeat the word, not a path line", () => {
+  assert.deepEqual(fallbackConversationTurn({ plan, usedPathIds: [], phase: "explore", transcript: "What does cheers mean?" }), { say: "Sorry, I missed that word. Can you say it one more time?", move: "FOLLOW", pathId: null });
+  assert.deepEqual(fallbackConversationTurn({ plan, usedPathIds: [], phase: "explore", transcript: "Yes, on Sunday." }), { say: plan.paths[0].line, move: "NEW_PATH", pathId: "p1" });
 });

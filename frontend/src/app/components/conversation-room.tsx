@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { MicrophoneCapture, type MicControls, type VoiceCaptureState, type VoiceTranscriptionState } from "@/components/interview/microphone-capture";
 import { createSpeechFeed, toucanStateFor } from "@/components/interview/toucan/toucan-engine.mjs";
 import { AssessmentSocketRegistry } from "@/lib/interview/assessment-socket-registry.mjs";
-import { buildConversationTurnRequest, fallbackConversationTurn, isConversationEnd, MAX_SILENCE_NUDGES, nextUsedPathIds, shouldReact, silenceWaitMs, type ConversationLine, type ConversationPlanInput } from "@/lib/interview/conversation-policy.mjs";
+import { buildConversationTurnRequest, fallbackConversationTurn, isConversationEnd, isMeaningQuestion, MAX_SILENCE_NUDGES, nextUsedPathIds, shouldReact,silenceWaitMs, type ConversationLine, type ConversationPlanInput } from "@/lib/interview/conversation-policy.mjs";
 import { requestConversationTurn } from "@/lib/interview/conversation";
 import { conversationAssessmentSamples } from "@/lib/interview/conversation-report.mjs";
 import { pairInterviewTurns } from "@/lib/interview/report";
@@ -201,7 +201,7 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
     abortRef.current = controller;
     const body = buildConversationTurnRequest({ plan, usedPathIds: usedPathIdsRef.current, elapsedSeconds: secondsRef.current, durationMinutes, lines: personLines, transcript, silent });
     const reply = await requestConversationTurn(body, AbortSignal.any([controller.signal, AbortSignal.timeout(5_000)]))
-      .catch(() => fallbackConversationTurn({ plan, usedPathIds: usedPathIdsRef.current, phase: body.phase }));
+      .catch(() => fallbackConversationTurn({ plan, usedPathIds: usedPathIdsRef.current, phase: body.phase, transcript: body.transcript }));
     if (leftRef.current) return;
     abortRef.current = null;
     usedPathIdsRef.current = nextUsedPathIds(usedPathIdsRef.current, reply);
@@ -231,7 +231,7 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
     setVoiceCaptureState("idle");
     setAnswerError(null);
     setPhase("advancing");
-    if (shouldReact(transcript)) acknowledgements.schedule({ shouldPlay: () => !leftRef.current && phaseRef.current === "advancing" });
+    if (shouldReact(transcript) && !isMeaningQuestion(transcript)) acknowledgements.schedule({ shouldPlay: () => !leftRef.current && phaseRef.current === "advancing" });
     await takeTuckTurn(personLines, transcript, false);
   };
 

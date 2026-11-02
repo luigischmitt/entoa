@@ -59,9 +59,36 @@ export function nextUsedPathIds(usedPathIds, reply) {
   return [...used, pathId];
 }
 
-/** Used when the turn request fails: a closing line in the closing phase, otherwise the next unused path. */
-export function fallbackConversationTurn({ plan, usedPathIds = [], phase }) {
+const MISSED_WORD_LINE = "Sorry, I missed that word. Can you say it one more time?";
+const MEANING_MAX_WORDS = 8;
+// Keep in sync with isMeaningQuestion in backend/src/thinking/conversation-turn-service.ts (same patterns, same tests).
+const MEANING_PATTERNS = [
+  /^what does (.+) mean$/u,
+  /^what do you mean(?: by)? (.+)$/u,
+  /^what(?:'s| is) the meaning of (.+)$/u,
+  /^what(?:'s| is) (.+)$/u,
+  /^how do (?:you|i) (?:say|use) (.+)$/u,
+  /^can you explain (?:what )?(.+?)(?: means?)?$/u,
+  /^i (?:don't|do not) know what (.+?) means?$/u,
+  /^i (?:don't|do not) understand (?:what )?(.+)$/u,
+];
+const NOT_A_WORD_TO_EXPLAIN = /^(?:your|yours|you|you're|my|mine|our|their|his|her|the best|the most|the first|the last|a good|a great)\b/u;
+const LEADING_FILLER = /^(?:(?:yes|yeah|oh|sorry|so|well|um|uh|hmm|ok|okay|and|but)\s+)+/u;
+
+/** A short question about the meaning, translation or use of a word or phrase, as speech recognition writes it (often without a question mark). */
+export function isMeaningQuestion(text) {
+  const normalized = String(text ?? "").toLowerCase().replace(/[’]/gu, "'").replace(/[^\p{L}\p{N}' ]+/gu, " ").replace(/\s+/gu, " ").trim().replace(LEADING_FILLER, "");
+  if (!normalized || normalized.split(" ").length > MEANING_MAX_WORDS) return false;
+  return MEANING_PATTERNS.some((pattern) => {
+    const subject = pattern.exec(normalized)?.[1]?.trim();
+    return Boolean(subject) && !NOT_A_WORD_TO_EXPLAIN.test(subject);
+  });
+}
+
+/** Used when the turn request fails: a closing line in the closing phase, a missed-word line for a meaning question, otherwise the next unused path. */
+export function fallbackConversationTurn({ plan, usedPathIds = [], phase, transcript = "" }) {
   if (phase === "closing") return { say: CONVERSATION_CLOSING_LINE, move: "WRAP", pathId: null };
+  if (isMeaningQuestion(transcript)) return { say: MISSED_WORD_LINE, move: "FOLLOW", pathId: null };
   const used = new Set(usedPathIds);
   const next = plan.paths.find((path) => !used.has(path.id));
   if (next) return { say: next.line, move: "NEW_PATH", pathId: next.id };
