@@ -34,12 +34,14 @@ export function formatReportDate(value, locale = "pt-BR", fallback = new Date())
   return `${date.getDate()} ${monthsPt[date.getMonth()]} ${date.getFullYear()}`;
 }
 
-/** Summary paragraph: the technical summary, then the English overview when it adds new text. */
+/** Summary paragraph: the technical summary, then the English overview only when the summary does not already judge the English. */
 export function reportSummaryText(result) {
   const summary = result?.technicalContent?.summary;
   const english = result?.overview?.english;
   const summaryText = isCompleteSentence(summary) ? summary.trim() : null;
-  const englishText = isCompleteSentence(english) && !summaryText?.includes(english.trim()) ? english.trim() : null;
+  // The technical summary already says how the English sounded: a second English verdict would repeat it.
+  const summaryJudgesEnglish = summaryText !== null && /ingl[êe]s|english/iu.test(summaryText);
+  const englishText = isCompleteSentence(english) && !summaryJudgesEnglish && !summaryText?.includes(english.trim()) ? english.trim() : null;
   return [summaryText, englishText].filter(Boolean).join(" ");
 }
 
