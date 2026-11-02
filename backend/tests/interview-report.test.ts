@@ -494,6 +494,17 @@ describe("final interview report service", () => {
     await expect(makeService(async () => { throw new DOMException("timeout", "TimeoutError"); }).generate(input)).rejects.toMatchObject({ code: "THINKING_TIMEOUT", status: 504 });
     await expect(makeService(async () => new Response("failed", { status: 503 })).generate(input)).rejects.toMatchObject({ code: "THINKING_PROVIDER_UNAVAILABLE", status: 502 });
   });
+
+  it("tells the per-answer analysis that a premise correction is a valid answer, not a gap", async () => {
+    const bodies: Array<Record<string, any>> = [];
+    const fetchImplementation: typeof fetch = async (_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ technicalStrengths: [], technicalGaps: [], englishPatterns: [] }) } }] }), { status: 200 });
+    };
+    await makeService(fetchImplementation).analyzeTurn({ roleContext: input.roleContext, turn: input.turns[0] });
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0].messages[0].content).toContain("When the candidate corrects the premise of the question about their own work, saying that the thing asked about does not happen or works differently, treat that as a valid and honest answer: never report the correction as a gap, never call it a failure to address the question, and never advise describing what the candidate said does not exist.");
+  });
 });
 
 describe("POST /api/v1/thinking/report", () => {
