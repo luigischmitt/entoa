@@ -6,7 +6,7 @@ import { defaultThinkingModel, defaultThinkingTimeoutMs } from "../src/thinking/
 import { OpenRouterOrchestrationService } from "../src/thinking/openrouter-orchestration-service.js";
 import type { InterviewOrchestrationInput } from "../src/thinking/types.js";
 
-const speechConfig: SpeechConfig = { provider: "fake", kokoroBaseUrl: "http://localhost:8888", kokoroTimeoutMs: 1000, interviewerVoice: "af_bella", defaultSpeed: 1, format: "mp3" };
+const speechConfig: SpeechConfig = { provider: "fake", interviewerVoice: "en-US-AndrewNeural", defaultSpeed: 1, format: "mp3" };
 const currentQuestion = "How would you make a REST API reliable?";
 const base: InterviewOrchestrationInput = {
   currentQuestion,

@@ -1,17 +1,19 @@
 import { SpeechProviderUnavailableError } from "./errors.js";
-import { resolveKokoroVoice, resolveVoice } from "./voices.js";
+import { resolveChatterboxVoice, resolveVoice } from "./voices.js";
 import type {
   HedgeOutcome,
   SpeechProvider,
   SpeechProviderHealth,
   SpeechSynthesisRequest,
   SynthesizedSpeech,
-  VoiceStatus,
 } from "./types.js";
 
-type Source = "kokoro" | "azure" | "openrouter";
+type Source = "chatterbox" | "azure";
 
-// Routing hints are for this hybrid only: children (including a nested hybrid, which then races normally) never see them.
+const primarySource: Source = "chatterbox";
+const secondarySource: Source = "azure";
+
+// Routing hints are for this hybrid only: children never see them.
 function withoutRoutingHints(request: SpeechSynthesisRequest): SpeechSynthesisRequest {
   const copy = { ...request };
   delete copy.preferredSource;
@@ -20,55 +22,32 @@ function withoutRoutingHints(request: SpeechSynthesisRequest): SpeechSynthesisRe
 }
 
 type HybridSpeechProviderOptions = {
+  /** Chatterbox: the main voice. */
   primary: SpeechProvider;
+  /** Azure Neural TTS: the emergency fallback, in its own voice. */
   secondary: SpeechProvider;
-  /** Each provider gets its own voice: Kokoro accepts blends, OpenRouter does not. */
-  primaryVoice: string;
-  primarySource?: Source;
+  /** The configured Azure voice, used when a request voice is not selectable. */
   secondaryVoice: string;
-  secondarySource?: "openrouter" | "azure";
   timeoutMs: number;
   /** Start the secondary after this delay without primary audio; 0 disables the timed hedge (fast failures still fall back). */
   hedgeAfterMs: number;
   /** A pinned primary keeps its voice but gets this long before the other voice joins; 0 waits for its failure. Keep it well under timeoutMs. */
   pinnedFallbackAfterMs?: number;
-  /**
-   * Wake-up call for the scale-to-zero primary, e.g. an authenticated GET /health. A rejection or a
-   * resolved `{ status: "unavailable" }` counts as a failed attempt; `{ status: "warming" }` means
-   * the call was cut short while the primary is still starting.
-   */
-  warmupRequest?: () => Promise<unknown>;
-  warmupIntervalMs?: number;
-  /** Cached knowledge stays valid this long (ready and failed windows). */
-  statusTtlMs?: number;
-  /** Minimum gap between probes triggered by status polling. */
-  statusProbeIntervalMs?: number;
-  now?: () => number;
 };
 
 export class HybridSpeechProvider implements SpeechProvider {
   readonly name = "hybrid";
 
   private readonly options: HybridSpeechProviderOptions;
-  private warmupInFlight = false;
-  private lastWarmupAt = Number.NEGATIVE_INFINITY;
-  private lastReadyAt = Number.NEGATIVE_INFINITY;
-  private lastFailureAt = Number.NEGATIVE_INFINITY;
 
   constructor(options: HybridSpeechProviderOptions) {
     this.options = options;
   }
 
   async synthesize(request: SpeechSynthesisRequest, signal?: AbortSignal): Promise<SynthesizedSpeech> {
-    const { primary, secondary, primaryVoice, secondaryVoice, timeoutMs, hedgeAfterMs } = this.options;
-    const primarySource = this.options.primarySource ?? "kokoro";
-    const secondarySource = this.options.secondarySource ?? "openrouter";
-    const primaryVoiceForRequest = primarySource === "azure"
-      ? resolveVoice(request.voice, primaryVoice)
-      : resolveKokoroVoice(request.voice, primaryVoice);
-    const secondaryVoiceForRequest = secondarySource === "azure"
-      ? resolveVoice(request.voice, secondaryVoice)
-      : resolveKokoroVoice(request.voice, secondaryVoice);
+    const { primary, secondary, secondaryVoice, timeoutMs, hedgeAfterMs } = this.options;
+    const primaryVoiceForRequest = resolveChatterboxVoice(request.voice);
+    const secondaryVoiceForRequest = resolveVoice(request.voice, secondaryVoice);
     const controllers = { primary: new AbortController(), secondary: new AbortController() };
     let hedgeTimer: ReturnType<typeof setTimeout> | undefined;
     let overallTimer: ReturnType<typeof setTimeout> | undefined;
@@ -106,7 +85,6 @@ export class HybridSpeechProvider implements SpeechProvider {
       const win = (source: Source, speech: SynthesizedSpeech) => {
         if (settled) return;
         controllers[source === primarySource ? "secondary" : "primary"].abort(new Error("Another speech request answered first."));
-        if (source === "kokoro") this.lastReadyAt = this.now();
         const hedge: HedgeOutcome = source === secondarySource ? "hedge_won" : secondaryStarted ? "primary_won" : "not_needed";
         finish(() => resolve({ ...speech, diagnostics: { ...speech.diagnostics, hedge, voiceSource: source } }));
       };
@@ -154,49 +132,14 @@ export class HybridSpeechProvider implements SpeechProvider {
     });
   }
 
-  // No network call: health must not wake the scale-to-zero primary or spend paid requests.
+  // No network call: health must not spend paid requests.
   async health(): Promise<SpeechProviderHealth> {
     return { status: "ready" };
-  }
-
-  warmup(): void {
-    this.probe(this.options.warmupIntervalMs ?? 60_000);
   }
 
   warmConnection(): void {
     for (const provider of [this.options.primary, this.options.secondary]) {
       try { (provider as SpeechProvider & { warmConnection?: () => void }).warmConnection?.(); } catch { /* Best effort. */ }
     }
-  }
-
-  /** Cached readiness of the primary voice; polling may trigger a throttled background probe. */
-  voiceStatus(): VoiceStatus {
-    if (!this.options.warmupRequest) return "ready";
-    const ttl = this.options.statusTtlMs ?? 60_000;
-    if (this.now() - this.lastReadyAt < ttl) return "ready";
-    this.probe(this.options.statusProbeIntervalMs ?? 5_000);
-    if (this.lastFailureAt > this.lastReadyAt && this.now() - this.lastFailureAt < ttl) return "unavailable";
-    return "warming";
-  }
-
-  private now(): number {
-    return (this.options.now ?? Date.now)();
-  }
-
-  private probe(minIntervalMs: number): void {
-    const { warmupRequest } = this.options;
-    if (!warmupRequest || this.warmupInFlight || this.now() - this.lastWarmupAt < minIntervalMs) return;
-    this.warmupInFlight = true;
-    this.lastWarmupAt = this.now();
-    void Promise.resolve()
-      .then(warmupRequest)
-      .then((result) => {
-        const status = (result as { status?: unknown } | undefined)?.status;
-        if (status === "warming") return;
-        if (status === "unavailable") this.lastFailureAt = this.now();
-        else this.lastReadyAt = this.now();
-      })
-      .catch(() => { this.lastFailureAt = this.now(); })
-      .finally(() => { this.warmupInFlight = false; });
   }
 }

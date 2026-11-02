@@ -1,12 +1,12 @@
 import type { RequestHandler } from "express";
 
 import { normalizeTextForSpeech } from "../speech/text-normalization.js";
-import { resolveKokoroVoice, resolveVoice } from "../speech/voices.js";
+import { resolveVoice } from "../speech/voices.js";
 import { SpeechProviderUnavailableError } from "../speech/errors.js";
 import type { SpeechConfig } from "../speech/config.js";
 import type { SpeechCache, SpeechCacheResult } from "../speech/speech-cache.js";
 import type { InterviewerSpeechPrefetcher } from "../speech/interviewer-prefetcher.js";
-import type { SpeechDiagnostics, SpeechProvider, VoiceStatus } from "../speech/types.js";
+import type { SpeechDiagnostics, SpeechProvider } from "../speech/types.js";
 
 const maxTextLength = 2_000;
 
@@ -19,7 +19,7 @@ type SpeechBody = {
   voiceSource?: unknown;
 };
 
-const voiceSources = ["openrouter", "azure", "kokoro"] as const;
+const voiceSources = ["chatterbox", "azure"] as const;
 
 function requestedVoiceSource(value: unknown): (typeof voiceSources)[number] | undefined {
   return voiceSources.find((source) => source === value);
@@ -110,9 +110,7 @@ export function createSpeechController(provider: SpeechProvider, config: SpeechC
       const preferredSource = requestedVoiceSource(body.voiceSource);
       const synthesisRequest = {
         text: normalizeTextForSpeech(text),
-        voice: config.provider === "azure-openrouter" || config.provider === "openrouter-azure" || config.provider === "deepinfra-openrouter-azure"
-          ? resolveVoice(body.voice, config.interviewerVoice)
-          : resolveKokoroVoice(body.voice, config.interviewerVoice),
+        voice: resolveVoice(body.voice, config.interviewerVoice),
         speed,
         format: config.format,
         ...(preferredSource ? { preferredSource } : {}),
@@ -187,24 +185,20 @@ export function createSpeechController(provider: SpeechProvider, config: SpeechC
     }
   };
 
-  // Wakes a scale-to-zero provider and fills static phrases while the request keeps CPU allocated.
+  // Fills the static phrases for the requested voice and speed while the request keeps the server busy.
   const warmup: RequestHandler = async (request, response) => {
     const body = request.body as Pick<SpeechBody, "voice" | "speed">;
-    try { provider.warmup?.(); } catch { /* Warm-up is best effort. */ }
-    if (cache && prefetcher && config.provider !== "fake") {
+    const warmable = cache && prefetcher && config.provider !== "fake";
+    if (warmable) {
       try { await prefetcher.prefetchStaticFor(body?.voice, body?.speed, { concurrency: 3, deadlineMs: 30_000 }); } catch { /* Warm-up is best effort. */ }
     }
-    response.status(provider.warmup || (cache && prefetcher && config.provider !== "fake") ? 202 : 204).end();
+    response.status(warmable ? 202 : 204).end();
   };
 
-  // Cached readiness of the interviewer voice; never blocks on the provider.
+  // Kept for the client: Chatterbox and Azure have no warm-up state to report, so the voice is always ready.
   const warmupStatus: RequestHandler = (_request, response) => {
-    let voice: VoiceStatus = "ready";
-    if (provider.voiceStatus) {
-      try { voice = provider.voiceStatus(); } catch { voice = "unavailable"; }
-    }
     response.setHeader("Cache-Control", "no-store");
-    response.status(200).json({ voice });
+    response.status(200).json({ voice: "ready" });
   };
 
   const voices: RequestHandler = (_request, response) => {

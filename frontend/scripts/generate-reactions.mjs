@@ -1,7 +1,8 @@
 // Synthesizes the static interviewer reactions (one MP3 per phrase and voice and source) into
-// public/audio/reactions/<voice id>/ (Kokoro, through OpenRouter) and public/audio/reactions-azure/<voice id>/ (Azure Speech).
-// Existing files are kept, so a re-run only fills the gaps. Kokoro needs OPENROUTER_API_KEY; Azure needs AZURE_SPEECH_KEY and
-// AZURE_SPEECH_REGION. Each env var is required only when a file of that source is actually missing.
+// public/audio/reactions/<voice id>/ (Chatterbox, through DeepInfra) and public/audio/reactions-azure/<voice id>/ (Azure Speech).
+// Existing files are kept, so a re-run only fills the gaps; `--force-primary` regenerates the Chatterbox files in reactions/.
+// Chatterbox needs DEEPINFRA_API_KEY; Azure needs AZURE_SPEECH_KEY and AZURE_SPEECH_REGION. Each env var is required only
+// when a file of that source is actually missing (or regenerated).
 
 import { access, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -12,12 +13,25 @@ import { CONVERSATION_REACTIONS, reactionFileName } from "../src/lib/interview/s
 import { INTERVIEWER_VOICE_OPTIONS } from "../src/lib/interview/voices.mjs";
 
 const publicRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "public", "audio");
-const kokoroEndpoint = "https://openrouter.ai/api/v1/audio/speech";
+const chatterboxEndpoint = "https://api.deepinfra.com/v1/inference/ResembleAI/chatterbox-turbo";
 const attempts = 3;
+const forcePrimary = process.argv.includes("--force-primary");
+
+// Chatterbox voice ids (DeepInfra), by the interviewer voice id the app selects.
+const chatterboxVoiceIds = {
+  "en-US-AndrewNeural": "pxukbhrmd6in9omcerme",
+  "en-US-BrianNeural": "1di0faf2tnibx9ccbp08",
+  "en-US-GuyNeural": "7sy7qh963bdp4d61cbke",
+  "en-GB-RyanNeural": "u3o3sghrrgld77jxi368",
+  "en-US-AvaNeural": "nkwdqjkpkb656sng0njk",
+  "en-US-EmmaNeural": "qhoy6haei50tv441nacf",
+  "en-US-JennyNeural": "hjaqgzxdrdyd2jkwsdsi",
+  "en-GB-SoniaNeural": "v3oq44tcx0dgkwlhis7f",
+};
 
 const phrases = [...new Set([...ACKNOWLEDGEMENT_PHRASES, ...CONVERSATION_REACTIONS])];
 const sources = {
-  kokoro: { folder: "reactions", concurrency: 4 },
+  chatterbox: { folder: "reactions", concurrency: 3 },
   azure: { folder: "reactions-azure", concurrency: 2 },
 };
 const jobs = Object.entries(sources).flatMap(([source, { folder }]) =>
@@ -25,21 +39,22 @@ const jobs = Object.entries(sources).flatMap(([source, { folder }]) =>
 
 const exists = (file) => access(file).then(() => true, () => false);
 
-// Kokoro: OpenRouter's speech endpoint, one MP3 per phrase.
-async function synthesizeKokoro({ voice, phrase }, env) {
-  const response = await fetch(kokoroEndpoint, {
+// Chatterbox (DeepInfra): one request per phrase; the MP3 comes back as a base64 data URL in `audio`.
+async function synthesizeChatterbox({ voice, phrase }, env) {
+  const response = await fetch(chatterboxEndpoint, {
     method: "POST",
-    headers: { Authorization: `Bearer ${env.OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "hexgrad/kokoro-82m",
-      input: phrase,
-      voice: voice.kokoroVoice,
-      response_format: "mp3",
-      provider: { order: ["DeepInfra"], allow_fallbacks: true, data_collection: "deny" },
-    }),
+    headers: { Authorization: `Bearer ${env.DEEPINFRA_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ text: phrase, voice_id: chatterboxVoiceIds[voice.id], exaggeration: 0.85, cfg: 0.4, response_format: "mp3" }),
   });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return Buffer.from(await response.arrayBuffer());
+  if (!response.ok) {
+    const error = new Error(`HTTP ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+  const { audio } = await response.json();
+  const encoded = String(audio ?? "").replace(/^data:audio\/mp3;base64,/u, "");
+  if (!encoded) throw new Error("No audio in the Chatterbox response");
+  return Buffer.from(encoded, "base64");
 }
 
 // Azure: the same REST call as backend/src/speech/azure-speech-provider.ts (SSML, 24 kHz MP3, rate +0%).
@@ -63,7 +78,7 @@ async function synthesizeAzure({ voice, phrase }, env) {
   return Buffer.from(await response.arrayBuffer());
 }
 
-const synthesizers = { kokoro: synthesizeKokoro, azure: synthesizeAzure };
+const synthesizers = { chatterbox: synthesizeChatterbox, azure: synthesizeAzure };
 
 async function generate(job, env) {
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
@@ -82,7 +97,7 @@ async function generate(job, env) {
 }
 
 const pending = [];
-for (const job of jobs) if (!(await exists(job.file))) pending.push(job);
+for (const job of jobs) if ((forcePrimary && job.source === "chatterbox") || !(await exists(job.file))) pending.push(job);
 
 if (pending.length === 0) {
   console.log(`All ${jobs.length} reaction files already exist.`);
@@ -91,7 +106,7 @@ if (pending.length === 0) {
   const missingEnv = [];
   for (const source of Object.keys(sources)) {
     if (!pending.some((job) => job.source === source)) continue;
-    const required = source === "kokoro" ? ["OPENROUTER_API_KEY"] : ["AZURE_SPEECH_KEY", "AZURE_SPEECH_REGION"];
+    const required = source === "chatterbox" ? ["DEEPINFRA_API_KEY"] : ["AZURE_SPEECH_KEY", "AZURE_SPEECH_REGION"];
     for (const name of required) if (!env[name]) missingEnv.push(`${name} (for ${source} files)`);
   }
   if (missingEnv.length > 0) {

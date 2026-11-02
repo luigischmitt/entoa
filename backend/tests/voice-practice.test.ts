@@ -7,7 +7,7 @@ import { PracticeDailyLimit } from "../src/routes/voice.routes.js";
 import type { SpeechConfig } from "../src/speech/config.js";
 import type { PronunciationAssessmentService } from "../src/transcription/azure-pronunciation-assessment.js";
 
-const speechConfig: SpeechConfig = { provider: "fake", kokoroBaseUrl: "http://localhost:8880", kokoroTimeoutMs: 15_000, interviewerVoice: "af_bella+af_heart", defaultSpeed: 1, format: "mp3" };
+const speechConfig: SpeechConfig = { provider: "fake", interviewerVoice: "en-US-AndrewNeural", defaultSpeed: 1, format: "mp3" };
 
 function wav(durationMs = 1_000, options: { channels?: number; sampleRate?: number; bits?: number } = {}): Buffer {
   const channels = options.channels ?? 1;

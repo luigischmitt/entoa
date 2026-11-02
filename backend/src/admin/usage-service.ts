@@ -174,7 +174,7 @@ export class AdminUsageService {
     try {
       const token = await this.gcpToken(); const { start, end } = monthWindow(this.now());
       const query = async (metric: string) => {
-        const filter = `metric.type = \"${metric}\" AND resource.type = \"cloud_run_revision\" AND (resource.labels.service_name = \"english-interview-backend\" OR resource.labels.service_name = \"english-interview-kokoro\")`;
+        const filter = `metric.type = \"${metric}\" AND resource.type = \"cloud_run_revision\" AND resource.labels.service_name = \"english-interview-backend\"`;
         const params = new URLSearchParams({ filter, "interval.startTime": start, "interval.endTime": end, "aggregation.alignmentPeriod": "86400s", "aggregation.perSeriesAligner": "ALIGN_SUM", "aggregation.crossSeriesReducer": "REDUCE_SUM", "aggregation.groupByFields": "resource.labels.service_name" });
         const body = await json(this.fetchImpl, `https://monitoring.googleapis.com/v3/projects/${encodeURIComponent(project)}/timeSeries?${params}`, { headers: { authorization: `Bearer ${token}` } }) as { timeSeries?: Array<{ resource?: { labels?: { service_name?: unknown } }; points?: Array<{ value?: { doubleValue?: unknown; int64Value?: unknown } }> }> };
         return (body.timeSeries ?? []).map((series) => ({

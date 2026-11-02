@@ -1,6 +1,6 @@
 # Backend
 
-The backend provides interviewer speech through Kokoro, completed spoken-response transcription through OpenRouter Whisper Large V3 Turbo, and a technical-answer/English-communication assessment from submitted voice transcripts through OpenRouter. The English-formulation route remains a placeholder.
+The backend provides interviewer speech through Chatterbox on DeepInfra with Azure Neural TTS as the emergency fallback, completed spoken-response transcription through OpenRouter Whisper Large V3 Turbo, and a technical-answer/English-communication assessment from submitted voice transcripts through OpenRouter. The English-formulation route remains a placeholder.
 
 ## Run the complete local environment
 
@@ -10,7 +10,7 @@ From the repository root:
 docker compose up --build
 ```
 
-This starts the frontend at `http://localhost:3000`, the backend at `http://localhost:3001`, and Kokoro at `http://localhost:8880`. Source folders are mounted into the frontend and backend containers, so their development servers reload when code changes.
+This starts the frontend at `http://localhost:3000` and the backend at `http://localhost:3001`. Compose runs the backend with `SPEECH_PROVIDER=fake`, so it needs no speech keys; set `SPEECH_PROVIDER=chatterbox-azure` in `backend/.env` for the real voice. Source folders are mounted into the frontend and backend containers, so their development servers reload when code changes.
 
 Stop every service with:
 
@@ -50,32 +50,21 @@ performed by the authenticated frontend client. The speech service accepts:
 | `SUPABASE_URL` | — | Public Supabase project URL (same value as the frontend's `NEXT_PUBLIC_SUPABASE_URL`). Required while `BACKEND_AUTH_REQUIRED` is `true`; must be `https` (or `http` for `localhost`/`127.0.0.1`). The backend fails at startup without it. |
 | `SUPABASE_PUBLISHABLE_KEY` | — | Optional public key (same value as the frontend's `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; recommended). Enables the remote token check described under Authentication; without it, only ES256 tokens with a known `kid` are accepted. |
 | `BACKEND_AUTH_REQUIRED` | `true` | `false` disables access-token checks (local development only; a content-free `auth_disabled` warning is logged at startup). Any value other than `true`/`false` fails at startup. |
-| `SPEECH_PROVIDER` | `fake` | `fake` returns deterministic test audio; `kokoro` calls a Kokoro server; `openrouter` calls Kokoro through OpenRouter; `kokoro-openrouter` (hybrid) uses self-hosted Kokoro first with OpenRouter as the hedge; `azure-openrouter` uses Azure Neural TTS with OpenRouter Kokoro fallback. |
-| `KOKORO_URL` | — | Kokoro HTTP base URL, e.g. the private Cloud Run service. Required with `kokoro-openrouter`; with `kokoro` it takes precedence over `KOKORO_BASE_URL`. |
-| `KOKORO_BASE_URL` | `http://localhost:8880` | Kokoro HTTP base URL when `KOKORO_URL` is unset (local Docker). |
-| `KOKORO_AUTH` | `none` | `gcp-id-token` sends `Authorization: Bearer <Google identity token>` (audience = the Kokoro URL origin, from the metadata server) on every Kokoro request, health included. |
-| `HYBRID_SPEECH_HEDGE_AFTER_MS` | `2500` (`5000` with `openrouter-azure`) | Integer 0-30000. With `kokoro-openrouter`, OpenRouter starts if Kokoro has produced no audio after this delay; a fast Kokoro failure starts it immediately. With `openrouter-azure`, Azure starts only after this delay or after both OpenRouter upstreams fail. `0` disables the timed hedge (failures still fall back). |
-| `OPENROUTER_SPEECH_VOICE` | `am_echo` | Default interviewer voice with `openrouter` (and the OpenRouter voice with `kokoro-openrouter`); single voices only, blends are rejected. The default lives in `openRouterDefaultVoice` (`src/speech/config.ts`, from `src/speech/voices.ts`). Clients may request any voice in `selectableVoiceList` via an optional `voice` field on `POST /speech` and `POST /thinking/next-turn`; other values fall back to this default. With `kokoro-openrouter` the per-provider voices win. |
-| `KOKORO_TIMEOUT_MS` | `15000` | Positive request timeout in milliseconds (also used by `openrouter` and as the overall deadline of `kokoro-openrouter`). |
-| `INTERVIEWER_VOICE` | `af_bella+af_heart` (with `openrouter`: `OPENROUTER_SPEECH_VOICE`, then `am_echo`) | Voice passed to the provider. Blends containing `+` are rejected at startup with `openrouter`. |
-| `OPENROUTER_SPEECH_MODEL` | `hexgrad/kokoro-82m` | Speech model when `SPEECH_PROVIDER=openrouter`. Requires `OPENROUTER_API_KEY`, otherwise the backend fails at startup. |
-| `HYBRID_SPEECH_PINNED_FALLBACK_AFTER_MS` | `7000` | Integer 0-14000, used with `openrouter-azure`. An interview pinned to the OpenRouter voice keeps it, but Azure joins if no audio arrived after this delay. `0` waits for an OpenRouter failure, which arrives only at the shared deadline. |
-| `DEEPINFRA_API_KEY` | — | Required with `SPEECH_PROVIDER=deepinfra-openrouter-azure`; the backend fails at startup without it. Keep it server-side. |
-| `DEEPINFRA_SPEECH_URL` | `https://api.deepinfra.com/v1/openai/audio/speech` | DeepInfra speech endpoint, used only with `deepinfra-openrouter-azure`. |
-| `DEEPINFRA_SPEECH_MODEL` | `hexgrad/Kokoro-82M` | Model sent to DeepInfra with `deepinfra-openrouter-azure`. |
-| `DEEPINFRA_SPEECH_TIMEOUT_MS` | `6000` | Positive DeepInfra request timeout in milliseconds, used only with `deepinfra-openrouter-azure`. |
-| `DEEPINFRA_SPEECH_FALLBACK_AFTER_MS` | `1500` | Integer 0-10000. With `deepinfra-openrouter-azure`, OpenRouter Kokoro joins if DeepInfra has not answered after this delay, or immediately when DeepInfra fails. `0` disables the timed hedge (OpenRouter then starts only when DeepInfra fails). |
-| `OPENROUTER_SPEECH_HEDGE_AFTER_MS` | `2000` | Integer 0-10000. With `openrouter`, synthesis goes to DeepInfra first; if it has not answered after this delay (or fails sooner), a second request routed to Together starts and the first successful response wins. `0` disables hedging. |
+| `SPEECH_PROVIDER` | `fake` | `fake` returns deterministic test audio; `chatterbox-azure` uses Chatterbox on DeepInfra as the only main voice, with Azure Neural TTS as the emergency fallback. |
+| `HYBRID_SPEECH_HEDGE_AFTER_MS` | `5000` | Integer 0-30000. Azure starts if Chatterbox has produced no audio after this delay; a fast Chatterbox failure starts it immediately. `0` disables the timed hedge (failures still fall back). |
+| `HYBRID_SPEECH_PINNED_FALLBACK_AFTER_MS` | `6000` | Integer 0-14000. An interview pinned to Chatterbox keeps it, but Azure joins if no audio arrived after this delay. `0` waits for a Chatterbox failure. |
+| `DEEPINFRA_API_KEY` | — | Required with `SPEECH_PROVIDER=chatterbox-azure`; the backend fails at startup without it. Keep it server-side. |
+| `CHATTERBOX_SPEECH_TIMEOUT_MS` | `6000` | Positive Chatterbox request timeout in milliseconds. Azure gets its full timeout after this one. |
 | `SPEECH_CACHE_TTL_MS` | `60000` | 0-600000. Finished audio and in-flight syntheses are shared by identical `/speech` requests (key: normalized text + voice + speed + format); `0` turns the cache and prefetch off. |
 | `SPEECH_STATIC_CACHE_TTL_MS` | `3600000` | Lifetime of the fixed phrases (acknowledgements, closing line). |
 | `SPEECH_PREFETCH` | `1` | `0` stops the server synthesizing the next utterance when `POST /thinking/next-turn` produces a decision. |
 | `SPEECH_PREFETCH_CHUNKS` | `1` | 1-4. How many leading chunks of the next utterance are synthesized ahead (the first is what delays the voice). |
 | `SPEECH_PREFETCH_STATIC` | `1` | `0` skips synthesizing the fixed phrases at startup. |
-| `OPENROUTER_SPEECH_URL` | `https://openrouter.ai/api/v1/audio/speech` | Speech endpoint override, mainly for tests. |
 | `INTERVIEWER_SPEED` | `1` | Positive default speech speed. |
-| `AZURE_TTS_VOICE` | `en-US-AndrewNeural` | Configured Azure fallback voice. With `azure-openrouter`, clients may choose Andrew, Brian, Guy, Ryan, Ava, Emma, Jenny or Sonia; each selected Azure voice maps to a same-gender/accent Kokoro fallback. |
-| `AZURE_SPEECH_KEY` | — | Azure Speech resource key. Required only for voice transcription. Keep it server-side. |
-| `AZURE_SPEECH_REGION` | — | Azure Speech resource region, such as `brazilsouth`. Required only for voice transcription. |
+| `AZURE_TTS_VOICE` | `en-US-AndrewNeural` | Interviewer voice and Azure fallback voice. Clients may choose any voice in `selectableVoiceList` on `POST /speech`; each maps to a Chatterbox clone, and unknown values use Andrew's clone. |
+| `AZURE_TTS_TIMEOUT_MS` | `8000` | Positive Azure TTS timeout in milliseconds. |
+| `AZURE_SPEECH_KEY` | — | Azure Speech resource key. Required with `chatterbox-azure` (fallback voice) and for voice transcription. Keep it server-side. |
+| `AZURE_SPEECH_REGION` | — | Azure Speech resource region, such as `brazilsouth`. Required with `chatterbox-azure` and for voice transcription. |
 | `AZURE_SPEECH_TIMEOUT_MS` | `20000` | Positive Azure Speech request timeout in milliseconds. |
 | `AZURE_SPEECH_ASSESSMENT_ENABLED` | `false` | Set to `true` to enable optional experimental pronunciation signals. Requires Azure Speech key and region. |
 | `AZURE_SPEECH_ASSESSMENT_TIMEOUT_MS` | `15000` | Positive per-block deadline shared by ffmpeg conversion and one Azure scripted assessment request. |
@@ -128,90 +117,32 @@ finalization queue remains capped at 4 active plus 4 waiting per instance
 not a throughput or latency guarantee; actual capacity depends on audio length,
 provider latency, memory headroom, and Cloud Run scaling.
 
-## Interviewer voice via OpenRouter
+## Interviewer voice: Chatterbox with Azure fallback
 
-Production has no Kokoro server, so `SPEECH_PROVIDER=openrouter` synthesizes the
-interviewer with the same Kokoro model (`hexgrad/kokoro-82m`) through OpenRouter,
-reusing `OPENROUTER_API_KEY`, which stays server-side. Measured latency was
-1.5-1.9 s per question. Cost is about US$0.62 per 1M characters on DeepInfra;
-the OpenRouter price is not confirmed. Only single voices work (default
-`af_heart`): blends such as `af_bella+af_heart` return HTTP 400 upstream, so
-they are rejected at startup. `speed` is sent only when `INTERVIEWER_SPEED`
-is not `1` (verified live), and every request asks OpenRouter for
-`data_collection: "deny"`. `/api/v1/speech/health` reports `ready` without calling OpenRouter.
-Upstream latency varies a lot (0.5-10 s), so requests are hedged: the primary asks
-OpenRouter to prefer DeepInfra, and after `OPENROUTER_SPEECH_HEDGE_AFTER_MS` a second
-request prefers Together (about 6x the price, paid only when the hedge starts); the loser is aborted.
-The `speech_synthesis_timing` log gains a content-free `hedge` field:
-`not_needed`, `primary_won`, `hedge_won` or `both_failed`.
-When synthesis fails, the API returns `503 SPEECH_PROVIDER_UNAVAILABLE` and the
-frontend keeps showing the question as text with an audio-unavailable message.
+`SPEECH_PROVIDER=chatterbox-azure` is the production speech setup. Chatterbox Turbo (ResembleAI) on DeepInfra
+(`DEEPINFRA_API_KEY`) answers every interviewer line. Its voices are clones on the DeepInfra account; each
+selectable Azure id (`selectableVoiceList` in `src/speech/voices.ts`) maps to its clone, and any unknown value
+uses Andrew's clone. The model has no speed control, so `speed` is ignored there and the client controls speed.
 
-## Interviewer voice: self-hosted Kokoro with OpenRouter hedge
+Azure Neural TTS (`AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION`, voice `AZURE_TTS_VOICE`) is the emergency fallback. It
+joins after `HYBRID_SPEECH_HEDGE_AFTER_MS` without audio, at once when Chatterbox fails, and after
+`HYBRID_SPEECH_PINNED_FALLBACK_AFTER_MS` for an interview pinned to Chatterbox. The overall deadline is
+`CHATTERBOX_SPEECH_TIMEOUT_MS` plus `AZURE_TTS_TIMEOUT_MS`, so Azure keeps its full timeout. The first non-empty
+audio wins and the other request is aborted; if both fail the API returns `503 SPEECH_PROVIDER_UNAVAILABLE`.
 
-`SPEECH_PROVIDER=kokoro-openrouter` starts Kokoro (`KOKORO_URL`, optionally
-`KOKORO_AUTH=gcp-id-token` for a private Cloud Run service, voice
-`INTERVIEWER_VOICE`, default blend `af_bella+af_heart`) and, when it has not
-returned audio within `HYBRID_SPEECH_HEDGE_AFTER_MS` or fails, also starts
-`OpenRouterSpeechProvider` (voice `OPENROUTER_SPEECH_VOICE`, its own DeepInfra to
-Together hedge). The first non-empty audio wins and the other request is
-aborted; if both fail the API returns `503 SPEECH_PROVIDER_UNAVAILABLE`.
-Startup requires `KOKORO_URL` and `OPENROUTER_API_KEY`. `speech_synthesis_timing`
-logs `provider: "hybrid"`, `voiceSource` (`kokoro` or `openrouter`) and `hedge`
-(`not_needed`, `primary_won`, `hedge_won`, `both_failed`), never text or tokens.
-`GET /api/v1/speech/health` reports `ready` without calling either upstream, so it
-does not wake Kokoro.
+`speech_synthesis_timing` logs `provider: "hybrid"`, `voiceSource` (`chatterbox` or `azure`), `hedge`
+(`not_needed`, `primary_won`, `hedge_won`, `both_failed`) and, for Chatterbox audio, `upstream: "Chatterbox"`.
+Nothing logged carries text or tokens. Azure answers are never cached. `GET /api/v1/speech/health` reports
+`ready` without calling any upstream. `POST /api/v1/speech/warmup` fills the static phrases and returns `202`
+when the cache is on, `204` otherwise. `GET /api/v1/speech/warmup-status` always returns `{"voice":"ready"}`.
 
-`POST /api/v1/speech/warmup` (authenticated) wakes a scale-to-zero Kokoro: in hybrid
-mode it fires an authenticated `GET {KOKORO_URL}/health` in the background (one in
-flight, at most once per 60 s) and returns `202`; other modes return `204`.
+## Run speech locally
 
-`GET /api/v1/speech/warmup-status` (authenticated, never blocks) returns
-`{"voice":"ready"|"warming"|"unavailable"}` from cached knowledge in hybrid mode: `ready`
-if a Kokoro `/health` or a Kokoro synthesis succeeded in the last 60 s; otherwise it
-triggers the same deduped probe (at most one in flight, at most every 5 s from status
-polls) and returns `warming`, or `unavailable` for 60 s after a failed probe (non-2xx,
-token error, network). A probe cut short by the request timeout counts as still warming.
-Other modes always return `ready`. See `docs/deploy.md` for the Cloud Run service.
-
-## Interviewer voice: DeepInfra Kokoro, then OpenRouter, then Azure
-
-`SPEECH_PROVIDER=deepinfra-openrouter-azure` sends synthesis first to Kokoro on DeepInfra
-directly (`DeepInfraSpeechProvider`, voice `OPENROUTER_SPEECH_VOICE`, default `am_echo`). If DeepInfra
-fails, or has not answered after `DEEPINFRA_SPEECH_FALLBACK_AFTER_MS`, Kokoro through
-`OpenRouterSpeechProvider` joins (single voice, the same as the DeepInfra request). Azure
-(`AZURE_TTS_VOICE`) is the last resort: it joins after `HYBRID_SPEECH_HEDGE_AFTER_MS`
-(default `4000` in this mode) or after both Kokoro upstreams fail. The first non-empty audio wins and the
-other requests are aborted. Startup requires `DEEPINFRA_API_KEY`, `OPENROUTER_API_KEY`,
-`AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION`. Clients see `voiceSource: "openrouter"` for any
-Kokoro audio and `"azure"` only for Azure; `speech_synthesis_timing` logs `provider: "hybrid"` and
-the content-free `upstream` (`DeepInfra` or `Together`) of the Kokoro audio. Azure answers are never cached.
-
-## Run Kokoro with a local backend
-
-From the repository root, start Kokoro in the background:
-
-```bash
-docker compose up -d
-```
-
-Start the backend with these environment variables to use it (there is no committed `.env` file):
-
-```bash
-SPEECH_PROVIDER=kokoro \
-KOKORO_BASE_URL=http://localhost:8880 \
-INTERVIEWER_VOICE=af_bella+af_heart \
-npm run dev
-```
-
-The Compose service uses the CPU image and restarts automatically when Docker starts. Stop it with:
-
-```bash
-docker compose down
-```
+Compose runs the backend with `SPEECH_PROVIDER=fake`. To hear the real voice locally, set `SPEECH_PROVIDER=chatterbox-azure`,
+`DEEPINFRA_API_KEY`, `AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION` in `backend/.env` (or export them) and run `npm run dev`.
 
 When `SPEECH_PROVIDER=fake` (the default), the API returns deterministic test
-audio and never requires Docker or Kokoro. The frontend can continue showing
+audio and never requires Docker or speech keys. The frontend can continue showing
 the question and accepting an answer when speech is unavailable; speech is
 not a gate for interview practice.
 
@@ -412,7 +343,7 @@ This opt-in harness generates an English answer through `/api/v1/speech`,
 converts the returned audio to temporary mono 16 kHz s16le PCM with `ffmpeg`,
 and sends 100 ms frames at real-time pace through WebSocket protocol v2. It
 reports connection, first-speech, silence, queue-wait, and final-transcription
-latencies. It uses the normal Kokoro and Whisper paths, including VAD; it does
+latencies. It uses the normal speech and Whisper paths, including VAD; it does
 not run as part of `npm test`. On success, the harness records only transcript
 character count and never prints transcript text. Provider failures report
 only bounded error categories.
@@ -456,7 +387,7 @@ summed word counts, and mean queue, Whisper, and finalize-to-complete latency.
 It makes one speech-generation and one final-transcription request per case
 (with normal bounded retry behavior), so use it deliberately.
 
-Requirements: start Kokoro and the backend with `SPEECH_PROVIDER=kokoro`, set
+Requirements: start the backend with `SPEECH_PROVIDER=chatterbox-azure` and its DeepInfra and Azure speech keys, set
 `OPENROUTER_API_KEY` in the backend's ignored local `backend/.env`, and install
 `ffmpeg` on the machine running the harness. The backend must be reachable at
 port 3001. For example, with the local Docker services running:
@@ -507,7 +438,7 @@ does not print environment values or transcript text. Use the environment
 variable for custom text if it should not appear in shell history.
 
 The harness removes its temporary MP3 and PCM files on success or failure.
-Running it incurs local CPU time for Kokoro and one logical final transcription
+Running it incurs one paid Chatterbox synthesis (Azure only as fallback) and one logical final transcription
 through the configured Whisper provider (a 429 or one transient 5xx/network failure can trigger up to two bounded
 retries). When Azure assessment is enabled and Whisper returns valid word
 timestamps, the long default answer can trigger multiple aligned Azure calls
@@ -628,7 +559,7 @@ curl -X POST http://localhost:3001/api/v1/speech \
   --output interviewer.mp3
 ```
 
-The client supplies only `text` and optional `speed` (`0.25` through `4`). The server owns the voice selection and always passes `af_bella+af_heart` to Kokoro.
+The client supplies `text`, optional `speed` (`0.25` through `4`) and optionally a selectable voice. Any other voice falls back to `AZURE_TTS_VOICE` (default Andrew).
 
 ### Answer transcription (incremental Whisper)
 

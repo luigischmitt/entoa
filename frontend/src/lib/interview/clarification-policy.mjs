@@ -4,7 +4,7 @@
 // one-sentence explanation of a term (DEFINE). After `maxClarificationsPerQuestion` the interview moves on.
 
 export const maxClarificationsPerQuestion = 2;
-/** Repeated questions are spoken a bit slower (Kokoro/OpenRouter speech accept a `speed` parameter). */
+/** Repeated questions are spoken a bit slower: the turn's speed multiplies the room speed on playback (the audio itself is synthesized at 1x). */
 export const repeatSpeechSpeed = 0.85;
 export const repeatLeadIn = "Sure.";
 export const rephraseLeadIn = "Let me put it another way.";

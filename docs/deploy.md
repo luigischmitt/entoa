@@ -11,17 +11,17 @@ only, never values. Run them from the repository root.
   and run on Cloud Run in `us-east1` (project `english-interview-agent-510312`).
   Request-based billing, min 0 / max 1 instance, 1 vCPU, 1 GiB, session affinity.
   The image includes `ffmpeg` (required for Azure pronunciation assessment).
-- **Providers** (all called from the backend only): OpenRouter (interviewer voice
-  with Kokoro, reasoning, report, Whisper answer transcription),
-  Azure Speech (pronunciation assessment).
+- **Providers** (all called from the backend only): Chatterbox on DeepInfra (interviewer
+  voice), Azure Speech (fallback voice and pronunciation assessment), OpenRouter (reasoning,
+  report, Whisper answer transcription).
 - Local development is unchanged: `compose.yaml` uses `backend/Dockerfile` with
   `npm run dev`.
 
 ## Backend environment
 
-Secrets (Secret Manager): `OPENROUTER_API_KEY`, `AZURE_SPEECH_KEY`.
+Secrets (Secret Manager): `OPENROUTER_API_KEY`, `DEEPINFRA_API_KEY`, `AZURE_SPEECH_KEY`.
 
-Plain variables: `SPEECH_PROVIDER=openrouter`, `TRANSCRIPTION_PROVIDER=whisper-incremental`
+Plain variables: `SPEECH_PROVIDER=chatterbox-azure`, `TRANSCRIPTION_PROVIDER=whisper-incremental`
 (the only engine, and the default if unset; the retired values `cartesia` and `whisper` are still
 accepted, mapped to `whisper-incremental` with a startup warning),
 `AZURE_SPEECH_REGION`, `AZURE_SPEECH_ASSESSMENT_ENABLED=true`,
@@ -50,37 +50,14 @@ the Cloud Run runtime service account `roles/bigquery.jobUser` and
 `roles/monitoring.viewer` on the project. The running service uses its metadata
 identity; do not configure `GOOGLE_ACCESS_TOKEN` in production.
 
-To use the self-hosted Kokoro service below as the primary interviewer voice
-(OpenRouter becomes the hedge), set `SPEECH_PROVIDER=kokoro-openrouter`,
-`KOKORO_URL=<kokoro service url>` and `KOKORO_AUTH=gcp-id-token` instead of
-`SPEECH_PROVIDER=openrouter`. `OPENROUTER_API_KEY` stays required.
-To try DeepInfra Kokoro first, with OpenRouter and then Azure behind it, set `SPEECH_PROVIDER=deepinfra-openrouter-azure` and `DEEPINFRA_API_KEY` (see `backend/README.md`).
+Speech is Chatterbox first with Azure as the emergency fallback (`SPEECH_PROVIDER=chatterbox-azure`). See `backend/README.md` for the speech variables.
 
-### Interviewer voice: Azure (free tier)
+### Interviewer voice: Chatterbox and Azure fallback
 
-Azure Neural TTS uses the F0 allowance of 500,000 characters per month. The
-backend opens a cooldown after quota, authorization, or repeated rate-limit
-responses and immediately uses OpenRouter Kokoro during that window.
-
-Switch to Azure without rebuilding:
-
-```bash
-gcloud run services update english-interview-backend --region us-east1 --update-env-vars SPEECH_PROVIDER=azure-openrouter,AZURE_TTS_VOICE=en-US-AndrewNeural
-```
-
-Switch to OpenRouter Kokoro first without rebuilding:
-
-```bash
-gcloud run services update english-interview-backend --region us-east1 --update-env-vars SPEECH_PROVIDER=openrouter-azure
-```
-
-OpenRouter Kokoro is first (~US$0.62/1M chars, p50 ~1 s measured 2026-10-19), with Azure as fallback after 8 s or on failure (a line pinned to OpenRouter waits 7 s before the pinned fallback).
-
-Switch back to Kokoro without rebuilding:
-
-```bash
-gcloud run services update english-interview-backend --region us-east1 --update-env-vars SPEECH_PROVIDER=kokoro-openrouter
-```
+Chatterbox on DeepInfra answers every interviewer line. Azure Neural TTS is used only when Chatterbox
+fails or is too slow, and its free tier allows 500,000 characters per month. The backend opens a
+cooldown after Azure quota, authorization, or repeated rate-limit responses; while it is open,
+Azure fails fast and only Chatterbox answers.
 
 Sum this month's Azure characters (Cloud Run ingests these JSON stdout lines
 as `jsonPayload`):
@@ -92,8 +69,7 @@ gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.serv
 Or run `backend/scripts/azure-tts-usage.sh`; it prints usage and the percentage
 of the 500,000-character allowance.
 
-Do not set `KOKORO_BASE_URL` or
-`INTERVIEW_REASONING_DIAGNOSTICS`. Cloud Run injects `PORT=8080`. Every other
+Do not set `INTERVIEW_REASONING_DIAGNOSTICS` in production. Cloud Run injects `PORT=8080`. Every other
 variable keeps its default; see the table in `backend/README.md`.
 
 ## One-time setup
@@ -147,8 +123,8 @@ gcloud run deploy english-interview-backend \
   --allow-unauthenticated \
   --max-instances 1 --min-instances 0 --cpu 1 --memory 1Gi \
   --concurrency 20 --timeout 3600 --session-affinity \
-  --set-env-vars "SPEECH_PROVIDER=openrouter,TRANSCRIPTION_PROVIDER=whisper-incremental,AZURE_SPEECH_REGION=<region>,AZURE_SPEECH_ASSESSMENT_ENABLED=true,SUPABASE_URL=<supabase-url>,SUPABASE_PUBLISHABLE_KEY=<publishable-key>,ALLOWED_ORIGIN=<vercel-origin>" \
-  --set-secrets "OPENROUTER_API_KEY=OPENROUTER_API_KEY:latest,AZURE_SPEECH_KEY=AZURE_SPEECH_KEY:latest"
+  --set-env-vars "SPEECH_PROVIDER=chatterbox-azure,TRANSCRIPTION_PROVIDER=whisper-incremental,AZURE_SPEECH_REGION=<region>,AZURE_SPEECH_ASSESSMENT_ENABLED=true,SUPABASE_URL=<supabase-url>,SUPABASE_PUBLISHABLE_KEY=<publishable-key>,ALLOWED_ORIGIN=<vercel-origin>" \
+  --set-secrets "OPENROUTER_API_KEY=OPENROUTER_API_KEY:latest,DEEPINFRA_API_KEY=DEEPINFRA_API_KEY:latest,AZURE_SPEECH_KEY=AZURE_SPEECH_KEY:latest"
 ```
 
 `--allow-unauthenticated` is required because browsers call the service
@@ -277,41 +253,3 @@ production origin and refused (503) from other origins, Vercel production
 deploy on `englishinterview.vercel.app`. Supabase URL configuration is done in
 the Supabase dashboard.
 
-## Kokoro voice service (private)
-
-A self-hosted Kokoro runs as a private Cloud Run service and is the primary
-interviewer voice when the backend uses `SPEECH_PROVIDER=kokoro-openrouter`.
-
-```bash
-# Mirror the public image once (Cloud Run cannot pull from ghcr.io directly).
-docker pull --platform linux/amd64 ghcr.io/remsky/kokoro-fastapi-cpu:v0.6.0
-docker tag ghcr.io/remsky/kokoro-fastapi-cpu:v0.6.0 $REGION-docker.pkg.dev/$PROJECT/english-interview/kokoro:v0.6.0
-docker push $REGION-docker.pkg.dev/$PROJECT/english-interview/kokoro:v0.6.0
-
-gcloud run deploy english-interview-kokoro \
-  --image $REGION-docker.pkg.dev/$PROJECT/english-interview/kokoro:v0.6.0 --region $REGION \
-  --no-allow-unauthenticated \
-  --cpu 4 --memory 8Gi --cpu-boost \
-  --min-instances 0 --max-instances 1 --concurrency 4 \
-  --set-env-vars "OMP_NUM_THREADS=4,MKL_NUM_THREADS=4,TORCH_NUM_THREADS=4"
-
-# Only the backend's service account may call it (default compute SA unless changed).
-gcloud run services add-iam-policy-binding english-interview-kokoro --region $REGION \
-  --member "serviceAccount:<backend-service-account>" --role roles/run.invoker
-```
-
-Then deploy the backend with `SPEECH_PROVIDER=kokoro-openrouter`,
-`KOKORO_URL=<english-interview-kokoro url>`, `KOKORO_AUTH=gcp-id-token` and
-`INTERVIEWER_VOICE=af_heart` (the same single voice the OpenRouter hedge uses, so
-a hedge win does not change the interviewer's voice mid-interview).
-The backend fetches an identity token from the metadata server (audience = the
-Kokoro URL origin) and sends it as `Authorization: Bearer`. Without it Kokoro
-answers 403.
-
-Measured warm latency on 4 vCPU: about 1.2-1.5 s for 24 characters, 1.7-1.8 s
-for 50, 4.3 s for 106. With min instances 0 the first request after idle pays a
-cold start, so the frontend calls `POST /api/v1/speech/warmup` when the setup
-screen and the interview room open; the backend then pings Kokoro `/health`
-(at most once per 60 s). If Kokoro has not produced audio after
-`HYBRID_SPEECH_HEDGE_AFTER_MS` (2500 ms) or fails, OpenRouter races it and the
-first audio wins.

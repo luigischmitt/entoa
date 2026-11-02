@@ -11,7 +11,7 @@ import { attachTranscriptionWebSocket } from "../src/transcription/transcription
 import type { TranscriptionService } from "../src/transcription/types.js";
 import { createTestKey, fakeJwksFetch, signToken, testSupabaseUrl } from "./auth-helper.js";
 
-const speechConfig: SpeechConfig = { provider: "fake", kokoroBaseUrl: "http://localhost:8880", kokoroTimeoutMs: 15_000, interviewerVoice: "af_bella+af_heart", defaultSpeed: 1, format: "mp3" };
+const speechConfig: SpeechConfig = { provider: "fake", interviewerVoice: "en-US-AndrewNeural", defaultSpeed: 1, format: "mp3" };
 const key = createTestKey();
 const now = () => Math.floor(Date.now() / 1_000);
 

@@ -76,12 +76,12 @@ test("resume next turns omit vacancy framing and the inferred role, seniority an
 
 import { DEFAULT_INTERVIEWER_VOICE, INTERVIEWER_VOICE_OPTIONS, resolveInterviewerVoice } from "../src/lib/interview/voices.mjs";
 
-test("the next-turn request carries a selectable Azure voice and speed", () => {
+test("the next-turn request carries a selectable Azure voice, and no speed (lines are synthesized at 1x)", () => {
   const input = { config: { role: "Backend Engineer", seniority: "mid-level", focus: "mixed" }, currentQuestion: "Q?", transcript: "A", nextFixedQuestion: null, remainingFixedQuestions: [], followUpUsed: false, askedQuestions: [] };
   assert.equal(JSON.parse(serializeNextTurnRequest(input)).voice, "en-US-AndrewNeural");
   assert.equal(JSON.parse(serializeNextTurnRequest({ ...input, config: { ...input.config, voice: "en-GB-RyanNeural", speechSpeed: 0.9 } })).voice, "en-GB-RyanNeural");
   assert.equal(JSON.parse(serializeNextTurnRequest({ ...input, config: { ...input.config, voice: "af_bella+af_heart" } })).voice, "en-US-AndrewNeural");
-  assert.equal(JSON.parse(serializeNextTurnRequest({ ...input, config: { ...input.config, speechSpeed: 0.9 } })).speed, 0.9);
+  assert.equal(JSON.parse(serializeNextTurnRequest({ ...input, config: { ...input.config, speechSpeed: 0.9 } })).speed, undefined);
   assert.equal(DEFAULT_INTERVIEWER_VOICE, "en-US-AndrewNeural");
   assert.equal(resolveInterviewerVoice("nope"), "en-US-AndrewNeural");
   assert.equal(INTERVIEWER_VOICE_OPTIONS.length, 8);

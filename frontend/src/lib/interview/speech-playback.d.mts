@@ -14,8 +14,6 @@ export type SpeechPlaybackOptions = {
   requestBody?: Record<string, unknown>;
   /** Voice id sent with each speech request (a selectable voice; the server falls back to its default for unknown ids). */
   voice?: string;
-  /** Interviewer speech rate sent to the speech API (1 is the default and is omitted from the request). */
-  speed?: number;
   /** Longest wait for the first audio (and for each later chunk) before playback ends as "unavailable" (default FIRST_AUDIO_TIMEOUT_MS = 20000). */
   firstAudioTimeoutMs?: number;
   /** prewarmInterviewerSpeech only: deadline for the speech request and complete audio response body. */
@@ -114,7 +112,22 @@ export function clearRetainedSpeechBlobs(): void;
 export function resetSpeechFlights(): void;
 /** Starts a new interview: the next line that comes back decides the voice source again. */
 export function resetInterviewVoiceSource(): void;
-export function getInterviewVoiceSource(): "openrouter" | "azure" | "kokoro" | null;
+export function getInterviewVoiceSource(): "chatterbox" | "azure" | null;
+/** The rate every interviewer line plays at (the room speed times the turn speed). A line playing now follows at once. */
+export function setInterviewerPlaybackRate(rate: number): void;
+export function getInterviewerPlaybackRate(): number;
+/** Applies the current rate to an audio surface, keeping its pitch on HTMLAudio. */
+export function applyPlaybackRate(audio: { playbackRate: number; preservesPitch?: boolean }): void;
+/** Keeps an audio surface at the live rate until the returned function is called. */
+export function followPlaybackRate(audio: { playbackRate: number }, onChange?: (previous: number, next: number) => void): () => void;
+/** A safety deadline in media time at 1x; a rate change rescales what is left of it. */
+export function createRateDeadline(options: {
+  budgetMs: number;
+  onExpire: () => void;
+  schedule?: (callback: () => void, delay: number) => number;
+  unschedule?: (id: number) => void;
+  now?: () => number;
+}): { cancel: () => void; rescale: (previous: number, next: number) => void };
 /**
  * Decides the session's voice before its opening plays: synthesizes only the first chunk of `text` (playback reuses that
  * blob). Resolves to the voice source once it answered or after `options.timeoutMs` (default 6000). Never rejects.
@@ -122,8 +135,7 @@ export function getInterviewVoiceSource(): "openrouter" | "azure" | "kokoro" | n
 export function prepareSessionVoice(
   text: string,
   voice: string | undefined,
-  speed: number,
   options: { endpoint: string; fetcher?: typeof fetch; timeoutMs?: number; retainMs?: number },
-): Promise<"openrouter" | "azure" | "kokoro" | null>;
+): Promise<"chatterbox" | "azure" | null>;
 
-export function warmUpInterviewerSpeech(endpoint: string, fetcher: (input: string, init?: RequestInit) => Promise<unknown>, preferences?: { voice?: string; speed?: number }): void;
+export function warmUpInterviewerSpeech(endpoint: string, fetcher: (input: string, init?: RequestInit) => Promise<unknown>, preferences?: { voice?: string }): void;

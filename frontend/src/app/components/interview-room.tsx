@@ -183,14 +183,14 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
   // Receives each interviewer audio chunk (decoded for the avatar's beak lip-sync); it never touches playback.
   const speechFeed = useMemo(() => createSpeechFeed(), []);
   // The instant "Okay." / "Got it." (pre-synthesized, played from memory when the answer is considered finished).
-  // Adjustable from the call bar: every line synthesized after a change uses the new speed (saved for the next interviews too).
+  // Adjustable from the call bar: the line playing now follows at once (the speed is applied on playback, never in the request; saved for the next interviews too).
   const [interviewerSpeechSpeed, setInterviewerSpeechSpeed] = useState(() => resolveInterviewerSpeechSpeed(config.speechSpeed ?? 1));
   const changeInterviewerSpeechSpeed = useCallback((speed: number) => {
     const next = resolveInterviewerSpeechSpeed(speed);
     setInterviewerSpeechSpeed(next);
     storeInterviewerSpeechSpeed(window.localStorage, next);
   }, []);
-  const [acknowledgements] = useState(() => createInterviewerAcknowledgements(speechFeed.push, config.voice, interviewerSpeechSpeed));
+  const [acknowledgements] = useState(() => createInterviewerAcknowledgements(speechFeed.push, config.voice));
   // The acknowledgements are static files (free) at any speed, so they load as soon as the room opens.
   useEffect(() => { void acknowledgements.preload(); }, [acknowledgements]);
   const [acknowledgementPlaying, setAcknowledgementPlaying] = useState(false);
@@ -240,7 +240,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
   const listeningTimingRef = useRef<ReturnType<typeof createListeningHandoffTiming> | null>(null);
   const openingUtterance = composeContextualOpening(config, question.prompt);
   // The session's voice is decided on the opening's first chunk before the opening plays (see use-session-voice).
-  const { voiceReady, waitForOpeningDelay } = useSessionVoice(config.playInterviewerAudio, openingUtterance, config.voice, interviewerSpeechSpeed);
+  const { voiceReady, waitForOpeningDelay } = useSessionVoice(config.playInterviewerAudio, openingUtterance, config.voice);
   // The closing line is rotated between interviews; the lead is the reaction to the last answer (decided when the answer is final).
   // Two sets: the time ran out ("time_up"), or the interview ends early / has no more questions ("ended"); each rotates on its own.
   const [closingLines] = useState<Record<ClosingReason, string>>(() => ({ time_up: pickInterviewClosing(readLastClosingLine("time_up"), Math.random, "time_up"), ended: pickInterviewClosing(readLastClosingLine("ended"), Math.random, "ended") }));
@@ -514,9 +514,9 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
   useEffect(() => {
     if (phase !== "answering" || closingPrewarmedRef.current || !config.playInterviewerAudio) return;
     closingPrewarmedRef.current = true;
-    void prewarmInterviewerClosing(composeInterviewClosing(null, closingLines.time_up), config.voice, interviewerSpeechSpeed);
-    void prewarmInterviewerClosing(composeInterviewClosing(null, closingLines.ended), config.voice, interviewerSpeechSpeed);
-  }, [phase, config.playInterviewerAudio, config.voice, interviewerSpeechSpeed, closingLines]);
+    void prewarmInterviewerClosing(composeInterviewClosing(null, closingLines.time_up), config.voice);
+    void prewarmInterviewerClosing(composeInterviewClosing(null, closingLines.ended), config.voice);
+  }, [phase, config.playInterviewerAudio, config.voice, closingLines]);
 
   const logFixedPreparation = useCallback((entry: FixedHandoffEntry, outcome: "used" | "discarded" | "failed" | "closing", usedIndex?: number) => {
     const metrics = fixedHandoffPreparation.metrics(entry);
@@ -544,13 +544,13 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
       voiceKey: config.voice ?? "",
       transition: pickFixedHandoffTransition(recentAcknowledgementsRef.current),
       questions: planned,
-      prepareSpeech: (text: string) => prewarmFixedInterviewerUtterance(text, config.voice, interviewerSpeechSpeed),
+      prepareSpeech: (text: string) => prewarmFixedInterviewerUtterance(text, config.voice),
     });
     fixedHandoffTurnIdRef.current = entry.turnId;
     void Promise.all(entry.handles.map((handle: { promise: Promise<boolean> }) => handle.promise)).then(() => {
       if (fixedHandoffPreparation.peek() === entry && entry.readyCount === 0) logFixedPreparation(entry, "failed");
     });
-  }, [config.playInterviewerAudio, config.voice, interviewerSpeechSpeed, durationMinutes, fixedHandoffPreparation, logFixedPreparation, micTurnId, phase, questions]);
+  }, [config.playInterviewerAudio, config.voice, durationMinutes, fixedHandoffPreparation, logFixedPreparation, micTurnId, phase, questions]);
 
   const finishFixedPreparation = (outcome: "used" | "discarded" | "closing", usedIndex?: number) => {
     const entry = fixedHandoffPreparation.peek();
@@ -643,7 +643,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
     // The fallback reaction + each closing line, ready in case the model has no reaction (once per answer window).
     if (config.playInterviewerAudio && !closingFallbackPrewarmRef.current) {
       // Retained like the closing lines: the last answer can run for minutes after its first provisional snapshot.
-      const cancels = [closingLines.time_up, closingLines.ended].map((line) => prewarmInterviewerClosing(composeInterviewClosing(closingFallback, line), config.voice, interviewerSpeechSpeed).cancel);
+      const cancels = [closingLines.time_up, closingLines.ended].map((line) => prewarmInterviewerClosing(composeInterviewClosing(closingFallback, line), config.voice).cancel);
       closingFallbackPrewarmRef.current = () => { for (const cancel of cancels) cancel(); };
     }
     closingReaction.update(turn, answer, {
@@ -653,7 +653,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
       onReady: (reaction) => {
         if (!config.playInterviewerAudio || leftRef.current || !mountedRef.current || micTurnIdRef.current !== turn) return;
         closingPrewarmCancelRef.current?.();
-        const cancels = closingReactionVariants(reaction).flatMap((variant) => [closingLines.time_up, closingLines.ended].map((line) => prewarmInterviewerClosing(composeInterviewClosing(variant, line), config.voice, interviewerSpeechSpeed).cancel));
+        const cancels = closingReactionVariants(reaction).flatMap((variant) => [closingLines.time_up, closingLines.ended].map((line) => prewarmInterviewerClosing(composeInterviewClosing(variant, line), config.voice).cancel));
         closingPrewarmCancelRef.current = () => { for (const cancel of cancels) cancel(); };
       },
     });
@@ -836,13 +836,13 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
         let cancelFixedQuestionAudio: (() => void) | null = null;
         const cleanupSpeech: Array<() => void> = [];
         if (!stale && fixedSelection.adapted && fixedSelection.prompt) {
-          const fixedPrewarm = prewarmFixedInterviewerUtterance(fixedSelection.prompt, config.voice, interviewerSpeechSpeed);
+          const fixedPrewarm = prewarmFixedInterviewerUtterance(fixedSelection.prompt, config.voice);
           fixedQuestionAudioReady = fixedPrewarm.firstChunkReady;
           cancelFixedQuestionAudio = fixedPrewarm.cancel;
           cleanupSpeech.push(fixedPrewarm.cancel);
         }
         if (utterance) {
-          const prewarm = decision.decision === "FOLLOW_UP" ? prewarmFollowUpUtterance(utterance, config.voice, interviewerSpeechSpeed) : prewarmInterviewerUtterance(utterance, config.voice, interviewerSpeechSpeed);
+          const prewarm = decision.decision === "FOLLOW_UP" ? prewarmFollowUpUtterance(utterance, config.voice) : prewarmInterviewerUtterance(utterance, config.voice);
           // Starting the first chunk is enough for a zero-wait handoff; playback joins the remaining in-flight chunks.
           speechReady = prewarm.firstChunkReady;
           cancelSpeech = prewarm.cancel;
@@ -862,7 +862,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
             bridge: selectionBridge,
             prompt: selectionPrompt,
             utterance: composeAcknowledgedQuestion(spokenAcknowledgement(selectionBridge, answer), selectionPrompt),
-            prewarm: (text) => prewarmFixedInterviewerUtterance(text, config.voice, interviewerSpeechSpeed),
+            prewarm: (text) => prewarmFixedInterviewerUtterance(text, config.voice),
           });
         }
         reportAudioDiagnostic({ kind: "turn_preparation", preparationType: "speculative", outcome: "decision_ready", plannedCount: planned.length, revision, elapsedMs: Math.max(0, Math.round(performance.now() - preparationStartedAt)) });
@@ -1275,7 +1275,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
     submitInFlightRef.current = false;
     // Start synthesizing the next utterance this instant (a prepared one is already in flight and is joined, not repeated).
     const earlyUtterance = utteranceForDecision(decision, savedAnswer);
-    if (earlyUtterance) prewarmInterviewerUtterance(earlyUtterance, config.voice, interviewerSpeechSpeed);
+    if (earlyUtterance) prewarmInterviewerUtterance(earlyUtterance, config.voice);
 
     const clarificationsSoFar = clarificationCountsRef.current.get(question.id) ?? 0;
     const plan = planTurnAfterDecision({ decision, clarificationsSoFar, nextQuestion: decisionInput.nextFixedQuestion });

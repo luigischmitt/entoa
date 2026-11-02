@@ -1,108 +1,21 @@
 import type { SpeechConfig } from "./config.js";
-import { FakeSpeechProvider } from "./fake-speech-provider.js";
 import { AzureSpeechProvider } from "./azure-speech-provider.js";
-import { DeepInfraSpeechProvider } from "./deepinfra-speech-provider.js";
-import { createGcpIdTokenProvider } from "./gcp-identity-token.js";
+import { ChatterboxSpeechProvider } from "./chatterbox-speech-provider.js";
+import { FakeSpeechProvider } from "./fake-speech-provider.js";
 import { HybridSpeechProvider } from "./hybrid-speech-provider.js";
-import { KokoroSpeechProvider } from "./kokoro-speech-provider.js";
-import { OpenRouterSpeechProvider } from "./openrouter-speech-provider.js";
 import type { SpeechProvider } from "./types.js";
 
 export function createSpeechProvider(config: SpeechConfig): SpeechProvider {
-  if (config.provider === "deepinfra-openrouter-azure") {
-    if (!config.azure || !config.openRouter || !config.hybrid || !config.deepInfra) throw new Error("DeepInfra OpenRouter Azure speech configuration is missing.");
-    const openRouterVoice = config.hybrid.openRouterVoice;
-    const overallTimeoutMs = Math.max(config.azure.timeoutMs, config.kokoroTimeoutMs);
+  if (config.provider === "chatterbox-azure") {
+    if (!config.azure || !config.chatterbox || !config.hybrid) throw new Error("Chatterbox Azure speech configuration is missing.");
     return new HybridSpeechProvider({
-      // Inner race: both Kokoro upstreams speak the same voice, so only the source labels differ (they must differ).
-      primary: new HybridSpeechProvider({
-        primary: new DeepInfraSpeechProvider({ apiKey: config.deepInfra.apiKey, url: config.deepInfra.url, model: config.deepInfra.model, timeoutMs: config.deepInfra.timeoutMs }),
-        secondary: new OpenRouterSpeechProvider({ apiKey: config.openRouter.apiKey, url: config.openRouter.url, model: config.openRouter.model, timeoutMs: config.kokoroTimeoutMs, hedgeAfterMs: config.openRouter.hedgeAfterMs }),
-        primaryVoice: openRouterVoice,
-        primarySource: "kokoro",
-        secondaryVoice: openRouterVoice,
-        secondarySource: "openrouter",
-        timeoutMs: overallTimeoutMs,
-        hedgeAfterMs: config.deepInfra.fallbackAfterMs,
-      }),
+      primary: new ChatterboxSpeechProvider(config.chatterbox),
       secondary: new AzureSpeechProvider(config.azure),
-      primaryVoice: openRouterVoice,
-      primarySource: "openrouter",
       secondaryVoice: config.azure.voice,
-      secondarySource: "azure",
-      timeoutMs: overallTimeoutMs,
+      // Azure gets its full timeout after Chatterbox's own deadline, so the overall budget is the sum of both.
+      timeoutMs: config.chatterbox.timeoutMs + config.azure.timeoutMs,
       hedgeAfterMs: config.hybrid.hedgeAfterMs,
       pinnedFallbackAfterMs: config.hybrid.pinnedFallbackAfterMs,
-    });
-  }
-  if (config.provider === "openrouter-azure") {
-    if (!config.azure || !config.openRouter || !config.hybrid) throw new Error("OpenRouter Azure hybrid speech configuration is missing.");
-    return new HybridSpeechProvider({
-      primary: new OpenRouterSpeechProvider({ apiKey: config.openRouter.apiKey, url: config.openRouter.url, model: config.openRouter.model, timeoutMs: config.kokoroTimeoutMs, hedgeAfterMs: config.openRouter.hedgeAfterMs }),
-      secondary: new AzureSpeechProvider(config.azure),
-      primaryVoice: config.hybrid.openRouterVoice,
-      primarySource: "openrouter",
-      secondaryVoice: config.azure.voice,
-      secondarySource: "azure",
-      timeoutMs: Math.max(config.azure.timeoutMs, config.kokoroTimeoutMs),
-      hedgeAfterMs: config.hybrid.hedgeAfterMs,
-      pinnedFallbackAfterMs: config.hybrid.pinnedFallbackAfterMs,
-    });
-  }
-  if (config.provider === "azure-openrouter") {
-    if (!config.azure || !config.openRouter || !config.hybrid) throw new Error("Azure hybrid speech configuration is missing.");
-    return new HybridSpeechProvider({
-      primary: new AzureSpeechProvider(config.azure),
-      secondary: new OpenRouterSpeechProvider({ apiKey: config.openRouter.apiKey, url: config.openRouter.url, model: config.openRouter.model, timeoutMs: config.kokoroTimeoutMs, hedgeAfterMs: config.openRouter.hedgeAfterMs }),
-      primaryVoice: config.azure.voice,
-      primarySource: "azure",
-      secondaryVoice: config.hybrid.openRouterVoice,
-      // The OpenRouter fallback takes 7-11 s, so the overall budget is the general speech timeout, not Azure's own.
-      timeoutMs: Math.max(config.azure.timeoutMs, config.kokoroTimeoutMs),
-      hedgeAfterMs: config.hybrid.hedgeAfterMs,
-    });
-  }
-  if (config.provider === "kokoro" || config.provider === "kokoro-openrouter") {
-    const idTokenProvider = config.kokoroAuth === "gcp-id-token"
-      ? createGcpIdTokenProvider({ audienceUrl: config.kokoroBaseUrl })
-      : undefined;
-    const kokoro = new KokoroSpeechProvider({
-      baseUrl: config.kokoroBaseUrl,
-      timeoutMs: config.kokoroTimeoutMs,
-      ...(idTokenProvider ? { idTokenProvider } : {}),
-    });
-    if (config.provider === "kokoro") return kokoro;
-    if (!config.openRouter || !config.hybrid) throw new Error("Hybrid speech configuration is missing.");
-    return new HybridSpeechProvider({
-      primary: kokoro,
-      secondary: new OpenRouterSpeechProvider({
-        apiKey: config.openRouter.apiKey,
-        url: config.openRouter.url,
-        model: config.openRouter.model,
-        timeoutMs: config.kokoroTimeoutMs,
-        hedgeAfterMs: config.openRouter.hedgeAfterMs,
-      }),
-      primaryVoice: config.interviewerVoice,
-      secondaryVoice: config.hybrid.openRouterVoice,
-      timeoutMs: config.kokoroTimeoutMs,
-      hedgeAfterMs: config.hybrid.hedgeAfterMs,
-      warmupRequest: () => kokoro.health().catch((error: unknown) => {
-        // A cold start outlasts the request timeout: still warming, not failed.
-        const cause = (error as { cause?: unknown } | undefined)?.cause;
-        if (cause instanceof Error && /timed out/i.test(cause.message)) return { status: "warming" as const };
-        throw error;
-      }),
-    });
-  }
-
-  if (config.provider === "openrouter") {
-    if (!config.openRouter) throw new Error("OpenRouter speech configuration is missing.");
-    return new OpenRouterSpeechProvider({
-      apiKey: config.openRouter.apiKey,
-      url: config.openRouter.url,
-      model: config.openRouter.model,
-      timeoutMs: config.kokoroTimeoutMs,
-      hedgeAfterMs: config.openRouter.hedgeAfterMs,
     });
   }
 

@@ -9,9 +9,7 @@ import type { TranscriptionService } from "../src/transcription/types.js";
 
 const speechConfig: SpeechConfig = {
   provider: "fake",
-  kokoroBaseUrl: "http://localhost:8880",
-  kokoroTimeoutMs: 15_000,
-  interviewerVoice: "af_bella+af_heart",
+  interviewerVoice: "en-US-AndrewNeural",
   defaultSpeed: 1,
   format: "mp3",
 };

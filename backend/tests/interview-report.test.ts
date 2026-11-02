@@ -12,8 +12,8 @@ import type { SpeechConfig } from "../src/speech/config.js";
 import { isLikelyTranscriptionArtifactRephrase } from "../src/thinking/report-guards.js";
 
 const speechConfig: SpeechConfig = {
-  provider: "fake", kokoroBaseUrl: "http://localhost:8888", kokoroTimeoutMs: 1000,
-  interviewerVoice: "af_bella+af_heart", defaultSpeed: 1, format: "mp3",
+  provider: "fake",
+  interviewerVoice: "en-US-AndrewNeural", defaultSpeed: 1, format: "mp3",
 };
 const input: InterviewReportInput = {
   roleContext: { targetRole: "Backend Engineer", seniority: "mid-level", focus: "technical-depth" },

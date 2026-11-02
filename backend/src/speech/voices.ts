@@ -1,21 +1,21 @@
-/** Azure public identifiers with equivalent Kokoro voices for an OpenRouter fallback. Keep in sync with the frontend. */
+/** Azure public identifiers clients may choose; each maps to a Chatterbox clone. Keep in sync with the frontend. */
 export const defaultInterviewerVoice = "en-US-AndrewNeural";
 
-export type SelectableVoiceInfo = { id: string; kokoroVoice: string; gender: "male" | "female"; accent: "US" | "UK" };
+export type SelectableVoiceInfo = { id: string; chatterboxVoiceId: string; gender: "male" | "female"; accent: "US" | "UK" };
 
+// Voices cloned on the DeepInfra account; Andrew is Tuck.
 export const selectableVoiceList: readonly SelectableVoiceInfo[] = [
-  { id: "en-US-AndrewNeural", kokoroVoice: "am_echo", gender: "male", accent: "US" },
-  { id: "en-US-BrianNeural", kokoroVoice: "am_michael", gender: "male", accent: "US" },
-  { id: "en-US-GuyNeural", kokoroVoice: "am_eric", gender: "male", accent: "US" },
-  { id: "en-GB-RyanNeural", kokoroVoice: "bm_george", gender: "male", accent: "UK" },
-  { id: "en-US-AvaNeural", kokoroVoice: "af_heart", gender: "female", accent: "US" },
-  { id: "en-US-EmmaNeural", kokoroVoice: "af_bella", gender: "female", accent: "US" },
-  { id: "en-US-JennyNeural", kokoroVoice: "af_sarah", gender: "female", accent: "US" },
-  { id: "en-GB-SoniaNeural", kokoroVoice: "bf_emma", gender: "female", accent: "UK" },
+  { id: "en-US-AndrewNeural", chatterboxVoiceId: "pxukbhrmd6in9omcerme", gender: "male", accent: "US" },
+  { id: "en-US-BrianNeural", chatterboxVoiceId: "1di0faf2tnibx9ccbp08", gender: "male", accent: "US" },
+  { id: "en-US-GuyNeural", chatterboxVoiceId: "7sy7qh963bdp4d61cbke", gender: "male", accent: "US" },
+  { id: "en-GB-RyanNeural", chatterboxVoiceId: "u3o3sghrrgld77jxi368", gender: "male", accent: "UK" },
+  { id: "en-US-AvaNeural", chatterboxVoiceId: "nkwdqjkpkb656sng0njk", gender: "female", accent: "US" },
+  { id: "en-US-EmmaNeural", chatterboxVoiceId: "qhoy6haei50tv441nacf", gender: "female", accent: "US" },
+  { id: "en-US-JennyNeural", chatterboxVoiceId: "hjaqgzxdrdyd2jkwsdsi", gender: "female", accent: "US" },
+  { id: "en-GB-SoniaNeural", chatterboxVoiceId: "v3oq44tcx0dgkwlhis7f", gender: "female", accent: "UK" },
 ];
 
 export const selectableVoices: readonly string[] = selectableVoiceList.map((voice) => voice.id);
-const legacyKokoroVoices = new Set(selectableVoiceList.map((voice) => voice.kokoroVoice));
 
 export function isSelectableVoice(value: unknown): value is string {
   return typeof value === "string" && selectableVoices.includes(value);
@@ -26,8 +26,8 @@ export function resolveVoice(requested: unknown, fallback: string): string {
   return isSelectableVoice(requested) ? requested : fallback;
 }
 
-/** The Kokoro counterpart of a selectable Azure voice; no untrusted client value reaches a provider. */
-export function resolveKokoroVoice(requested: unknown, fallback: string): string {
-  if (typeof requested === "string" && legacyKokoroVoices.has(requested)) return requested;
-  return selectableVoiceList.find((voice) => voice.id === requested)?.kokoroVoice ?? fallback;
+/** The Chatterbox clone of a selectable voice id; anything unknown gets Andrew's clone. No untrusted client value reaches the provider. */
+export function resolveChatterboxVoice(requested: unknown): string {
+  const andrew = selectableVoiceList[0]!.chatterboxVoiceId;
+  return selectableVoiceList.find((voice) => voice.id === requested)?.chatterboxVoiceId ?? andrew;
 }

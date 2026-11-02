@@ -376,7 +376,7 @@ const englishCopy: Record<string, string> = {
   "Velocidade da voz": "Voice speed",
   "Mais devagar": "Slower",
   "Mais rápido": "Faster",
-  "Vale a partir da próxima fala.": "Applies from the next line.",
+  "Vale na hora, inclusive na fala em curso.": "Applies immediately, even mid-line.",
   "A escolha fica salva neste navegador e pode ser alterada ao preparar cada entrevista.": "Your choice is saved in this browser and can be changed when setting up each interview.",
   "Câmera e avatar do entrevistador": "Interviewer camera and avatar",
   "Esses recursos ainda não estão disponíveis.": "These features are not available yet.",

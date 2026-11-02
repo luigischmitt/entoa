@@ -27,13 +27,12 @@ export function createAcknowledgementPlayer(options: {
   phrases?: string[];
   /** Voice id sent with each phrase request. */
   voice?: string;
-  speed?: number;
   loadBlob?: (phrase: string) => Promise<Blob>;
   /** Static audio for a phrase (no request); when it rejects the phrase falls back to `loadBlob`. */
   staticBlob?: (phrase: string) => Promise<Blob>;
-  /** Azure copy of a phrase (no request); kept apart from the Kokoro blobs and used only in Azure sessions. Never fails preload. */
+  /** Azure copy of a phrase (no request); kept apart from the Chatterbox blobs and used only in Azure sessions. Never fails preload. */
   azureBlob?: (phrase: string) => Promise<Blob>;
-  /** The session's voice source; "azure" plays the Azure copies only, anything else plays the Kokoro blobs. */
+  /** The session's voice source; "azure" plays the Azure copies only, anything else plays the Chatterbox blobs. */
   voiceSource?: () => string | null;
   makeAudio?: (url: string) => HTMLAudioElement;
   createObjectUrl?: (blob: Blob) => string;

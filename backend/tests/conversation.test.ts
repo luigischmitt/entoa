@@ -6,7 +6,7 @@ import type { SpeechConfig } from "../src/speech/config.js";
 import { genericConversationPlan, OpenRouterConversationPlanService, type ConversationPlanService } from "../src/thinking/conversation-plan-service.js";
 import { fitConversationLine, OpenRouterConversationTurnService, maxConversationSentences, maxConversationWords, type ConversationTurnInput, type ConversationTurnService } from "../src/thinking/conversation-turn-service.js";
 
-const speechConfig: SpeechConfig = { provider: "fake", kokoroBaseUrl: "http://localhost:8888", kokoroTimeoutMs: 1000, interviewerVoice: "af_bella", defaultSpeed: 1, format: "mp3" };
+const speechConfig: SpeechConfig = { provider: "fake", interviewerVoice: "en-US-AndrewNeural", defaultSpeed: 1, format: "mp3" };
 const stuckLine = "Hmm, I got a bit lost in the forest there. Tell me a little more about that?";
 const closingLine = "This was a really nice chat. Thanks for talking with me, and I hope to hear more next time!";
 

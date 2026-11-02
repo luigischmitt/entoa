@@ -9,7 +9,7 @@ import { readDashboardCache } from "@/lib/dashboard-data-cache.mjs";
 import { readStoredInterviewerSpeechSpeed } from "@/lib/interview/interviewer-speech-speed.mjs";
 import { loadProgressRecords } from "@/lib/interview/persistence";
 import { stopMediaStreamTracks } from "@/lib/interview/session-policy.mjs";
-import { fetchSpeechBlob, playInterviewerSegments, prewarmInterviewerSpeech, splitInterviewerSpeech } from "@/lib/interview/speech-playback.mjs";
+import { applyPlaybackRate, fetchSpeechBlob, playInterviewerSegments, prewarmInterviewerSpeech, setInterviewerPlaybackRate, splitInterviewerSpeech } from "@/lib/interview/speech-playback.mjs";
 import { readStoredInterviewerVoice } from "@/lib/interview/voice-picker.mjs";
 import { buildVoiceInsights, buildVoiceLesson, buildVoicePracticePlan, buildVoiceTrainingPhrases, encodeWav16Mono, migrateLegacyPracticeAttempts, normalizePracticeSpokenText, readPracticeAttempts, savePracticeAttempt, type VoiceMetricKey, type VoicePracticeAttempt, type VoiceTip, type VoiceTrainingPhrase } from "@/lib/interview/voice-insights.mjs";
 import { buildVoiceSession, focusedSessionSize, quickSessionSize, summarizeVoiceSession, voiceSessionCatalog, type VoiceSessionKind } from "@/lib/interview/voice-sessions.mjs";
@@ -110,8 +110,8 @@ function AttemptResult({ attempts, focus, beforeAccuracy = null }: { attempts: V
 type Capture = { stream: MediaStream; context: AudioContext; source: MediaStreamAudioSourceNode; node: AudioWorkletNode; sink: GainNode; frames: Float32Array[]; timer: number; target: string; text: string };
 type SpeechPreview = { blob: Blob; url: string };
 
-function speechPreviewKey(text: string, voice: string | undefined, speed: number) {
-  return JSON.stringify([text, voice ?? "", speed]);
+function speechPreviewKey(text: string, voice: string | undefined) {
+  return JSON.stringify([text, voice ?? ""]);
 }
 
 export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
@@ -231,16 +231,15 @@ export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
 
   const speechPreferences = useCallback(() => ({
     voice: readStoredInterviewerVoice(window.localStorage),
-    speed: readStoredInterviewerSpeechSpeed(window.localStorage),
   }), []);
   const loadSpeechPreview = useCallback((text: string) => {
-    const { voice, speed } = speechPreferences();
-    const key = speechPreviewKey(text, voice, speed);
+    const { voice } = speechPreferences();
+    const key = speechPreviewKey(text, voice);
     const cachedPreview = speechPreviewCacheRef.current.get(key);
     if (cachedPreview) return Promise.resolve(cachedPreview);
     const inFlight = speechPreviewFlightsRef.current.get(key);
     if (inFlight) return inFlight;
-    const promise = fetchSpeechBlob(text, { endpoint: speechEndpoint, fetcher: authorizedFetch, voice, speed }).then((blob) => {
+    const promise = fetchSpeechBlob(text, { endpoint: speechEndpoint, fetcher: authorizedFetch, voice }).then((blob) => {
       const preview = { blob, url: URL.createObjectURL(blob) };
       if (!isMountedRef.current) {
         URL.revokeObjectURL(preview.url);
@@ -257,8 +256,10 @@ export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
 
   const playText = async (text: string) => {
     setMessage(null);
-    const { voice, speed } = speechPreferences();
-    const key = speechPreviewKey(text, voice, speed);
+    // The preview plays at the saved speed; the audio itself is the same 1x file at any speed.
+    setInterviewerPlaybackRate(readStoredInterviewerSpeechSpeed(window.localStorage));
+    const { voice } = speechPreferences();
+    const key = speechPreviewKey(text, voice);
     setLoadingSpeech(key);
     try {
       const segments = splitInterviewerSpeech(text);
@@ -266,7 +267,7 @@ export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
       spokenPlaybackRef.current?.cancel();
       if (segments.length > 1 || text.length > 120) {
         const playback = playInterviewerSegments(segments, {
-          endpoint: speechEndpoint, fetcher: authorizedFetch, voice, speed,
+          endpoint: speechEndpoint, fetcher: authorizedFetch, voice,
           onPlaybackStarted: () => setLoadingSpeech((current) => current === key ? null : current),
         });
         spokenPlaybackRef.current = playback;
@@ -276,6 +277,7 @@ export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
       }
       const preview = await loadSpeechPreview(text);
       const audio = new Audio(preview.url);
+      applyPlaybackRate(audio);
       audioRef.current = audio;
       audio.onplaying = () => setLoadingSpeech((current) => current === key ? null : current);
       await audio.play();
@@ -284,8 +286,8 @@ export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
   };
 
   const isSpeechLoading = (text: string) => {
-    const { voice, speed } = speechPreferences();
-    return loadingSpeech === speechPreviewKey(text, voice, speed);
+    const { voice } = speechPreferences();
+    return loadingSpeech === speechPreviewKey(text, voice);
   };
 
   useEffect(() => {
@@ -297,8 +299,8 @@ export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
       seen.add(text);
       const segments = splitInterviewerSpeech(text);
       if (segments.length > 1 || text.length > 120) {
-        const { voice, speed } = speechPreferences();
-        const prewarm = prewarmInterviewerSpeech(segments, { endpoint: speechEndpoint, fetcher: authorizedFetch, voice, speed, retainMs: 60_000 });
+        const { voice } = speechPreferences();
+        const prewarm = prewarmInterviewerSpeech(segments, { endpoint: speechEndpoint, fetcher: authorizedFetch, voice, retainMs: 60_000 });
         speechPrewarms.push(prewarm);
         void prewarm.promise;
       } else void loadSpeechPreview(text).catch(() => undefined);
