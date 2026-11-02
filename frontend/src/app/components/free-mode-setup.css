@@ -1,0 +1,31 @@
+/* Free mode setup: suggestion buttons. Corners match .ds-field, 44px touch target, tokens only (light and dark). */
+
+/* Reserve the suggestion area so the card does not jump when the topics appear after mount (1 column, then 2 from 480px). */
+.fms-topics { display: grid; gap: 0.5rem; grid-template-columns: minmax(0, 1fr); min-height: 19rem; }
+@media (min-width: 480px) { .fms-topics { grid-template-columns: repeat(2, minmax(0, 1fr)); min-height: 9.5rem; } }
+
+.fms-topic {
+  display: flex;
+  min-width: 0;
+  min-height: 2.75rem;
+  align-items: center;
+  border-radius: var(--ds-r-field);
+  background: var(--ds-field);
+  box-shadow: inset 0 0 0 1px var(--ds-line);
+  color: var(--ds-ink);
+  padding: 0.5rem 0.875rem;
+  font-size: 0.875rem;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 150ms ease, box-shadow 150ms ease;
+}
+.fms-topic:hover:not(:disabled) { background: var(--ds-field-hover); }
+.fms-topic:focus-visible { outline: var(--ds-focus-outline); outline-offset: 3px; }
+.fms-topic:disabled { cursor: not-allowed; opacity: 0.55; }
+.fms-topic[aria-pressed="true"] {
+  background: var(--ds-tint);
+  box-shadow: inset 0 0 0 1.5px var(--ds-green);
+  color: var(--ds-green-deep);
+  font-weight: 600;
+}
