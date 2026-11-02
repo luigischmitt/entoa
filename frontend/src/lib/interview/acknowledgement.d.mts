@@ -1,6 +1,7 @@
 import type { SpeechPlaybackOptions } from "./speech-playback.mjs";
 
 export const ACKNOWLEDGEMENT_PHRASES: string[];
+export const CLOSING_ACKNOWLEDGEMENTS: string[];
 export const ACKNOWLEDGEMENT_LEAD_MS: number;
 export const ACKNOWLEDGEMENT_GAP_MS: number;
 export const ACKNOWLEDGEMENT_MIN_WORDS: number;

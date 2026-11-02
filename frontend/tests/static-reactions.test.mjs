@@ -6,9 +6,23 @@ import { CONVERSATION_REACTIONS, loadStaticReaction, reactionAudioPath, reaction
 import { DEFAULT_INTERVIEWER_VOICE, INTERVIEWER_VOICE_OPTIONS } from "../src/lib/interview/voices.mjs";
 
 test("reaction file names are lowercase, dash-separated and mp3", () => {
-  assert.equal(reactionFileName("Mm-hm, okay."), "mm-hm-okay.mp3");
-  assert.equal(reactionFileName("I understand what you mean."), "i-understand-what-you-mean.mp3");
+  assert.equal(reactionFileName("Mm-hm... okay, got it."), "mm-hm-okay-got-it.mp3");
   assert.equal(reactionFileName("  Oh, really?  "), "oh-really.mp3");
+});
+
+test("ellipses and punctuation runs give valid, unique reaction file names", () => {
+  assert.equal(reactionFileName("Hmm... hmm... okay, let's see."), "hmm-hmm-okay-let-s-see.mp3");
+  assert.equal(reactionFileName("Hmm... alright, let's go."), "hmm-alright-let-s-go.mp3");
+  const phrases = [...new Set([...ACKNOWLEDGEMENT_PHRASES, ...CONVERSATION_REACTIONS])];
+  const names = phrases.map((phrase) => reactionFileName(phrase));
+  for (const name of names) assert.match(name, /^[a-z0-9]+(?:-[a-z0-9]+)*\.mp3$/u, name);
+  assert.equal(new Set(names).size, phrases.length, "two phrases share a file");
+});
+
+test("the conversation reactions are the question-like ones plus the thinking sounds, with no quick words", () => {
+  assert.deepEqual(CONVERSATION_REACTIONS.slice(0, 3), ["Oh, really?", "Hm, interesting.", "Oh, I see."]);
+  for (const phrase of ACKNOWLEDGEMENT_PHRASES) assert.ok(CONVERSATION_REACTIONS.includes(phrase), phrase);
+  for (const quick of ["I see.", "Ah, okay.", "Mm-hm.", "Right.", "Huh, interesting."]) assert.ok(!CONVERSATION_REACTIONS.includes(quick), quick);
 });
 
 test("the reaction path uses the default voice for an unknown voice", () => {

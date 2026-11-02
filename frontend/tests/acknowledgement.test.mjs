@@ -21,13 +21,16 @@ test("the acknowledgement rotates through the phrases without repeating the last
 });
 
 test("the acknowledgement skips families the interviewer used in a recent bridge and phrases with no audio", () => {
-  assert.equal(pickAcknowledgement({ recent: ["Okay, thanks for that."] }), "Got it.", "Okay is recent");
-  assert.equal(pickAcknowledgement({ recent: ["OK.", "Got it."] }), "Alright.");
-  assert.equal(pickAcknowledgement({ lastPhrase: "Got it.", recent: ["Alright, great."] }), "Mm-hm, okay.");
-  assert.equal(pickAcknowledgement({ available: ["Thanks."], recent: ["Thank you."] }), "Thanks.", "falls back rather than staying silent");
-  assert.equal(pickAcknowledgement({ available: ["Alright.", "Thanks."], lastPhrase: "Alright." }), "Thanks.");
+  const hmmLetMeThink = "Hmm, let me think.";
+  const mmHmGotIt = "Mm-hm... okay, got it.";
+  const okayLetMeSee = "Okay, let me see.";
+  assert.equal(pickAcknowledgement({ lastPhrase: hmmLetMeThink, recent: ["Okay, thanks for that."] }), mmHmGotIt, "okay is recent: the okay phrase is skipped");
+  assert.equal(pickAcknowledgement({ recent: ["Hmm, so."] }), mmHmGotIt, "every hmm phrase is skipped");
+  assert.equal(pickAcknowledgement({ recent: ["Mm-hm, great."] }), ACKNOWLEDGEMENT_PHRASES[0], "mm-hm is recent");
+  assert.equal(pickAcknowledgement({ lastPhrase: ACKNOWLEDGEMENT_PHRASES[0], recent: ["Hmm, right."] }), mmHmGotIt);
+  assert.equal(pickAcknowledgement({ available: [hmmLetMeThink], recent: ["Hmm, right."] }), hmmLetMeThink, "falls back rather than staying silent");
+  assert.equal(pickAcknowledgement({ available: [okayLetMeSee], lastPhrase: okayLetMeSee }), okayLetMeSee, "a single phrase may repeat");
   assert.equal(pickAcknowledgement({ available: [] }), null);
-  assert.equal(pickAcknowledgement({ available: ["Okay."], lastPhrase: "Okay." }), "Okay.", "a single phrase may repeat");
 });
 
 test("a bridge loses only a leading pure acknowledgement, never a phrase that carries meaning", () => {
@@ -75,10 +78,11 @@ function playerHarness(extra = {}) {
 }
 
 test("preload synthesizes every phrase once, one at a time, and a failing phrase is simply never picked", async () => {
-  const { player } = playerHarness({ loadBlob: async (phrase) => { if (phrase === "Alright.") throw new Error("down"); return new Blob([phrase]); } });
+  const failing = ACKNOWLEDGEMENT_PHRASES[5];
+  const { player } = playerHarness({ loadBlob: async (phrase) => { if (phrase === failing) throw new Error("down"); return new Blob([phrase]); } });
   await Promise.all([player.preload(), player.preload()]);
   assert.equal(player.loadedCount, ACKNOWLEDGEMENT_PHRASES.length - 1);
-  assert.equal(player.play()?.phrase !== "Alright.", true);
+  assert.equal(player.play()?.phrase !== failing, true);
 });
 
 test("nothing plays before the audio is loaded", () => {
@@ -91,7 +95,7 @@ test("play starts the stored audio at once, feeds the avatar like a speech chunk
   const { player, audios, chunks, revoked } = playerHarness();
   await player.preload();
   const handle = player.play({ recent: [] });
-  assert.equal(handle.phrase, "Okay.");
+  assert.equal(handle.phrase, ACKNOWLEDGEMENT_PHRASES[0]);
   assert.equal(audios.length, 1);
   assert.equal(audios[0].plays, 1, "play() is called synchronously: no network, no waiting");
   assert.equal(chunks.length, 1);
@@ -111,7 +115,7 @@ test("play starts the stored audio at once, feeds the avatar like a speech chunk
   await player.whenIdle();
 
   const next = player.play({ recent: [] });
-  assert.equal(next.phrase, "Got it.", "rotates; no repeat");
+  assert.equal(next.phrase, ACKNOWLEDGEMENT_PHRASES[1], "rotates; no repeat");
   next.cancel();
 });
 

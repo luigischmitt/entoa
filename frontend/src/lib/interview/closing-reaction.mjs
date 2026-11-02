@@ -54,7 +54,7 @@ export function pickClosingFallbackReaction(lastUsed = null, random = Math.rando
 
 /** True when the text opens with an acknowledgement word, so a separate "Okay." before it would double up. */
 export function startsWithAcknowledgement(text) {
-  return /^\s*(?:okay|ok|alright|all right|got it|gotcha|right|sure|understood|i see|mm-?hm+|thanks|thank you)\b/iu.test(String(text ?? ""));
+  return /^\s*(?:okay|ok|alright|all right|got it|gotcha|right|sure|understood|i see|mm-?hm+|hmm+|thanks|thank you)\b/iu.test(String(text ?? ""));
 }
 
 /** The texts a ready reaction may be spoken as: itself, plus its form without a leading acknowledgement (used when "Okay." already played). */
