@@ -1,6 +1,7 @@
 import type { SpeechConfig } from "./config.js";
 import { FakeSpeechProvider } from "./fake-speech-provider.js";
 import { AzureSpeechProvider } from "./azure-speech-provider.js";
+import { DeepInfraSpeechProvider } from "./deepinfra-speech-provider.js";
 import { createGcpIdTokenProvider } from "./gcp-identity-token.js";
 import { HybridSpeechProvider } from "./hybrid-speech-provider.js";
 import { KokoroSpeechProvider } from "./kokoro-speech-provider.js";
@@ -8,6 +9,32 @@ import { OpenRouterSpeechProvider } from "./openrouter-speech-provider.js";
 import type { SpeechProvider } from "./types.js";
 
 export function createSpeechProvider(config: SpeechConfig): SpeechProvider {
+  if (config.provider === "deepinfra-openrouter-azure") {
+    if (!config.azure || !config.openRouter || !config.hybrid || !config.deepInfra) throw new Error("DeepInfra OpenRouter Azure speech configuration is missing.");
+    const openRouterVoice = config.hybrid.openRouterVoice;
+    const overallTimeoutMs = Math.max(config.azure.timeoutMs, config.kokoroTimeoutMs);
+    return new HybridSpeechProvider({
+      // Inner race: both Kokoro upstreams speak the same voice, so only the source labels differ (they must differ).
+      primary: new HybridSpeechProvider({
+        primary: new DeepInfraSpeechProvider({ apiKey: config.deepInfra.apiKey, url: config.deepInfra.url, model: config.deepInfra.model, timeoutMs: config.deepInfra.timeoutMs }),
+        secondary: new OpenRouterSpeechProvider({ apiKey: config.openRouter.apiKey, url: config.openRouter.url, model: config.openRouter.model, timeoutMs: config.kokoroTimeoutMs, hedgeAfterMs: config.openRouter.hedgeAfterMs }),
+        primaryVoice: openRouterVoice,
+        primarySource: "kokoro",
+        secondaryVoice: openRouterVoice,
+        secondarySource: "openrouter",
+        timeoutMs: overallTimeoutMs,
+        hedgeAfterMs: config.deepInfra.fallbackAfterMs,
+      }),
+      secondary: new AzureSpeechProvider(config.azure),
+      primaryVoice: openRouterVoice,
+      primarySource: "openrouter",
+      secondaryVoice: config.azure.voice,
+      secondarySource: "azure",
+      timeoutMs: overallTimeoutMs,
+      hedgeAfterMs: config.hybrid.hedgeAfterMs,
+      pinnedFallbackAfterMs: config.hybrid.pinnedFallbackAfterMs,
+    });
+  }
   if (config.provider === "openrouter-azure") {
     if (!config.azure || !config.openRouter || !config.hybrid) throw new Error("OpenRouter Azure hybrid speech configuration is missing.");
     return new HybridSpeechProvider({

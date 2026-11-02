@@ -110,7 +110,7 @@ export function createSpeechController(provider: SpeechProvider, config: SpeechC
       const preferredSource = requestedVoiceSource(body.voiceSource);
       const synthesisRequest = {
         text: normalizeTextForSpeech(text),
-        voice: config.provider === "azure-openrouter" || config.provider === "openrouter-azure"
+        voice: config.provider === "azure-openrouter" || config.provider === "openrouter-azure" || config.provider === "deepinfra-openrouter-azure"
           ? resolveVoice(body.voice, config.interviewerVoice)
           : resolveKokoroVoice(body.voice, config.interviewerVoice),
         speed,
