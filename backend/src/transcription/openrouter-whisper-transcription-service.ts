@@ -18,6 +18,8 @@ export const segmentTimestampRetryTimeoutMs = 12_000;
 
 const maxHttpAttempts = 3;
 const transientRetryDelayMs = 500;
+/** OpenRouter reports in-flight credit contention as 402; one short wait usually clears it. */
+const creditRetryDelayMs = 800;
 
 const modelForProvider: Record<Exclude<TranscriptionProvider, "azure">, string> = {
   "whisper-large-v3": "openai/whisper-large-v3",
@@ -45,6 +47,13 @@ export class OpenRouterWhisperTranscriptionService implements TranscriptionServi
     const timeoutSignal = AbortSignal.timeout(this.options.timeoutMs);
     let attempts = 0;
     let transientRetried = false;
+    let creditRetried = false;
+    let creditRetryActive = false;
+    const logCreditRetryOutcome = (outcome: "recovered" | "failed") => {
+      if (!creditRetryActive) return;
+      creditRetryActive = false;
+      console.info(JSON.stringify({ event: "transcription_credit_retry", outcome }));
+    };
     const unavailable = (message: string, providerStatus: TranscriptionFailureCategory, cause?: unknown) =>
       new TranscriptionUnavailableError(message, { providerStatus, attempts, ...(cause === undefined ? {} : { cause }) });
     try {
@@ -107,6 +116,19 @@ export class OpenRouterWhisperTranscriptionService implements TranscriptionServi
           }
           throw new TranscriptionUnavailableError("OpenRouter returned HTTP 400.", { providerStatus: "rejected", attempts, httpStatus: response.status });
         }
+        if (response.status === 402) {
+          const providerMessage = await openRouterErrorMessage(response);
+          if (!creditRetried && providerMessage && /in-flight/i.test(providerMessage)) {
+            // In-flight contention is transient: wait briefly once, without using up a normal retry attempt.
+            creditRetried = true;
+            creditRetryActive = true;
+            console.info(JSON.stringify({ event: "transcription_credit_retry", delayMs: creditRetryDelayMs }));
+            await sleepWithSignal(this.sleepImplementation, creditRetryDelayMs, requestSignal);
+            attempts -= 1;
+            continue;
+          }
+          throw new TranscriptionUnavailableError("OpenRouter returned HTTP 402.", { providerStatus: "rejected", attempts, httpStatus: 402, ...(providerMessage ? { providerMessage } : {}) });
+        }
         if (!response.ok) {
           const category: TranscriptionFailureCategory = response.status === 429 ? "429" : response.status >= 500 ? "5xx" : "rejected";
           const providerMessage = await openRouterErrorMessage(response);
@@ -142,9 +164,11 @@ export class OpenRouterWhisperTranscriptionService implements TranscriptionServi
           },
         });
         if (attempts > 1) Object.defineProperty(normalized, "attempts", { enumerable: false, value: attempts });
+        logCreditRetryOutcome("recovered");
         return normalized;
       }
     } catch (error) {
+      logCreditRetryOutcome("failed");
       if (error instanceof TranscriptionUnavailableError) throw error;
       // Reached when a backoff sleep is interrupted by the caller abort or the overall budget.
       throw unavailable("OpenRouter transcription is unavailable right now.", timeoutSignal.aborted ? "timeout" : signal?.aborted ? "aborted" : "network", error);

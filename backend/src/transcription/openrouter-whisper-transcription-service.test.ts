@@ -161,4 +161,35 @@ describe("OpenRouter Whisper final request", () => {
     const error = await service.transcribe(pcmToWav(Buffer.alloc(32_000)), "whisper-large-v3-turbo").catch((caught: unknown) => caught);
     expect(error).toMatchObject({ httpStatus: 402, providerMessage: "Insufficient credits for sk-*** | Groq" });
   });
+
+  describe("in-flight credit retry", () => {
+    const ok = () => new Response(JSON.stringify({ text: "hello there" }), { status: 200 });
+    const inFlight = () => new Response(JSON.stringify({ error: { code: 402, message: "This request would exceed your available credits given your current in-flight requests. Retry after in-flight requests settle, or add credits." } }), { status: 402 });
+    const make = (fetcher: typeof fetch) => {
+      const sleep = vi.fn(async () => undefined);
+      return { sleep, service: new OpenRouterWhisperTranscriptionService({ key: "test", timeoutMs: 1_000, fetchImplementation: fetcher, sleepImplementation: sleep }) };
+    };
+    const audio = () => pcmToWav(Buffer.alloc(32_000));
+
+    it("retries once after an in-flight HTTP 402 and returns the transcript", async () => {
+      const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(inFlight()).mockResolvedValueOnce(ok());
+      const { service, sleep } = make(fetcher);
+      const result = await service.transcribe(audio(), "whisper-large-v3-turbo");
+      expect(result.transcript).toBe("hello there");
+      expect(fetcher).toHaveBeenCalledTimes(2);
+      expect(sleep).toHaveBeenCalledWith(800);
+    });
+
+    it("rejects with HTTP 402 after a second in-flight response", async () => {
+      const fetcher = vi.fn<typeof fetch>(async () => inFlight());
+      await expect(make(fetcher).service.transcribe(audio(), "whisper-large-v3-turbo")).rejects.toMatchObject({ providerStatus: "rejected", httpStatus: 402 });
+      expect(fetcher).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not retry other HTTP 402 messages", async () => {
+      const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ error: { message: "Insufficient credits." } }), { status: 402 }));
+      await expect(make(fetcher).service.transcribe(audio(), "whisper-large-v3-turbo")).rejects.toMatchObject({ providerStatus: "rejected", httpStatus: 402, attempts: 1 });
+      expect(fetcher).toHaveBeenCalledOnce();
+    });
+  });
 });
