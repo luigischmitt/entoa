@@ -60,6 +60,17 @@ export function SkChart({ bars = 12, h = "9rem", i = 0 }: { bars?: number; h?: s
   );
 }
 
+/** Full-screen calm loader for a route segment: centred, opaque on the page ground, and themed by the design tokens. */
+export function RouteLoading({ label }: { label: ReactNode }) {
+  return (
+    <main className="grid min-h-dvh place-items-center bg-[var(--ds-cream)] px-6">
+      <div className="ld-fade">
+        <LoadingLabel>{label}</LoadingLabel>
+      </div>
+    </main>
+  );
+}
+
 /** Wrapper that announces busy state; put a LoadingLabel and the skeleton shapes inside. */
 export function LoadingRegion({ label, className = "", children }: { label: ReactNode; className?: string; children: ReactNode }) {
   return (

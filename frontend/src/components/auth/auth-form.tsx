@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { sanitizeNextPath } from "@/lib/auth/redirect";
+import { startNavigation } from "@/lib/navigation-progress.mjs";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 import "./auth.css";
@@ -94,6 +95,7 @@ export function AuthForm({ mode, reason, next }: { mode: AuthMode; reason?: stri
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
 
         if (signInError) throw signInError;
+        startNavigation();
         router.replace(sanitizeNextPath(next));
         return;
       }
@@ -110,6 +112,7 @@ export function AuthForm({ mode, reason, next }: { mode: AuthMode; reason?: stri
 
         if (signUpError) throw signUpError;
         if (data.session) {
+          startNavigation();
           router.replace("/dashboard");
           return;
         }

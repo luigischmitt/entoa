@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { getCurrentLocale, t } from "@/lib/locale";
-import { ArrowLeft, ArrowUpRight, Download, Pencil } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Download, LoaderCircle, Pencil } from "lucide-react";
 import { answerOrdinalForSequence, pairInterviewTurns, type InterviewReportResult } from "@/lib/interview/report";
 import type { AzureMetricSummary } from "@/lib/interview/report-metrics.mjs";
 import type { InterviewConfig } from "@/lib/interview/types";
@@ -361,7 +362,7 @@ function ConversationDocument({ model, dateLabel }: { model: ConversationModel; 
 function ReadyAppendix() {
   return (
     <div className="rp-appendix">
-      <a className="ds-btn ds-btn-cta-green rp-voice-link" href="/dashboard?view=voice">{t("Treinar minha voz")}</a>
+      <Link className="ds-btn ds-btn-cta-green rp-voice-link" href="/dashboard?view=voice">{t("Treinar minha voz")}</Link>
     </div>
   );
 }
@@ -385,6 +386,16 @@ type RenameResult = { ok: true; title: string | null } | { ok: false; message: s
 export function InterviewReport({ config, elapsed, totalClock, answerCount, persistenceMessage, feedbackSyncMessage, reportState, turns, azureSummary, coverage, onLeave, progressRecords, currentInterviewId, historical = false, onRetry, retrying = false, canRegenerate = false, onRegenerate, customTitle, onRename }: {
   config: InterviewConfig; elapsed: string; totalClock: string; answerCount: number; persistenceLabel: string; persistenceMessage: string | null; feedbackSyncMessage: string | null; reportState: ReportState; progressRecords: ProgressRecord[]; currentInterviewId?: string; historical?: boolean; turns: Turns; azureSummary: AzureMetricSummary; coverage: { available: number; pending: number; total: number }; onLeave: () => void; onRetry?: () => void; retrying?: boolean; canRegenerate?: boolean; onRegenerate?: () => void; customTitle?: string | null; onRename?: (title: string | null) => Promise<RenameResult>;
 }): ReactNode {
+  // Leaving a live report starts a route change; the button shows it is working until the page changes.
+  const [leaving, setLeaving] = useState(false);
+  const leaveReport = () => {
+    if (historical) {
+      onLeave();
+      return;
+    }
+    setLeaving(true);
+    onLeave();
+  };
   const [loadedTurns, setLoadedTurns] = useState<Turns>(turns);
   const [loadingTurns, setLoadingTurns] = useState(historical && turns.length === 0 && Boolean(currentInterviewId));
   const [loadingStep, setLoadingStep] = useState(0);
@@ -611,8 +622,10 @@ export function InterviewReport({ config, elapsed, totalClock, answerCount, pers
       </article>
       {readyAny && <ReadyAppendix />}
       <div className="rp-foot">
-        <button type="button" className={`ds-btn ${reportState.status === "pending" ? "ds-btn-quiet" : "ds-btn-cta-green"} rp-back`} onClick={onLeave}>{t(historical ? "Voltar ao Progresso " : "Voltar ao dashboard ")}
-          <ArrowUpRight className="ds-arrow size-4" aria-hidden="true" />
+        <button type="button" className={`ds-btn ${reportState.status === "pending" ? "ds-btn-quiet" : "ds-btn-cta-green"} rp-back`} onClick={leaveReport} disabled={leaving} aria-busy={leaving || undefined}>{t(leaving ? "Abrindo o início…" : historical ? "Voltar ao Progresso " : "Voltar ao dashboard ")}
+          {leaving
+            ? <LoaderCircle className="ds-arrow size-4 motion-safe:animate-spin" aria-hidden="true" />
+            : <ArrowUpRight className="ds-arrow size-4" aria-hidden="true" />}
         </button>
       </div>
     </section>

@@ -3,7 +3,7 @@
 
 import { getCurrentLocale, t } from "@/lib/locale";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
-import { ArrowUpRight, ArrowLeft, ChevronDown, FileText } from "lucide-react";
+import { ArrowUpRight, ArrowLeft, ChevronDown, FileText, LoaderCircle } from "lucide-react";
 import type { InterviewConfig } from "@/lib/interview/types";
 import type { JobDirection, JobSeniority } from "@/lib/interview/job-direction.mjs";
 import type { SetupMode } from "@/lib/interview/job-direction.mjs";
@@ -57,7 +57,8 @@ export function InterviewSetup({
   voiceReadiness,
 }: {
   onBack: () => void;
-  onStart: (config: InterviewConfig) => void;
+  /** Returns false when the hand-off could not be stored, so the start button becomes available again. */
+  onStart: (config: InterviewConfig) => boolean | void;
   voiceReadiness: VoiceReadinessState;
 }) {
   const [config, setConfig] = useState<InterviewConfig>(defaultInterviewConfig);
@@ -80,6 +81,7 @@ export function InterviewSetup({
   const jobAnalysisGenerationRef = useRef(0);
   const resumeAnalysisGenerationRef = useRef(0);
   const [showErrors, setShowErrors] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [audioTestStatus, setAudioTestStatus] = useState<{ kind: "idle" | "loading" | "success" | "error"; message?: string }>({ kind: "idle" });
   const audioTestRef = useRef<{ cancel: () => void } | null>(null);
   const [roomOptionsOpen, setRoomOptionsOpen] = useState(false);
@@ -450,7 +452,8 @@ export function InterviewSetup({
       priorityCompetencies: config.jobDirection.priorityCompetencies.map((item) => item.trim()),
       productTeamContext: config.jobDirection.productTeamContext.trim(),
     } : undefined;
-    onStart({
+    setStarting(true);
+    const accepted = onStart({
       ...config,
       role: config.role.trim(),
       voice,
@@ -460,6 +463,7 @@ export function InterviewSetup({
       interviewSource: setupMode === "auto" ? "job" : setupMode,
       ...(jobDirection ? { jobDirection } : {}),
     });
+    if (accepted === false) setStarting(false);
   };
 
   const localizedSeniorityLabels = Object.fromEntries(Object.entries(seniorityLabels).map(([key, label]) => [key, t(label)])) as typeof seniorityLabels;
@@ -832,7 +836,8 @@ export function InterviewSetup({
                 </div>
               ))}
             </dl>
-            <button type="submit" className="ds-btn ds-btn-cta-green mt-4 hidden lg:flex" disabled={startBlocked} aria-describedby={startBlocked ? "start-hint-desktop" : undefined}>
+            <button type="submit" className="ds-btn ds-btn-cta-green mt-4 hidden lg:flex" disabled={startBlocked || starting} aria-busy={starting || undefined} aria-describedby={startBlocked ? "start-hint-desktop" : undefined}>
+              {starting && <LoaderCircle className="size-4 motion-safe:animate-spin" aria-hidden="true" />}
               {config.playInterviewerAudio && voiceReadiness === "warming" && <span className="loading loading-spinner loading-sm" aria-hidden="true" />}
               {t(startLabel)} <ArrowUpRight className="ds-arrow size-4" aria-hidden="true" />
             </button>
@@ -847,7 +852,8 @@ export function InterviewSetup({
         {/* Mobile: the primary action stays reachable */}
         <div className="isu-bar fixed inset-x-0 z-20 px-4 pb-3 pt-3 lg:hidden">
           {startBlocked && <p id="start-hint-mobile" className="ds-hint mb-2 text-center text-text-2">{t(startHint)}</p>}
-          <button type="submit" form="interview-setup-form" className="ds-btn ds-btn-cta-green" disabled={startBlocked} aria-describedby={startBlocked ? "start-hint-mobile" : undefined}>
+          <button type="submit" form="interview-setup-form" className="ds-btn ds-btn-cta-green" disabled={startBlocked || starting} aria-busy={starting || undefined} aria-describedby={startBlocked ? "start-hint-mobile" : undefined}>
+            {starting && <LoaderCircle className="size-4 motion-safe:animate-spin" aria-hidden="true" />}
             {config.playInterviewerAudio && voiceReadiness === "warming" && <span className="loading loading-spinner loading-sm" aria-hidden="true" />}
             {t(startLabel)} <ArrowUpRight className="ds-arrow size-4" aria-hidden="true" />
           </button>

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
+import { startNavigation } from "@/lib/navigation-progress.mjs";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export function AuthSessionGuard() {
@@ -23,6 +24,7 @@ export function AuthSessionGuard() {
       if (event === "SIGNED_OUT") {
         const wasManual = window.sessionStorage.getItem("auth:manual-signout") === "1";
         window.sessionStorage.removeItem("auth:manual-signout");
+        startNavigation();
         router.replace(wasManual ? "/login" : "/login?reason=expired");
       }
     });

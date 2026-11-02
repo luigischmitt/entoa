@@ -10,6 +10,7 @@ import { SlidingSegmented } from "@/components/ui/sliding-segmented";
 import { defaultInterviewConfig } from "../interview-config";
 import { prewarmInterviewerUtterance } from "../hooks/use-speech-playback";
 import { useLocale } from "@/lib/locale";
+import { startNavigation } from "@/lib/navigation-progress.mjs";
 import type { InterviewConfig } from "@/lib/interview/types";
 import type { ConversationPlanInput } from "@/lib/interview/conversation-policy.mjs";
 import type { ConversationTopic } from "@/lib/interview/conversation-topics.mjs";
@@ -94,7 +95,10 @@ export function FreeModeSetup() {
       conversationPlan: plan,
     };
     if (config.playInterviewerAudio) prewarmInterviewerUtterance(plan.opening, voice);
-    if (storeRoomHandoff(window.sessionStorage, config)) router.push("/interview");
+    if (storeRoomHandoff(window.sessionStorage, config)) {
+      startNavigation();
+      router.push("/interview");
+    }
     else { setStartError(true); setPreparing(false); }
   };
 

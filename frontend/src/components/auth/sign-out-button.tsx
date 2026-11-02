@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useLocale } from "@/lib/locale";
+import { startNavigation } from "@/lib/navigation-progress.mjs";
 
 export function SignOutButton() {
   const { t } = useLocale();
@@ -22,6 +23,7 @@ export function SignOutButton() {
       const { error: signOutError } = await getSupabaseBrowserClient().auth.signOut();
 
       if (signOutError) throw signOutError;
+      startNavigation();
       router.replace("/login");
     } catch {
       window.sessionStorage.removeItem("auth:manual-signout");

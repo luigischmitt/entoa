@@ -33,7 +33,7 @@ test("makes every saved interview recoverable from history and returns from the 
   assert.match(progressView, /selectedReportState\.status !== "pending"/);
   assert.match(progressView, /setTimeout\(\(\) => \{ void refresh\(\); \}, 2_500\)/);
   assert.match(progressView, /turns=\{\[\]\}/);
-  assert.match(report, /onClick=\{onLeave\}>\{t\(historical \? "Voltar ao Progresso /);
+  assert.match(report, /onClick=\{leaveReport\} disabled=\{leaving\}[^>]*>\{t\(leaving \? "Abrindo o início…" : historical \? "Voltar ao Progresso /);
 });
 
 test("labels the English profile as prioritized patterns found, not as a complete error-free score", async () => {

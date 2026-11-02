@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { t } from "@/lib/locale";
 import { azureMetricReliability, type AzureMetricSummary, type AzureReportDimension } from "@/lib/interview/report-metrics.mjs";
@@ -110,7 +111,7 @@ export function AzureVoiceReport({ summary, coverage, step, title = "Sinais voca
         <p className="rp-delivery-insight">{delivery.insights.map((item, index) => <span key={item.key}>{index > 0 ? " " : ""}{t(item.key, item.values)}</span>)}</p>
       </div>}
       <p className="rp-hint mt-4 rp-voice-foot">{t("Cobertura: ")}{coverage.available} {t("de ")}{coverage.total} {t("respostas com sinais disponíveis.")}{coverage.pending ? ` ${coverage.pending} ${t("avaliação(ões) ainda em processamento; a conclusão da sessão não espera por elas.")}` : ""} {t(coverageHelp)}</p>
-      <a className="ds-btn ds-btn-cta-green rp-voice-training rp-voice-foot" href="/dashboard?view=voice">{t("Treinar minha voz")}</a>
+      <Link className="ds-btn ds-btn-cta-green rp-voice-training rp-voice-foot" href="/dashboard?view=voice">{t("Treinar minha voz")}</Link>
     </section>
   );
 }
