@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   canClearCheckpointAfterSync,
   clearLocalCheckpoint,
+  discardConversationCheckpoint,
   localCheckpointKey,
   markCheckpointTurnSynced,
   readLocalCheckpoint,
@@ -143,4 +144,25 @@ test("storage quota/write failures return false so the UI cannot claim a local s
   storage.failWrites = true;
   assert.equal(writeLocalCheckpoint(storage, { userId: "user-a", localSessionId: "local-a", config, snapshot }, 1_000), false);
   assert.equal(readLocalCheckpoint(storage, "user-a", 1_000), null);
+});
+
+test("a conversation checkpoint is never offered for resume and is discarded on request", () => {
+  const storage = new MemoryStorage();
+  const userId = "user-conv";
+  const conversation = { ...config, mode: "conversation", conversationPlan: { title: "T", opening: "Hi", paths: [{ id: "p1", line: "x" }] } };
+  assert.equal(writeLocalCheckpoint(storage, { userId, localSessionId: "conv-1", config: conversation, snapshot, status: "in_progress" }, 1000), true);
+  assert.equal(readLocalCheckpoint(storage, userId, 1000).config.mode, "conversation");
+  assert.equal(readResumableCheckpoint(storage, userId, 1000), null);
+  assert.equal(discardConversationCheckpoint(storage, userId, 1000), true);
+  assert.equal(readLocalCheckpoint(storage, userId, 1000), null);
+  assert.equal(discardConversationCheckpoint(storage, userId, 1000), false);
+});
+
+test("an interview checkpoint is still resumable and is not discarded as a conversation", () => {
+  const storage = new MemoryStorage();
+  const userId = "user-int";
+  writeLocalCheckpoint(storage, { userId, localSessionId: "int-1", config, snapshot, status: "in_progress" }, 1000);
+  assert.equal(readResumableCheckpoint(storage, userId, 1000).localSessionId, "int-1");
+  assert.equal(discardConversationCheckpoint(storage, userId, 1000), false);
+  assert.equal(readLocalCheckpoint(storage, userId, 1000).localSessionId, "int-1");
 });

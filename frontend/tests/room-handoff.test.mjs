@@ -81,3 +81,37 @@ test("smoothing rises faster than it falls and settles at zero", () => {
   for (let i = 0; i < 80; i += 1) value = smoothIntensity(value, 0);
   assert.equal(value, 0);
 });
+
+const conversationPlan = {
+  title: "Rotina da manhã", opening: "Good morning! How does yours start?",
+  paths: [{ id: "p1", line: "What did you do first?" }, { id: "p2", line: "Which morning helps you?" }],
+};
+const conversationConfig = { ...config, role: "Modo livre", seniority: "mid-level", focus: "mixed", duration: "10", mode: "conversation", conversationPlan };
+
+test("a conversation hand-off keeps its mode and a valid plan", () => {
+  assert.deepEqual(parseRoomHandoff(serializeRoomHandoff(conversationConfig, 1), 2), conversationConfig);
+});
+
+test("a conversation with a malformed plan is dropped to a plain config, mode included", () => {
+  const broken = [
+    { ...conversationPlan, paths: [] },
+    { ...conversationPlan, paths: [{ id: "p1" }] },
+    { ...conversationPlan, title: "   " },
+    { ...conversationPlan, opening: 42 },
+    { ...conversationPlan, paths: Array.from({ length: 13 }, (_, index) => ({ id: `p${index}`, line: "x" })) },
+    undefined,
+  ];
+  for (const plan of broken) {
+    const parsed = parseRoomHandoff(serializeRoomHandoff({ ...conversationConfig, conversationPlan: plan }, 1), 2);
+    assert.equal("mode" in parsed, false);
+    assert.equal("conversationPlan" in parsed, false);
+  }
+});
+
+test("a plan without the conversation mode is dropped, and unknown plan fields are not kept", () => {
+  const withoutMode = parseRoomHandoff(serializeRoomHandoff({ ...conversationConfig, mode: "interview" }, 1), 2);
+  assert.equal("mode" in withoutMode, false);
+  assert.equal("conversationPlan" in withoutMode, false);
+  const parsed = parseRoomHandoff(serializeRoomHandoff({ ...conversationConfig, conversationPlan: { ...conversationPlan, paths: [{ id: "p1", line: "a", extra: 1 }] } }, 1), 2);
+  assert.deepEqual(parsed.conversationPlan.paths, [{ id: "p1", line: "a" }]);
+});

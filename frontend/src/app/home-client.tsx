@@ -10,6 +10,7 @@ import {
   AudioLines,
   Gauge,
   LineChart,
+  MessagesSquare,
   PanelLeftClose,
   PanelLeftOpen,
   Play,
@@ -38,12 +39,13 @@ import { authorizedFetch } from "@/lib/auth/backend-auth";
 
 import "./components/shell.css";
 
-type View = "home" | "interview-setup" | "progress" | "voice" | "settings" | "admin-usage";
+type View = "home" | "interview-setup" | "free-mode" | "progress" | "voice" | "settings" | "admin-usage";
 type InitialView = View;
 
 const primaryNavigationItems = [
   { id: "home" as const, label: "Início", icon: Home },
   { id: "interview-setup" as const, label: "Entrevista", icon: Video },
+  { id: "free-mode" as const, label: "Modo livre", icon: MessagesSquare },
   { id: "voice" as const, label: "Sua voz", icon: AudioLines },
   { id: "progress" as const, label: "Progresso", icon: LineChart },
 ];
@@ -60,6 +62,7 @@ import { LoadingLabel, LoadingRegion, Sk, SkCard } from "@/components/ui/loading
 const subscribeNever = () => () => {};
 
 const loadInterviewSetup = () => import("./components/interview-setup").then((module) => module.InterviewSetup);
+const loadFreeModeSetup = () => import("./components/free-mode-setup").then((module) => module.FreeModeSetup);
 const loadProgressView = () => import("./components/progress-view").then((module) => module.ProgressView);
 const loadVoiceView = () => import("./components/voice-view").then((module) => module.VoiceView);
 const loadAdminUsageView = () => import("./components/admin-usage-view").then((module) => module.AdminUsageView);
@@ -81,12 +84,14 @@ const ViewLoading = () => {
 };
 
 const InterviewSetup = dynamic(loadInterviewSetup, { loading: ViewLoading });
+const FreeModeSetup = dynamic(loadFreeModeSetup, { loading: ViewLoading });
 const ProgressView = dynamic(loadProgressView, { loading: ViewLoading });
 const VoiceView = dynamic(loadVoiceView, { loading: ViewLoading });
 const AdminUsageView = dynamic(loadAdminUsageView, { loading: ViewLoading });
 
 function preloadView(view: View) {
   if (view === "interview-setup") void loadInterviewSetup();
+  if (view === "free-mode") void loadFreeModeSetup();
   if (view === "progress") void loadProgressView();
   if (view === "voice") void loadVoiceView();
   if (view === "admin-usage") void loadAdminUsageView();
@@ -100,6 +105,7 @@ function isNavigationItemActive(view: View, item: View) {
 const viewTrail: Record<View, readonly [string, string?]> = {
   home: ["Início"],
   "interview-setup": ["Entrevista", "Preparar entrevista"],
+  "free-mode": ["Modo livre"],
   progress: ["Progresso"],
   voice: ["Sua voz"],
   settings: ["Configurações"],
@@ -733,6 +739,7 @@ export default function App({ initialView = "home" }: { initialView?: InitialVie
               }}
             />
           )}
+          {view === "free-mode" && <FreeModeSetup />}
           {view === "progress" && (
             <ProgressView
               onStart={() => navigate("interview-setup")}

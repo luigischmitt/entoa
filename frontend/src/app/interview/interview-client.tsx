@@ -5,12 +5,13 @@ import { useEffect, useRef, useState } from "react";
 
 import { SessionExpiredNotice } from "@/components/auth/session-expired-notice";
 import { consumeRoomHandoff } from "@/lib/interview/room-handoff.mjs";
-import { readResumableCheckpoint, type LocalInterviewCheckpoint } from "@/lib/interview/local-checkpoint.mjs";
+import { discardConversationCheckpoint, readResumableCheckpoint, type LocalInterviewCheckpoint } from "@/lib/interview/local-checkpoint.mjs";
 import { getLocalSessionUserId } from "@/lib/auth/browser-session";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { InterviewConfig } from "@/lib/interview/types";
 import { useLocale } from "@/lib/locale";
 
+import { ConversationRoom } from "../components/conversation-room";
 import { InterviewRoom } from "../components/interview-room";
 
 const setupPath = "/dashboard?view=interview-setup";
@@ -41,6 +42,8 @@ export default function InterviewClient() {
     }
     void (async () => {
       const userId = await getLocalSessionUserId(getSupabaseBrowserClient());
+      // A conversation is never resumed: its stored checkpoint is dropped here, so only interviews can come back.
+      if (userId) discardConversationCheckpoint(browserStorage(), userId);
       const checkpoint = userId ? readResumableCheckpoint(browserStorage(), userId) : null;
       if (checkpoint) {
         setResumeCheckpoint(checkpoint);
@@ -54,7 +57,9 @@ export default function InterviewClient() {
   return (
     <div lang={locale === "en" ? "en" : "pt-BR"}>
       <SessionExpiredNotice />
-      <InterviewRoom config={config} resumeCheckpoint={resumeCheckpoint} onLeave={() => router.replace("/dashboard")} />
+      {config.mode === "conversation" && config.conversationPlan
+        ? <ConversationRoom config={config} plan={config.conversationPlan} onLeave={() => router.replace("/dashboard")} />
+        : <InterviewRoom config={config} resumeCheckpoint={resumeCheckpoint} onLeave={() => router.replace("/dashboard")} />}
     </div>
   );
 }

@@ -50,3 +50,16 @@ test("resume sessions save a neutral label instead of the inferred role, seniori
   const job = buildInterviewSessionPayload({ ...config, interviewSource: "job" }, "user-1", "now");
   assert.deepEqual([job.target_role, job.seniority, job.focus], ["Backend Engineer", "mid-level", "mixed"]);
 });
+
+test("a conversation adds its mode and a short topic title; interviews gain no new columns", () => {
+  const conversation = {
+    role: "Modo livre", seniority: "mid-level", focus: "mixed", duration: "10", questionCount: null, mode: "conversation",
+    conversationPlan: { title: "T".repeat(120), opening: "Hi", paths: [{ id: "p1", line: "x" }] },
+  };
+  const payload = buildInterviewSessionPayload(conversation, "user-1", "now");
+  assert.equal(payload.mode, "conversation");
+  assert.equal(payload.conversation_topic, "T".repeat(80));
+  assert.equal(payload.target_role, "Modo livre");
+  assert.equal(Object.hasOwn(buildInterviewSessionPayload({ ...config, mode: "interview" }, "user-1", "now"), "mode"), false);
+  assert.equal(Object.hasOwn(buildInterviewSessionPayload(config, "user-1", "now"), "conversation_topic"), false);
+});

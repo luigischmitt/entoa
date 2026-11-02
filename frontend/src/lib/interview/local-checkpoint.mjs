@@ -42,6 +42,8 @@ function safeConfig(config) {
     ...(["job", "resume"].includes(config.interviewSource) ? { interviewSource: config.interviewSource } : {}),
     ...(typeof config.voice === "string" ? { voice: config.voice } : {}),
     ...(typeof config.speechSpeed === "number" ? { speechSpeed: config.speechSpeed } : {}),
+    // Kept only so a conversation is recognised: conversations are never resumed.
+    ...(config.mode === "conversation" ? { mode: "conversation" } : {}),
   };
 }
 
@@ -88,7 +90,16 @@ export function readLocalCheckpoint(storage, userId, now = Date.now()) {
 
 export function readResumableCheckpoint(storage, userId, now = Date.now()) {
   const record = readLocalCheckpoint(storage, userId, now);
-  return record?.status === "in_progress" ? record : null;
+  return record?.status === "in_progress" && record.config.mode !== "conversation" ? record : null;
+}
+
+/**
+ * A conversation is never resumed: a stored conversation checkpoint is removed so it cannot block the next session's saves.
+ * Returns true when one was removed.
+ */
+export function discardConversationCheckpoint(storage, userId, now = Date.now()) {
+  const record = readLocalCheckpoint(storage, userId, now);
+  return record?.config.mode === "conversation" && clearLocalCheckpoint(storage, userId);
 }
 
 export function readLocalCheckpointForSession(storage, userId, localSessionId, now = Date.now()) {

@@ -13,6 +13,19 @@ export const roomHandoffKey = "eia:interview-room-handoff";
 export const roomHandoffMaxAgeMs = 10 * 60 * 1000;
 
 const stringFields = ["role", "seniority", "focus", "duration"];
+const maxConversationPaths = 12;
+
+/** A conversation plan is kept only when every field has the expected shape. */
+function parseConversationPlan(plan) {
+  if (!plan || typeof plan !== "object" || typeof plan.title !== "string" || typeof plan.opening !== "string") return null;
+  if (!Array.isArray(plan.paths) || plan.paths.length < 1 || plan.paths.length > maxConversationPaths) return null;
+  const paths = plan.paths.map((path) => (path && typeof path === "object" && typeof path.id === "string" && typeof path.line === "string"
+    ? { id: path.id, line: path.line }
+    : null));
+  if (paths.some((path) => path === null || path.id.trim() === "" || path.line.trim() === "")) return null;
+  if (plan.title.trim() === "" || plan.opening.trim() === "") return null;
+  return { title: plan.title, opening: plan.opening, paths };
+}
 const booleanFields = ["playInterviewerAudio", "showQuestionCaptions", "candidateCameraEnabled", "autoCaptureVoice"];
 
 export function serializeRoomHandoff(config, now = Date.now()) {
@@ -44,6 +57,8 @@ export function parseRoomHandoff(raw, now = Date.now()) {
     : config.interviewSource === "job" && jobDirection
       ? "job"
       : "manual";
+  // A conversation keeps its mode and plan only together; anything else is an interview.
+  const conversationPlan = config.mode === "conversation" ? parseConversationPlan(config.conversationPlan) : null;
   return {
     role: config.role,
     seniority: normalizeSeniority(config.seniority),
@@ -60,6 +75,7 @@ export function parseRoomHandoff(raw, now = Date.now()) {
     ...(microphoneDeviceId === null ? {} : { microphoneDeviceId }),
     ...(jobDirection ? { jobDirection } : {}),
     ...(interviewSource !== "manual" ? { interviewSource } : {}),
+    ...(conversationPlan ? { mode: "conversation", conversationPlan } : {}),
     // Optional (older hand-offs have none): only a known interviewer voice is kept; otherwise the room uses the default.
     ...(INTERVIEWER_VOICES.includes(config.voice) ? { voice: config.voice } : {}),
     ...(typeof config.speechSpeed === "number" ? { speechSpeed: resolveInterviewerSpeechSpeed(config.speechSpeed) } : {}),
