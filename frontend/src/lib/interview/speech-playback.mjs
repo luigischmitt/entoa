@@ -85,18 +85,12 @@ const speechFlights = new Map();
 // Finished blobs of prepared (pre-synthesized) utterances, reusable by an identical request for a short time.
 const retainedSpeechBlobs = new Map();
 const VOICE_SOURCES = ["openrouter", "azure", "kokoro"];
-// The provider that answered an utterance; later requests ask for it so the voice stays the same. Azure only covers the
-// line it answered: releaseAzureVoiceSource() clears that pin when the line ends, so the next line tries the cheaper voice again.
+// The provider that answered the session's first line stays for the whole session; every later request asks for it so the voice stays the same.
 let interviewVoiceSource = null;
 
 /** Starts a new interview: the next line that comes back decides the voice source again. */
 export function resetInterviewVoiceSource() {
   interviewVoiceSource = null;
-}
-
-/** Azure only covers the line it answered; the next line tries the cheaper voice again. OpenRouter and Kokoro pins stay. */
-export function releaseAzureVoiceSource() {
-  if (interviewVoiceSource === "azure") interviewVoiceSource = null;
 }
 
 export function getInterviewVoiceSource() {
@@ -180,9 +174,14 @@ function acquireSpeechBlob(options, text) {
   const { request, key } = speechRequestFor(options, text);
   const retained = retainedSpeechBlobs.get(key);
   if (retained && isOtherInterviewVoice(retained.source)) forgetRetainedSpeechBlob(key);
-  else if (retained) return { promise: Promise.resolve(retained.blob), release() {} };
+  else if (retained) {
+    // A blob prepared before the session started still decides its voice.
+    rememberInterviewVoiceSource(retained.source);
+    return { promise: Promise.resolve(retained.blob), release() {} };
+  }
   let flight = speechFlights.get(key);
   if (flight && isOtherInterviewVoice(flight.source)) flight = null;
+  if (flight) rememberInterviewVoiceSource(flight.source);
   if (!flight) {
     const controller = new AbortController();
     const fetcher = options.fetcher ?? fetch;
@@ -803,8 +802,6 @@ export function playInterviewerSegments(segments, options) {
     requests?.stop();
     stopPlaying?.();
     for (const item of prepared) release(item);
-    // Once per utterance, on success, failure and cancel: the line is over, so an Azure pin no longer applies.
-    releaseAzureVoiceSource();
   });
 
   return {
@@ -818,6 +815,31 @@ export function playInterviewerSegments(segments, options) {
       for (const item of prepared) release(item);
     },
   };
+}
+
+/**
+ * Decides the session's voice before its opening plays. Only the first chunk of `text` is synthesized, with the same
+ * chunking and request body as `playInterviewerSegments`, so playback joins that flight or reuses its retained blob
+ * (`retainMs`) instead of synthesizing the opening twice. Resolves to the interview's voice source once the first
+ * chunk answered or after `options.timeoutMs` (default 6000); the request keeps running after a timeout. Never rejects.
+ */
+export function prepareSessionVoice(text, voice, speed, options = {}) {
+  const chunks = groupInterviewerSentences(splitInterviewerSpeech(text));
+  if (!chunks.length) return Promise.resolve(getInterviewVoiceSource());
+  const schedule = options.setTimeout ?? ((callback, delay) => globalThis.setTimeout(callback, delay));
+  const unschedule = options.clearTimeout ?? ((id) => globalThis.clearTimeout(id));
+  const lease = acquireSpeechBlob({ endpoint: options.endpoint, fetcher: options.fetcher, voice, speed, retainMs: options.retainMs ?? 30_000 }, chunks[0].text);
+  let timerId = null;
+  const deadline = new Promise((resolve) => { timerId = schedule(resolve, options.timeoutMs ?? 6_000); });
+  // Released only once answered: a timed-out request stays attached for the playback that will ask for it.
+  const answered = lease.promise.then(
+    () => { lease.release(false); },
+    () => undefined,
+  );
+  return Promise.race([answered, deadline])
+    .catch(() => undefined)
+    .finally(() => { if (timerId !== null) unschedule(timerId); })
+    .then(() => getInterviewVoiceSource());
 }
 
 /**

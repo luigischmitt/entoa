@@ -6,6 +6,7 @@ import { createSpeechProvider } from "../src/speech/create-speech-provider.js";
 import { SpeechProviderUnavailableError } from "../src/speech/errors.js";
 import { createGcpIdTokenProvider } from "../src/speech/gcp-identity-token.js";
 import { HybridSpeechProvider } from "../src/speech/hybrid-speech-provider.js";
+import { InterviewerSpeechPrefetcher } from "../src/speech/interviewer-prefetcher.js";
 import { KokoroSpeechProvider } from "../src/speech/kokoro-speech-provider.js";
 import type { SpeechProvider, SpeechSynthesisRequest, SynthesizedSpeech } from "../src/speech/types.js";
 
@@ -481,5 +482,61 @@ describe("hybrid voice source preference", () => {
     await vi.waitFor(() => expect(secondary.calls).toHaveLength(1));
     secondary.calls[0].resolve(audio("s"));
     expect((await pending).diagnostics).toMatchObject({ voiceSource: "openrouter" });
+  });
+});
+
+describe("hybrid primary only", () => {
+  it("rejects when the primary fails and never calls the secondary", async () => {
+    const { provider, primary, secondary } = hybrid();
+    const pending = provider.synthesize({ ...req, primaryOnly: true });
+    const assertion = expect(pending).rejects.toBeInstanceOf(SpeechProviderUnavailableError);
+    primary.calls[0].reject(new SpeechProviderUnavailableError("down"));
+    await assertion;
+    expect(secondary.calls).toHaveLength(0);
+    expect(primary.calls[0].request).not.toHaveProperty("primaryOnly");
+  });
+
+  it("never starts the secondary on a stall past the hedge time, even when it is preferred", async () => {
+    vi.useFakeTimers();
+    const { provider, primary, secondary } = hybrid({ hedgeAfterMs: 2_500, pinnedFallbackAfterMs: 1_000 });
+    const pending = provider.synthesize({ ...req, primaryOnly: true, preferredSource: "openrouter" });
+    expect(primary.calls).toHaveLength(1);
+    expect(secondary.calls).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(secondary.calls).toHaveLength(0);
+    primary.calls[0].resolve(audio("p"));
+    expect((await pending).diagnostics).toMatchObject({ hedge: "not_needed", voiceSource: "kokoro" });
+    expect(secondary.calls).toHaveLength(0);
+  });
+
+  it("lets a nested hybrid primary race its own fallback normally", async () => {
+    vi.useFakeTimers();
+    const inner = hybrid({ hedgeAfterMs: 2_500 });
+    const outerSecondary = controllable("azure");
+    const outer = new HybridSpeechProvider({
+      primary: inner.provider, secondary: outerSecondary.provider,
+      primaryVoice: "af_bella+af_heart", secondaryVoice: "en-US-test",
+      primarySource: "kokoro", secondarySource: "azure",
+      timeoutMs: 15_000, hedgeAfterMs: 2_500,
+    });
+    const pending = outer.synthesize({ ...req, primaryOnly: true });
+    await vi.advanceTimersByTimeAsync(2_500);
+    expect(inner.secondary.calls).toHaveLength(1);
+    expect(outerSecondary.calls).toHaveLength(0);
+    inner.secondary.calls[0].resolve(audio("o"));
+    expect((await pending).audio.toString()).toBe("o");
+    expect(outerSecondary.calls).toHaveLength(0);
+  });
+});
+
+describe("static warmup is background work", () => {
+  it("sends primaryOnly on every static phrase synthesis", async () => {
+    const seen: SpeechSynthesisRequest[] = [];
+    const cache = {
+      synthesize: vi.fn(async (request: SpeechSynthesisRequest) => { seen.push(request); return { audio: Buffer.from([1]), contentType: "audio/mpeg" }; }),
+    };
+    await new InterviewerSpeechPrefetcher({ cache, chunks: 1, voice: "af_heart", speed: 1, format: "mp3" } as never).prefetchStaticFor(undefined, 1.1, { concurrency: 2 });
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((request) => request.primaryOnly === true)).toBe(true);
   });
 });

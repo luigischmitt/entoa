@@ -7,6 +7,8 @@ export type SpeechSynthesisRequest = {
   format: AudioFormat;
   /** Preference for which provider answers; only the hybrid provider acts on it, others ignore it. */
   preferredSource?: "openrouter" | "azure" | "kokoro";
+  /** Background work that must never reach the fallback voice: only the primary is tried, and a preferred secondary is ignored. Never forwarded to providers. */
+  primaryOnly?: boolean;
 };
 
 export type HedgeOutcome = "not_needed" | "primary_won" | "hedge_won" | "both_failed";

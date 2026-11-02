@@ -36,6 +36,8 @@ import { InterviewReport, type ReportState } from "./interview-report";
 import "./interview-room.css";
 import { createSpeechFeed, toucanStateFor } from "@/components/interview/toucan/toucan-engine.mjs";
 import { CallDock, CandidateTile, InterviewerTile, Toast, useCandidateCamera, useMicLevelMeter } from "./call-stage";
+import { SessionPreparing } from "./session-preparing";
+import { useSessionVoice } from "../hooks/use-session-voice";
 import { waitForPendingAssessments } from "@/lib/interview/assessment-report-wait.mjs";
 import { canAutoSubmitVoiceTranscript, canSkipVoiceQuestion, createOnceGate, finalTranscriptForSubmission, hasTimeForNextQuestion, minimumSecondsForNextQuestion } from "@/lib/interview/session-policy.mjs";
 import { canAskAnotherFollowUp } from "@/lib/interview/follow-up-policy.mjs";
@@ -45,7 +47,7 @@ import { isAcknowledgeableAnswer, pickAcknowledgement, stripLeadingAcknowledgeme
 import { closingReactionVariants, composeClosingLead, createClosingReactionTracker, isLastAnswerExpected, pickClosingFallbackReaction } from "@/lib/interview/closing-reaction.mjs";
 import { requestClosingReaction } from "@/lib/interview/closing-reaction-request";
 import { useMicEngine } from "../hooks/use-mic-engine";
-import { composeAcknowledgedQuestion, composeContextualOpening, composeInterviewClosing, pickInterviewClosing, resetInterviewVoiceSource, type ClosingReason, resolveInterviewerCaption, resolveSkippedQuestion, splitInterviewerSpeech } from "@/lib/interview/speech-playback.mjs";
+import { composeAcknowledgedQuestion, composeContextualOpening, composeInterviewClosing, pickInterviewClosing, type ClosingReason, resolveInterviewerCaption, resolveSkippedQuestion, splitInterviewerSpeech } from "@/lib/interview/speech-playback.mjs";
 import { createInterviewHandoffTiming, createListeningHandoffTiming, isHandoffTimingEnabled } from "@/lib/interview/handoff-timing.mjs";
 import { buildRoleContext, isResumePractice, RESUME_PRACTICE_LABEL } from "@/lib/interview/resume-neutral.mjs";
 import { createOpeningSpeechTiming, isOpeningTimingEnabled } from "@/lib/interview/opening-timing.mjs";
@@ -238,6 +240,8 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
   const openingTimingRef = useRef<{ mark: (stage: string) => void } | null>(null);
   const listeningTimingRef = useRef<ReturnType<typeof createListeningHandoffTiming> | null>(null);
   const openingUtterance = composeContextualOpening(config, question.prompt);
+  // The session's voice is decided on the opening's first chunk before the opening plays (see use-session-voice).
+  const { voiceReady, waitForOpeningDelay } = useSessionVoice(config.playInterviewerAudio, openingUtterance, config.voice, interviewerSpeechSpeed);
   // The closing line is rotated between interviews; the lead is the reaction to the last answer (decided when the answer is final).
   // Two sets: the time ran out ("time_up"), or the interview ends early / has no more questions ("ended"); each rotates on its own.
   const [closingLines] = useState<Record<ClosingReason, string>>(() => ({ time_up: pickInterviewClosing(readLastClosingLine("time_up"), Math.random, "time_up"), ended: pickInterviewClosing(readLastClosingLine("ended"), Math.random, "ended") }));
@@ -296,7 +300,6 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
     phaseRef.current = nextPhase;
     setPhase(nextPhase);
   };
-  useEffect(() => { resetInterviewVoiceSource(); }, []);
   useEffect(() => { elapsedSecondsRef.current = seconds; }, [seconds]);
   useEffect(() => { setAskedQuestionIdsSnapshot([...askedPlannedQuestionIdsRef.current]); }, [currentIndex, followUpsAsked, question.id]);
   useEffect(() => { voiceAssessmentsRef.current = voiceAssessments; }, [voiceAssessments]);
@@ -409,6 +412,8 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
   }, [acknowledgements, autoCaptureVoice]);
 
   const onInterviewerUtteranceReady = useCallback(() => {
+    // Playback is held until the voice is decided; the hook reports "ready" then too, which must not open the answer window.
+    if (!voiceReady) return;
     if (phaseRef.current === "closing") {
       advanceTimerRef.current = window.setTimeout(() => {
         advanceTimerRef.current = null;
@@ -426,21 +431,22 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
     transitionPhase("answering");
     setVoiceCaptureState("idle");
     if (autoCaptureVoice) setAutoCaptureQuestionId(micTurnId);
-  }, [autoCaptureVoice, micTurnId]);
+  }, [autoCaptureVoice, micTurnId, voiceReady]);
   const isInterviewerSpeaking = phase === "introducing" || phase === "speaking" || phase === "closing";
   const speechSegments = useMemo(
     () => splitInterviewerSpeech(currentUtterance),
     [currentUtterance],
   );
   const waitBeforeInterviewerPlayback = useCallback(async () => {
-    if (phaseRef.current === "introducing") await new Promise((resolve) => window.setTimeout(resolve, 2_200));
+    // The opening's breathing room counts from the moment its voice was ready (600 ms after a slow preparation).
+    if (phaseRef.current === "introducing") await waitForOpeningDelay();
     await waitForAcknowledgement();
-  }, [waitForAcknowledgement]);
+  }, [waitForAcknowledgement, waitForOpeningDelay]);
   const onInterChunkGap = useCallback((gapMs: number) => {
     const marks = handoffAudioMarksRef.current;
     if (marks.confirmationAt !== null) marks.maxInterChunkGapMs = Math.max(marks.maxInterChunkGapMs, gapMs);
   }, []);
-  const { activeSegment, speechMessage, audioBlocked, setSpeechMessage, cancelPlayback, retrySpeech } = useSpeechPlayback(speechSegments, onInterviewerUtteranceReady, isInterviewerSpeaking && config.playInterviewerAudio, onSpeechTimingEvent, onFinalChunkStarted, interviewerSpeechSpeed * (spokenTurn?.speed ?? 1), speechFeed.push, waitBeforeInterviewerPlayback, config.voice, onInterChunkGap, onQuestionAudioStarted, onFinalChunkPlaybackStarted);
+  const { activeSegment, speechMessage, audioBlocked, setSpeechMessage, cancelPlayback, retrySpeech } = useSpeechPlayback(speechSegments, onInterviewerUtteranceReady, isInterviewerSpeaking && config.playInterviewerAudio && voiceReady, onSpeechTimingEvent, onFinalChunkStarted, interviewerSpeechSpeed * (spokenTurn?.speed ?? 1), speechFeed.push, waitBeforeInterviewerPlayback, config.voice, onInterChunkGap, onQuestionAudioStarted, onFinalChunkPlaybackStarted);
   const progress = Math.min(100, Math.round((seconds / (durationMinutes * 60)) * 100));
   const currentAssessmentSamples = useMemo(() => assessmentSamples(voiceAssessments, excludedAssessments), [voiceAssessments, excludedAssessments]);
   const currentAzureSummary = useMemo(() => ({ ...summarizeAzureAssessments(currentAssessmentSamples), answers: buildAzureAnswerRecords(Object.values(voiceAssessments).filter((entry) => !excludedAssessments.has(assessmentContextKey(entry))), answerClipPaths) }), [answerClipPaths, currentAssessmentSamples, excludedAssessments, voiceAssessments]);
@@ -1636,6 +1642,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
 
   return (
     <main id="main-content" className="rm-root mx-auto min-h-dvh w-full max-w-7xl px-4 py-5 sm:px-8 sm:py-8">
+      <SessionPreparing ready={voiceReady} label={t("Preparando sua entrevista…")} />
       {phase === "ending" && (
         <>
           <button type="button" className="ds-btn ds-btn-quiet -ml-3 mb-4 min-h-10 gap-2 px-3 text-sm" onClick={onLeave}>

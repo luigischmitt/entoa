@@ -1317,6 +1317,7 @@ const englishCopy: Record<string, string> = {
   "Não foi possível abrir a sala de conversa neste navegador. Libere o armazenamento do site e tente novamente.": "The conversation couldn't open in this browser. Free up the site's storage and try again.",
   "Começar conversa": "Start conversation",
   "Preparando a conversa…": "Preparing the conversation…",
+  "Preparando sua entrevista…": "Preparing your interview…",
   "Confira se o microfone certo está selecionado e se não está mudo.": "Check that the right microphone is selected and that it isn't muted.",
   "Aguardando sua vez": "Waiting for your turn",
   "Não consegui ouvir sua resposta. Tente falar de novo.": "I couldn't hear your answer. Try speaking again.",

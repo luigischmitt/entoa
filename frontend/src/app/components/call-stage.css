@@ -52,6 +52,15 @@
 .mt-call[hidden] { display: none; }
 .mt-call :focus-visible { outline: 2px solid var(--mt-accent); outline-offset: 3px; }
 
+/* ---- Session preparing: covers the call until the voice is decided. Opaque stage, so nothing behind it flashes. ---- */
+.mt-preparing {
+  position: fixed; inset: 0; z-index: 50; display: grid; place-content: center; justify-items: center; gap: 14px; padding: 24px;
+  background: var(--ds-cream); color: var(--ds-text-2); transition: opacity 200ms ease;
+}
+.mt-preparing[data-done] { opacity: 0; pointer-events: none; }
+.mt-preparing-text { margin: 0; font-size: 15px; text-align: center; }
+@media (prefers-reduced-motion: reduce) { .mt-preparing { transition: none; } }
+
 /* No entrance on join: header, tiles and dock are simply there. Movement in the room is live state only (speaking ring, audio bars, mic). */
 
 /* ---- Top overlay: role, save status, calm timer, hairline progress. ---- */

@@ -11,9 +11,11 @@ import type {
 
 type Source = "kokoro" | "azure" | "openrouter";
 
-function withoutPreference(request: SpeechSynthesisRequest): SpeechSynthesisRequest {
+// Routing hints are for this hybrid only: children (including a nested hybrid, which then races normally) never see them.
+function withoutRoutingHints(request: SpeechSynthesisRequest): SpeechSynthesisRequest {
   const copy = { ...request };
   delete copy.preferredSource;
+  delete copy.primaryOnly;
   return copy;
 }
 
@@ -75,8 +77,10 @@ export class HybridSpeechProvider implements SpeechProvider {
     let settled = false;
     let primaryFailed = false;
     let secondaryFailed = false;
+    // Background work never reaches the secondary, so it has no hedge, no pinned timer and no preferred start.
+    const primaryOnly = request.primaryOnly === true;
     // A preferred secondary starts at once and the primary only as its fallback.
-    const preferSecondary = request.preferredSource === secondarySource;
+    const preferSecondary = !primaryOnly && request.preferredSource === secondarySource;
 
     return new Promise<SynthesizedSpeech>((resolve, reject) => {
       const finish = (action: () => void) => {
@@ -107,7 +111,7 @@ export class HybridSpeechProvider implements SpeechProvider {
         finish(() => resolve({ ...speech, diagnostics: { ...speech.diagnostics, hedge, voiceSource: source } }));
       };
       const run = (provider: SpeechProvider, voice: string, source: Source, attemptSignal: AbortSignal) =>
-        provider.synthesize({ ...withoutPreference(request), voice }, attemptSignal).then((speech) => {
+        provider.synthesize({ ...withoutRoutingHints(request), voice }, attemptSignal).then((speech) => {
           if (speech.audio.length === 0) throw new SpeechProviderUnavailableError("Speech provider returned no audio.");
           return speech;
         }).then((speech) => win(source, speech));
@@ -129,6 +133,7 @@ export class HybridSpeechProvider implements SpeechProvider {
         run(primary, primaryVoiceForRequest, primarySource, controllers.primary.signal).catch(() => {
           primaryFailed = true;
           if (settled) return;
+          if (primaryOnly) { fail(); return; }
           if (!secondaryStarted) startSecondary();
           else if (secondaryFailed) fail();
         });
@@ -138,7 +143,8 @@ export class HybridSpeechProvider implements SpeechProvider {
       if (signal?.aborted) { onCallerAbort(); return; }
 
       overallTimer = setTimeout(fail, timeoutMs);
-      if (preferSecondary) startSecondary();
+      if (primaryOnly) startPrimary();
+      else if (preferSecondary) startSecondary();
       else {
         startPrimary();
         // An interview pinned to the primary voice does not race the other voice early: only a failure or a real stall brings it in.
