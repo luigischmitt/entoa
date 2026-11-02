@@ -85,7 +85,9 @@ export class InterviewerSpeechPrefetcher {
     const { cache, speed, format } = this.options;
     const resolvedVoice = this.options.voice.includes("Neural") ? resolveVoice(voice, this.options.voice) : resolveKokoroVoice(voice, this.options.voice);
     const resolvedSpeed = typeof requestedSpeed === "number" && Number.isFinite(requestedSpeed) && requestedSpeed >= 0.25 && requestedSpeed <= 4 ? requestedSpeed : speed;
-    const texts = staticSpeechTexts();
+    // At speed 1 the client plays the acknowledgements from static files, so they are not synthesized here.
+    const skipped = new Set(resolvedSpeed === 1 ? ACKNOWLEDGEMENT_PHRASES.map((phrase) => normalizeTextForSpeech(phrase.trim())) : []);
+    const texts = staticSpeechTexts().filter((text) => !skipped.has(text));
     let next = 0;
     const work = async () => {
       for (;;) {

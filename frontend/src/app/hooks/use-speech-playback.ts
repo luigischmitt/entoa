@@ -5,6 +5,7 @@ import { authorizedFetch } from "@/lib/auth/backend-auth";
 import { reportAudioDiagnostic } from "@/lib/interview/audio-diagnostics";
 import { installAudioUnlockOnFirstGesture, setAudioUnlockObserver, unlockSharedAudio } from "@/lib/interview/audio-unlock.mjs";
 import { createAcknowledgementPlayer } from "@/lib/interview/acknowledgement.mjs";
+import { loadStaticReaction } from "@/lib/interview/static-reactions.mjs";
 import { playInterviewerSegments, prewarmInterviewerSpeech, splitInterviewerSpeech, warmUpInterviewerSpeech, type SpeechPlayback, type SpeechPlaybackOptions } from "@/lib/interview/speech-playback.mjs";
 import { readStoredInterviewerVoice } from "@/lib/interview/voice-picker.mjs";
 import { readStoredInterviewerSpeechSpeed } from "@/lib/interview/interviewer-speech-speed.mjs";
@@ -69,8 +70,8 @@ export function prewarmInterviewerClosing(utterance: string, voice?: string, spe
 }
 
 /** The instant "Okay." / "Got it." player: its phrases are synthesized once (preload) and then played from memory. */
-export function createInterviewerAcknowledgements(onChunkAudio: SpeechPlaybackOptions["onChunkAudio"], voice?: string, speed = 1) {
-  return createAcknowledgementPlayer({ endpoint: speechEndpoint, fetcher: authorizedFetch, voice, speed, onChunkAudio, onDiagnostic: reportAudioDiagnostic });
+export function createInterviewerAcknowledgements(onChunkAudio: SpeechPlaybackOptions["onChunkAudio"], voice?: string, speed = 1, phrases?: string[]) {
+  return createAcknowledgementPlayer({ endpoint: speechEndpoint, fetcher: authorizedFetch, voice, speed, phrases, onChunkAudio, onDiagnostic: reportAudioDiagnostic, staticBlob: speed === 1 ? (phrase) => loadStaticReaction(voice, phrase) : undefined });
 }
 
 export function useSpeechPlayback(segments: string[], onReady: () => void, enabled = true, onTimingEvent?: (event: SpeechTimingEvent) => void, onFinalChunkStarted?: () => void, speed = 1, onChunkAudio?: SpeechPlaybackOptions["onChunkAudio"], waitBeforePlayback?: () => Promise<unknown>, voice?: string, onInterChunkGap?: (gapMs: number) => void, onQuestionStarted?: () => void, onFinalChunkPlaybackStarted?: () => void) {

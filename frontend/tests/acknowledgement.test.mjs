@@ -12,7 +12,7 @@ const tick = () => new Promise((resolve) => setImmediate(resolve));
 test("the acknowledgement rotates through the phrases without repeating the last one", () => {
   const played = [];
   let lastPhrase = null;
-  for (let index = 0; index < 7; index += 1) {
+  for (let index = 0; index < ACKNOWLEDGEMENT_PHRASES.length + 2; index += 1) {
     lastPhrase = pickAcknowledgement({ lastPhrase });
     played.push(lastPhrase);
   }

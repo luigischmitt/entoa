@@ -6,7 +6,7 @@ import { acquireInterviewerAudio, releaseInterviewerAudio } from "./audio-unlock
 import { errorNameOf } from "./client-environment.mjs";
 import { fetchSpeechBlob } from "./speech-playback.mjs";
 
-export const ACKNOWLEDGEMENT_PHRASES = ["Okay.", "Got it.", "Alright.", "Mm-hm, okay.", "Thanks."];
+export const ACKNOWLEDGEMENT_PHRASES = ["Okay.", "Got it.", "Alright.", "Mm-hm, okay.", "Thanks.", "I got it.", "I understand what you mean."];
 
 /** A natural beat between the end of the answer and the acknowledgement, and between the acknowledgement and the question. */
 export const ACKNOWLEDGEMENT_LEAD_MS = 450;
@@ -24,7 +24,7 @@ const normalize = (text) => text.toLocaleLowerCase().replace(/[^\p{L}\p{N}\s-]/g
 /** Opening word(s) that identify a family of acknowledgements, so "Okay, thanks." and "OK." count as the same one. */
 function acknowledgementFamily(text) {
   const words = normalize(text);
-  const families = [["okay", /^(?:okay|ok)\b/u], ["got it", /^(?:got it|gotcha)\b/u], ["alright", /^(?:alright|all right)\b/u], ["mm-hm", /^(?:mm-?hm+|mhm+|uh-?huh)\b/u], ["thanks", /^(?:thanks|thank you)\b/u]];
+  const families = [["okay", /^(?:okay|ok)\b/u], ["got it", /^(?:got it|i got it|gotcha)\b/u], ["alright", /^(?:alright|all right)\b/u], ["mm-hm", /^(?:mm-?hm+|mhm+|uh-?huh)\b/u], ["thanks", /^(?:thanks|thank you)\b/u], ["understand", /^i understand\b/u]];
   return families.find(([, pattern]) => pattern.test(words))?.[0] ?? null;
 }
 
@@ -79,6 +79,13 @@ export function createAcknowledgementPlayer(options) {
   const unschedule = options.clearTimeout ?? ((id) => globalThis.clearTimeout(id));
   const maxPlayMs = options.maxPlayMs ?? 5_000;
   const loadBlob = options.loadBlob ?? ((phrase) => fetchSpeechBlob(phrase, { endpoint: options.endpoint, fetcher: options.fetcher, timeoutMs: 20_000, voice: options.voice, speed: options.speed }));
+  // A static file (free, no request) when the phrase has one; otherwise it is synthesized like any other phrase.
+  const loadPhraseBlob = async (phrase) => {
+    if (options.staticBlob) {
+      try { return await options.staticBlob(phrase); } catch { /* Not generated for this voice: synthesize it instead. */ }
+    }
+    return loadBlob(phrase);
+  };
   const blobs = new Map();
   let preloading = null;
   let lastPhrase = null;
@@ -102,7 +109,7 @@ export function createAcknowledgementPlayer(options) {
     preload() {
       preloading ??= (async () => {
         for (const phrase of phrases) {
-          try { blobs.set(phrase, await loadBlob(phrase)); } catch { /* A missing phrase is simply never picked. */ }
+          try { blobs.set(phrase, await loadPhraseBlob(phrase)); } catch { /* A missing phrase is simply never picked. */ }
         }
         diagnose("ack_preloaded", { loaded: blobs.size, total: phrases.length });
       })();
