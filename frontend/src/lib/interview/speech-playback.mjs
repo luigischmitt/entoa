@@ -85,12 +85,18 @@ const speechFlights = new Map();
 // Finished blobs of prepared (pre-synthesized) utterances, reusable by an identical request for a short time.
 const retainedSpeechBlobs = new Map();
 const VOICE_SOURCES = ["openrouter", "azure", "kokoro"];
-// The provider that answered the interview's first line; every later request asks for it so the voice stays the same.
+// The provider that answered an utterance; later requests ask for it so the voice stays the same. Azure only covers the
+// line it answered: releaseAzureVoiceSource() clears that pin when the line ends, so the next line tries the cheaper voice again.
 let interviewVoiceSource = null;
 
 /** Starts a new interview: the next line that comes back decides the voice source again. */
 export function resetInterviewVoiceSource() {
   interviewVoiceSource = null;
+}
+
+/** Azure only covers the line it answered; the next line tries the cheaper voice again. OpenRouter and Kokoro pins stay. */
+export function releaseAzureVoiceSource() {
+  if (interviewVoiceSource === "azure") interviewVoiceSource = null;
 }
 
 export function getInterviewVoiceSource() {
@@ -797,6 +803,8 @@ export function playInterviewerSegments(segments, options) {
     requests?.stop();
     stopPlaying?.();
     for (const item of prepared) release(item);
+    // Once per utterance, on success, failure and cancel: the line is over, so an Azure pin no longer applies.
+    releaseAzureVoiceSource();
   });
 
   return {

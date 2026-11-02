@@ -96,7 +96,7 @@ describe("Azure TTS", () => {
     expect(() => loadSpeechConfig(env)).toThrow(/AZURE_SPEECH_KEY/);
     expect(() => loadSpeechConfig({ ...env, AZURE_SPEECH_KEY: "x" })).toThrow(/AZURE_SPEECH_REGION/);
     const config = loadSpeechConfig({ ...env, AZURE_SPEECH_KEY: "x", AZURE_SPEECH_REGION: "brazilsouth" });
-    expect(config).toMatchObject({ provider: "openrouter-azure", interviewerVoice: "en-US-AndrewNeural", hybrid: { hedgeAfterMs: 5_000, openRouterVoice: "am_echo" } });
+    expect(config).toMatchObject({ provider: "openrouter-azure", interviewerVoice: "en-US-AndrewNeural", hybrid: { hedgeAfterMs: 8_000, openRouterVoice: "am_echo" } });
     expect(createSpeechProvider(config).name).toBe("hybrid");
   });
 

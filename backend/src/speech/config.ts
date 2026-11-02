@@ -105,7 +105,7 @@ export function loadSpeechConfig(environment = process.env): SpeechConfig {
       // OpenRouter's own Together hedge runs first. Azure has a different voice, so it only joins after that race has
       // had enough time to finish (or immediately after both OpenRouter attempts fail).
       // The OpenRouter attempts share the hybrid deadline, so a stall there would leave Azure no time without this earlier limit.
-      hybridConfig = { hedgeAfterMs: parseHybridHedgeAfterMs(environment.HYBRID_SPEECH_HEDGE_AFTER_MS, provider === "openrouter-azure" ? 5_000 : 2_500), pinnedFallbackAfterMs: parseIntegerInRange("HYBRID_SPEECH_PINNED_FALLBACK_AFTER_MS", environment.HYBRID_SPEECH_PINNED_FALLBACK_AFTER_MS, 7_000, 0, 14_000), openRouterVoice };
+      hybridConfig = { hedgeAfterMs: parseHybridHedgeAfterMs(environment.HYBRID_SPEECH_HEDGE_AFTER_MS, provider === "openrouter-azure" ? 8_000 : 2_500), pinnedFallbackAfterMs: parseIntegerInRange("HYBRID_SPEECH_PINNED_FALLBACK_AFTER_MS", environment.HYBRID_SPEECH_PINNED_FALLBACK_AFTER_MS, 7_000, 0, 14_000), openRouterVoice };
     } else if (interviewerVoice.includes("+")) {
       throw new Error("OPENROUTER_SPEECH_VOICE / INTERVIEWER_VOICE cannot be a voice blend with SPEECH_PROVIDER 'openrouter'; use a single voice such as 'am_michael'.");
     }

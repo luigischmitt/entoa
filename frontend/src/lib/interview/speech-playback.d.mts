@@ -112,8 +112,10 @@ export function prewarmInterviewerSpeech(segments: string[], options: SpeechPlay
 export function fetchSpeechBlob(text: string, options: SpeechPlaybackOptions): Promise<Blob>;
 export function clearRetainedSpeechBlobs(): void;
 export function resetSpeechFlights(): void;
-/** Starts a new interview: the first line that comes back fixes the voice source for the rest of it. */
+/** Starts a new interview: the next line that comes back decides the voice source again. */
 export function resetInterviewVoiceSource(): void;
 export function getInterviewVoiceSource(): "openrouter" | "azure" | "kokoro" | null;
+/** Azure only covers the line it answered: clears an Azure pin, keeps OpenRouter and Kokoro pins. */
+export function releaseAzureVoiceSource(): void;
 
 export function warmUpInterviewerSpeech(endpoint: string, fetcher: (input: string, init?: RequestInit) => Promise<unknown>, preferences?: { voice?: string; speed?: number }): void;

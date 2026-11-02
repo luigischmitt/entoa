@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { clearRetainedSpeechBlobs, fetchSpeechBlob, getInterviewVoiceSource, resetInterviewVoiceSource, resetSpeechFlights } from "../src/lib/interview/speech-playback.mjs";
+import { clearRetainedSpeechBlobs, fetchSpeechBlob, getInterviewVoiceSource, releaseAzureVoiceSource, resetInterviewVoiceSource, resetSpeechFlights } from "../src/lib/interview/speech-playback.mjs";
 
 const endpoint = "https://api.test/api/v1/speech";
 
@@ -87,5 +87,28 @@ test("an explicit requestBody is sent unchanged, without the interview voice sou
   await fetchSpeechBlob("A line.", { endpoint, fetcher });
   await fetchSpeechBlob("Chunk.", { endpoint, fetcher, requestBody: { text: "Chunk.", chunk: 1 } });
   assert.deepEqual(bodies[1], { text: "Chunk.", chunk: 1 });
+  reset();
+});
+
+test("releaseAzureVoiceSource clears an Azure pin, so the next request has no voiceSource", async () => {
+  reset();
+  const { bodies, fetcher } = recordingFetcher(["azure", null]);
+  await fetchSpeechBlob("Azure line.", { endpoint, fetcher });
+  assert.equal(getInterviewVoiceSource(), "azure");
+  releaseAzureVoiceSource();
+  assert.equal(getInterviewVoiceSource(), null);
+  await fetchSpeechBlob("Next line.", { endpoint, fetcher });
+  assert.equal(bodies[1].voiceSource, undefined);
+  reset();
+});
+
+test("releaseAzureVoiceSource keeps an openrouter pin", async () => {
+  reset();
+  const { bodies, fetcher } = recordingFetcher(["openrouter", null]);
+  await fetchSpeechBlob("OpenRouter line.", { endpoint, fetcher });
+  releaseAzureVoiceSource();
+  assert.equal(getInterviewVoiceSource(), "openrouter");
+  await fetchSpeechBlob("Next line.", { endpoint, fetcher });
+  assert.equal(bodies[1].voiceSource, "openrouter");
   reset();
 });
