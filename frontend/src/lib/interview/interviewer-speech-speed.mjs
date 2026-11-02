@@ -1,4 +1,4 @@
-export const DEFAULT_INTERVIEWER_SPEECH_SPEED = 1;
+export const DEFAULT_INTERVIEWER_SPEECH_SPEED = 0.95;
 export const interviewerSpeechSpeedStorageKey = "eia:interviewer-speech-speed";
 /** Any speed in this range is allowed, in steps of `INTERVIEWER_SPEECH_SPEED_STEP`. */
 export const MIN_INTERVIEWER_SPEECH_SPEED = 0.7;

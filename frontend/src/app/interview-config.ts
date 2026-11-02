@@ -10,7 +10,7 @@ export const defaultInterviewConfig: InterviewConfig = {
   voice: DEFAULT_INTERVIEWER_VOICE,
   speechSpeed: DEFAULT_INTERVIEWER_SPEECH_SPEED,
   focus: "mixed",
-  duration: "15",
+  duration: "5",
   questionCount: null,
   ...defaultCandidateVoicePreferences,
   ...defaultInterviewRoomPreferences,

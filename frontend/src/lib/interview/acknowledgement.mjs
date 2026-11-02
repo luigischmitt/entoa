@@ -79,10 +79,12 @@ export function createAcknowledgementPlayer(options) {
   const unschedule = options.clearTimeout ?? ((id) => globalThis.clearTimeout(id));
   const maxPlayMs = options.maxPlayMs ?? 5_000;
   const loadBlob = options.loadBlob ?? ((phrase) => fetchSpeechBlob(phrase, { endpoint: options.endpoint, fetcher: options.fetcher, timeoutMs: 20_000, voice: options.voice, speed: options.speed }));
-  // A static file (free, no request) when the phrase has one; otherwise it is synthesized like any other phrase.
+  // A static file (free, no request, recorded at 1x) when the phrase has one; otherwise it is synthesized like any other phrase.
+  // Only the static blobs are played at the session's speed (playbackRate); a synthesized one already has the speed in its audio.
+  const staticBlobs = new WeakSet();
   const loadPhraseBlob = async (phrase) => {
     if (options.staticBlob) {
-      try { return await options.staticBlob(phrase); } catch { /* Not generated for this voice: synthesize it instead. */ }
+      try { const blob = await options.staticBlob(phrase); staticBlobs.add(blob); return blob; } catch { /* Not generated for this voice: synthesize it instead. */ }
     }
     return loadBlob(phrase);
   };
@@ -113,7 +115,7 @@ export function createAcknowledgementPlayer(options) {
         for (const phrase of phrases) {
           try { blobs.set(phrase, await loadPhraseBlob(phrase)); } catch { /* A missing phrase is simply never picked. */ }
           if (options.azureBlob) {
-            try { azureBlobs.set(phrase, await options.azureBlob(phrase)); } catch { /* No Azure copy: never played in an Azure session. */ }
+            try { const blob = await options.azureBlob(phrase); staticBlobs.add(blob); azureBlobs.set(phrase, blob); } catch { /* No Azure copy: never played in an Azure session. */ }
           }
         }
         diagnose("ack_preloaded", { loaded: blobs.size, total: phrases.length, azureLoaded: azureBlobs.size });
@@ -172,6 +174,8 @@ export function createAcknowledgementPlayer(options) {
         url = createObjectUrl(blob);
         audio = makeAudio(url);
         const track = audio;
+        // Set on every play: a pooled element may still carry the rate of its previous use.
+        track.playbackRate = staticBlobs.has(blob) ? (options.speed ?? 1) : 1;
         track.addEventListener("ended", cleanup, { once: true });
         track.addEventListener("error", cleanup, { once: true });
         try {

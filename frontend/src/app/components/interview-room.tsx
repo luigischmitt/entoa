@@ -191,9 +191,8 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
     storeInterviewerSpeechSpeed(window.localStorage, next);
   }, []);
   const [acknowledgements] = useState(() => createInterviewerAcknowledgements(speechFeed.push, config.voice, interviewerSpeechSpeed));
-  // At speed 1 the acknowledgements are static files (free), so they load as soon as the room opens.
-  const [initialSpeechSpeed] = useState(interviewerSpeechSpeed);
-  useEffect(() => { if (initialSpeechSpeed === 1) void acknowledgements.preload(); }, [acknowledgements, initialSpeechSpeed]);
+  // The acknowledgements are static files (free) at any speed, so they load as soon as the room opens.
+  useEffect(() => { void acknowledgements.preload(); }, [acknowledgements]);
   const [acknowledgementPlaying, setAcknowledgementPlaying] = useState(false);
   const acknowledgedTurnRef = useRef<string | null>(null);
   // What the final answer of a turn got: whether an acknowledgement is going to be spoken (decides if the bridge keeps its own "Okay.").
