@@ -78,22 +78,3 @@ export function analysisCoverageNotice(coverage, ordinalForSequence = (sequenceN
   if (missing.length > 1) return `Não conseguimos analisar as respostas ${missing.join(" e ")}. Os pontos abaixo cobrem as outras respostas.`;
   return "Nem todas as respostas puderam ser analisadas. Os pontos abaixo cobrem as outras respostas.";
 }
-
-const phonemeTips = [
-  [/^θ|\bth\b/i, "th: língua entre os dentes, com sopro."], [/^ð|\bdh\b/i, "th sonoro: língua entre os dentes e voz vibrando."],
-  [/^ɹ|^r$/i, "r: leve a língua para trás, sem vibrar."], [/^h|^hh$/i, "h: solte um sopro leve no início."],
-  [/^z$/i, "z: mantenha a voz vibrando durante o som."], [/^s$/i, "s: mantenha o ar passando sem voz."],
-  [/^v$/i, "v: encoste os dentes de cima no lábio inferior."], [/^w$/i, "w: arredonde os lábios no começo."],
-  [/^ɪ|^ih$/i, "ih: faça um i curto e relaxado."], [/^iː|^iy$/i, "iy: sustente um i mais longo."],
-  [/^æ|^ae$/i, "ae: abra mais a boca para a vogal."], [/^ʌ|^ah$/i, "ah: use uma vogal curta e central."],
-  [/^ə|^ax$/i, "ax: reduza a vogal para um som curto de â."], [/^uː|^uw$/i, "uw: arredonde os lábios e sustente o u."],
-  [/^ʊ|^uh$/i, "uh: faça um u curto e relaxado."], [/^eɪ|^ey$/i, "ey: comece aberto e deslize para i."],
-  [/^oʊ|^ow$/i, "ow: comece arredondado e deslize para u."], [/^ɝ|^er$/i, "er: mantenha a língua recolhida durante a vogal."],
-  [/^ŋ|^ng$/i, "ng: termine pelo nariz, sem acrescentar g."], [/^l.*final|^l$/i, "l final: mantenha a língua tocando atrás dos dentes."],
-  [/ed$/i, "-ed: pronuncie a terminação sem acrescentar outra sílaba quando ela não existir."],
-];
-export function phonemeTip(phoneme, word = "") {
-  const value = String(phoneme ?? "");
-  return phonemeTips.find(([pattern]) => pattern.test(value))?.[1]
-    ?? (/ed$/i.test(word) ? phonemeTips.at(-1)[1] : "pronuncie cada sílaba com clareza");
-}

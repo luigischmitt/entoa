@@ -174,14 +174,10 @@
 .rp-gap-how { font-size: 0.875rem; line-height: 1.5; padding-left: 0.7rem; border-left: 2px solid var(--ds-green); }
 .rp-gap-how b { font-weight: 600; color: var(--ds-green-deep, var(--ds-green)); }
 
-/* Notas da sua voz: the speech rhythm facts and the words to review, under the score tiles. */
+/* Notas da sua voz: the speech rhythm facts, under the score tiles. */
 .rp-voice-detail { display: grid; gap: 0.5rem; margin-top: 0.5rem; }
 .rp-vfacts { margin: 0; font-size: 0.8125rem; line-height: 1.5; color: var(--ds-text-2); }
 .rp-vinsight { margin: 0; font-size: 0.875rem; line-height: 1.55; }
-.rp-words { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
-.rp-words li { display: grid; gap: 0.1rem; padding-top: 0.5rem; border-top: 1px solid var(--ds-hairline); }
-.rp-words b { font-size: 0.95rem; font-weight: 600; overflow-wrap: anywhere; }
-.rp-words span { font-size: 0.8rem; line-height: 1.45; color: var(--ds-text-2); }
 
 /* Small uppercase labels used inside the paper (answers, voice detail). */
 .rp-psub { margin: 0; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.1em; line-height: 1.2; text-transform: uppercase; color: var(--ds-text-2); }
@@ -205,6 +201,6 @@
   html.rp-printing .rp-pblock-long > .rp-sh + * { break-before: avoid; }
   html.rp-printing .rp-errs li { break-inside: avoid; }
   html.rp-printing .rp-gaps li { break-inside: avoid; }
-  html.rp-printing .rp-words li, html.rp-printing .rp-voice-detail { break-inside: avoid; }
+  html.rp-printing .rp-voice-detail { break-inside: avoid; }
   html.rp-printing .rp-noprint, html.rp-printing .rp-docbar, html.rp-printing .rp-appendix, html.rp-printing .rp-foot { display: none !important; }
 }

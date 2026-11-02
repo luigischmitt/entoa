@@ -12,7 +12,7 @@ import { RESUME_PRACTICE_LABEL } from "@/lib/interview/resume-neutral.mjs";
 import { normalizeFocus, normalizeSeniority } from "@/lib/interview/interview-normalization.mjs";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { findingsForAnswer } from "@/lib/interview/report-response.mjs";
-import { analysisCoverageNotice, displayInterviewerTakeaway, displayTechnicalFindings, phonemeTip } from "@/lib/interview/report-presentation.mjs";
+import { analysisCoverageNotice, displayInterviewerTakeaway, displayTechnicalFindings } from "@/lib/interview/report-presentation.mjs";
 import { voiceDeliveryInterpretation } from "@/lib/interview/voice-report-insights.mjs";
 import { buildErrorRows, buildJobCoverage, buildPracticePriorities, buildVoiceNotes, formatReportDate, reportFileBase, reportSummaryText, type JobCoverageItem } from "@/lib/interview/report-document.mjs";
 import { useReplayReveal } from "@/lib/use-replay-reveal";
@@ -49,8 +49,6 @@ const conversationLoadingSteps = [
 ];
 const maxVisibleErrors = 8;
 const maxStrengths = 3;
-const maxPronunciationWords = 6;
-const pronunciationScoreLimit = 70;
 /** Answers longer than this are clamped on screen (to four lines) until the reader asks for the full text. */
 const seniorityLabels: Record<string, string> = { intern: "Estágio", junior: "Júnior", "mid-level": "Pleno", senior: "Sênior" };
 const jobStatusLabels: Record<JobCoverageItem["status"], string> = {
@@ -90,22 +88,6 @@ function ReportPart({ title, hint, children, style }: { title: string; hint?: st
   );
 }
 
-/** Words the voice analysis flagged as hard (score under the limit), lowest score first, each word once. */
-function pronunciationWords(summary: AzureMetricSummary) {
-  const words = new Map<string, { word: string; score: number; worstPhoneme: string | null }>();
-  for (const answer of summary.answers ?? []) {
-    for (const phrase of answer.phrases ?? []) {
-      for (const problem of phrase.problemWords ?? []) {
-        if (problem.score === null || problem.score >= pronunciationScoreLimit) continue;
-        const key = problem.word.toLowerCase();
-        const current = words.get(key);
-        if (!current || problem.score < current.score) words.set(key, { word: problem.word, score: problem.score, worstPhoneme: problem.worstPhoneme });
-      }
-    }
-  }
-  return [...words.values()].sort((a, b) => a.score - b.score).slice(0, maxPronunciationWords);
-}
-
 /** Everything the ready report shows, derived once from the result (shared by the paper and the appendix). */
 function buildReadyModel(result: InterviewReportResult, turns: Turns, azureSummary: AzureMetricSummary) {
   const reference = (sequenceNumber: number) => answerOrdinalForSequence(turns, sequenceNumber);
@@ -126,7 +108,6 @@ function buildReadyModel(result: InterviewReportResult, turns: Turns, azureSumma
     errorRows: buildErrorRows(allPatterns),
     voiceNotes: buildVoiceNotes(azureSummary),
     voiceFacts: voiceDeliveryInterpretation(azureSummary.answers ?? []),
-    pronunciation: pronunciationWords(azureSummary),
     priorities: buildPracticePriorities(result),
   };
 }
@@ -175,9 +156,9 @@ function ErrorBlock({ rows, reference, emptyText }: { rows: ReadyModel["errorRow
   );
 }
 
-/** "Notas da sua voz": three scores, the pace facts and the words to review. Shared by both documents. */
-function VoiceBlock({ model, emptyText }: { model: Pick<ReadyModel, "voiceNotes" | "voiceFacts" | "pronunciation">; emptyText: string }) {
-  const { voiceFacts, pronunciation } = model;
+/** "Notas da sua voz": three scores and the pace facts. Shared by both documents. */
+function VoiceBlock({ model, emptyText }: { model: Pick<ReadyModel, "voiceNotes" | "voiceFacts">; emptyText: string }) {
+  const { voiceFacts } = model;
   const hasVoice = model.voiceNotes.some((note) => note.value !== null);
   return (
     <section className="rp-pblock">
@@ -207,19 +188,6 @@ function VoiceBlock({ model, emptyText }: { model: Pick<ReadyModel, "voiceNotes"
             {voiceFacts.fillerCount > 0 ? <> · {voiceFacts.fillerCount} {t("hesitações")}</> : null}
           </p>
           <p className="rp-vinsight">{voiceFacts.insights.map((item, index) => <span key={item.key}>{index > 0 ? " " : ""}{t(item.key, item.values)}</span>)}</p>
-        </div>
-      )}
-      {pronunciation.length > 0 && (
-        <div className="rp-voice-detail">
-          <p className="rp-psub">{t("Palavras para revisar a pronúncia")}</p>
-          <ul className="rp-words">
-            {pronunciation.map((item) => (
-              <li key={item.word}>
-                <b lang="en">{item.word}</b>
-                <span>{t(phonemeTip(item.worstPhoneme, item.word))}</span>
-              </li>
-            ))}
-          </ul>
         </div>
       )}
     </section>
@@ -317,7 +285,6 @@ function buildConversationModel(result: InterviewReportResult, turns: Turns, azu
     errorRows: buildErrorRows(result.englishCommunication.patterns),
     voiceNotes: buildVoiceNotes(azureSummary),
     voiceFacts: voiceDeliveryInterpretation(azureSummary.answers ?? []),
-    pronunciation: pronunciationWords(azureSummary),
     priorities: result.priorities.flatMap((item) => item.focus?.trim() ? [{ title: item.focus.trim() }] : []),
   };
 }
