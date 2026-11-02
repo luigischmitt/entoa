@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  analyseSamples, BEAK_POSES, beakTargetAt, BeakPoser, clamp, createClockInterpolator, createToucanEngine, genericBeakTarget, HeadPoser, JAW, JawModel,
+  analyseSamples, BEAK_POSES, beakTargetAt, BeakPoser, clamp, createClockInterpolator, createSpeechFeed, createToucanEngine, genericBeakTarget, HeadPoser, JAW, JawModel,
   mouthWedgePath, NodScheduler, PhraseListener, sat, Spring, toucanStateFor, valueNoise,
 } from "../src/components/interview/toucan/toucan-engine.mjs";
 
@@ -390,4 +390,43 @@ test("speaking: the upper lid stays fully out of the eye except during a blink (
     n += 1; if (y === -11) open += 1;
   });
   assert.ok(open / n >= 0.9, `lid fully open in ${open}/${n} frames`);
+});
+
+/* speech feed: a reaction must never remove the chunks of an utterance, in either order */
+
+const stubDecode = async () => ({ getChannelData: () => new Float32Array(2205), sampleRate: SR });
+const feedChunk = (chunkIndex, { kind, pos, playing }) => ({ chunkIndex, chunkCount: 2, kind, blob: {}, clock: () => pos, isPlaying: () => playing.on });
+
+test("speech feed: a reaction fed after an utterance's first chunk keeps that chunk for lookup", () => {
+  const feed = createSpeechFeed({ decode: stubDecode });
+  const utterance = { on: false };
+  const reaction = { on: false };
+  feed.push(feedChunk(0, { pos: 0.42, playing: utterance }));
+  feed.push(feedChunk(0, { kind: "reaction", pos: 0.07, playing: reaction }));
+  assert.equal(feed.size, 2, "both entries are kept");
+  utterance.on = true;
+  assert.equal(feed.sample(1)?.pos, 0.42, "the utterance chunk is found while it plays");
+  utterance.on = false;
+  reaction.on = true;
+  assert.equal(feed.sample(2)?.pos, 0.07, "the reaction is found while it plays");
+});
+
+test("speech feed: a reaction fed before an utterance's first chunk does not hide that chunk", () => {
+  const feed = createSpeechFeed({ decode: stubDecode });
+  const utterance = { on: false };
+  const reaction = { on: false };
+  feed.push(feedChunk(0, { kind: "reaction", pos: 0.07, playing: reaction }));
+  feed.push(feedChunk(0, { pos: 0.42, playing: utterance }));
+  utterance.on = true;
+  assert.equal(feed.sample(1)?.pos, 0.42, "the new utterance's first chunk plays with its own features");
+});
+
+test("speech feed: a new utterance's first chunk still clears the stale chunks", () => {
+  const feed = createSpeechFeed({ decode: stubDecode });
+  const stale = { on: true };
+  const fresh = { on: false };
+  feed.push(feedChunk(0, { pos: 0.9, playing: stale }));
+  feed.push(feedChunk(0, { pos: 0.1, playing: fresh }));
+  assert.equal(feed.size, 1, "only the new utterance is kept");
+  assert.equal(feed.sample(1), null, "the stale chunk is no longer looked up");
 });

@@ -304,8 +304,11 @@ export function createSpeechFeed({ decode = decodeBlobToBuffer, rng = Math.rando
     /** Register a chunk. Safe to pass as the `onChunkAudio` callback. */
     push(info) {
       if (!info) return;
-      if (info.chunkIndex === 0) entries = [];
-      const entry = { id: ++serial, info, features: null, failed: false, seenPlaying: false, interpolate: createClockInterpolator() };
+      const reaction = info.kind === "reaction";
+      // A new utterance clears the stale chunks. A reaction is a separate clip: it only adds its own entry, so it never removes
+      // the chunks of an utterance that is already fed (or about to play).
+      if (!reaction && info.chunkIndex === 0) entries = [];
+      const entry = { id: ++serial, kind: reaction ? "reaction" : "utterance", info, features: null, failed: false, seenPlaying: false, interpolate: createClockInterpolator() };
       entries.push(entry);
       if (entries.length > maxEntries) entries.shift();
       void analyse(entry);
