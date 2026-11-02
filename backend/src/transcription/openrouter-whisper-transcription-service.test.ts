@@ -191,5 +191,28 @@ describe("OpenRouter Whisper final request", () => {
       await expect(make(fetcher).service.transcribe(audio(), "whisper-large-v3-turbo")).rejects.toMatchObject({ providerStatus: "rejected", httpStatus: 402, attempts: 1 });
       expect(fetcher).toHaveBeenCalledOnce();
     });
+
+    it("waits the Retry-After seconds on an in-flight 402", async () => {
+      const retryAfter = () => new Response(JSON.stringify({ error: { code: 402, message: "Retry later.", metadata: { reason: "in_flight_budget_exhausted" } } }), { status: 402, headers: { "retry-after": "2" } });
+      const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(retryAfter()).mockResolvedValueOnce(ok());
+      const { service, sleep } = make(fetcher);
+      await expect(service.transcribe(audio(), "whisper-large-v3-turbo")).resolves.toMatchObject({ transcript: "hello there" });
+      expect(sleep).toHaveBeenCalledWith(2_000);
+    });
+
+    it("clamps a large Retry-After on an in-flight 402 to 3000 ms", async () => {
+      const retryAfter = () => new Response(JSON.stringify({ error: { code: 402, message: "Retry later.", metadata: { limit_source: "openrouter_in_flight_budget" } } }), { status: 402, headers: { "retry-after": "30" } });
+      const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(retryAfter()).mockResolvedValueOnce(ok());
+      const { service, sleep } = make(fetcher);
+      await service.transcribe(audio(), "whisper-large-v3-turbo");
+      expect(sleep).toHaveBeenCalledWith(3_000);
+    });
+
+    it("never retries weight_exceeds_budget, even with an in-flight message", async () => {
+      const weight = () => new Response(JSON.stringify({ error: { code: 402, message: "Request exceeds budget with in-flight requests.", metadata: { reason: "weight_exceeds_budget" } } }), { status: 402 });
+      const fetcher = vi.fn<typeof fetch>(async () => weight());
+      await expect(make(fetcher).service.transcribe(audio(), "whisper-large-v3-turbo")).rejects.toMatchObject({ httpStatus: 402, attempts: 1 });
+      expect(fetcher).toHaveBeenCalledOnce();
+    });
   });
 });

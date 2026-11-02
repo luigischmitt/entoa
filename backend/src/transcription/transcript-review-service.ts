@@ -20,7 +20,7 @@ export class OpenRouterTranscriptReviewService implements TranscriptReviewServic
     try {
       const response = await this.fetchImplementation("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST", headers: { Authorization: `Bearer ${this.options.key}`, "Content-Type": "application/json" }, signal: requestSignal,
-        body: JSON.stringify({ model: this.options.model ?? "google/gemini-3.8-flash", temperature: 0,
+        body: JSON.stringify({ model: this.options.model ?? "google/gemini-3.8-flash", temperature: 0, max_tokens: reviewMaxTokens(draft),
           // Without this the model spends 2-5k reasoning tokens per answer (~US$0.011-0.020 per audio minute instead of ~US$0.0018) with no measured quality gain.
           reasoning: { effort: "minimal" }, usage: { include: true }, provider: { data_collection: "deny" }, messages: [{ role: "user", content: [
           { type: "text", text: instruction.replace("<question>", question ?? "").replace("<draft>", draft) },
@@ -28,8 +28,10 @@ export class OpenRouterTranscriptReviewService implements TranscriptReviewServic
         ] }] }),
       });
       if (!response.ok) return null;
-      const payload = await response.json() as { choices?: Array<{ message?: { content?: unknown } }>; usage?: { cost?: unknown } };
+      const payload = await response.json() as { choices?: Array<{ message?: { content?: unknown }; finish_reason?: unknown }>; usage?: { cost?: unknown } };
       if (typeof payload.usage?.cost === "number" && Number.isFinite(payload.usage.cost)) costUsd = payload.usage.cost;
+      // A truncated correction must never replace the draft.
+      if (payload.choices?.[0]?.finish_reason === "length") return null;
       const content = payload.choices?.[0]?.message?.content;
       if (typeof content !== "string") return null;
       const transcript = cleanTranscript(content);
@@ -55,5 +57,7 @@ function cleanTranscript(value: string): string {
   if (text.startsWith("**") && text.endsWith("**")) text = text.slice(2, -2).trim();
   return text;
 }
+/** Keeps OpenRouter's in-flight hold small: the correction is about the draft's length, not a long answer. */
+function reviewMaxTokens(draft: string): number { return Math.min(2_000, Math.ceil(draft.length / 2) + 300); }
 function wordCount(value: string): number { return value.match(/[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu)?.length ?? 0; }
 function normalize(value: string): string { return value.toLocaleLowerCase("en-US").replace(/[^\p{L}\p{N}]+/gu, " ").trim(); }

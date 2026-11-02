@@ -117,13 +117,18 @@ export class OpenRouterWhisperTranscriptionService implements TranscriptionServi
           throw new TranscriptionUnavailableError("OpenRouter returned HTTP 400.", { providerStatus: "rejected", attempts, httpStatus: response.status });
         }
         if (response.status === 402) {
-          const providerMessage = await openRouterErrorMessage(response);
-          if (!creditRetried && providerMessage && /in-flight/i.test(providerMessage)) {
+          const details = await openRouterErrorDetails(response);
+          const providerMessage = details.message;
+          // A budget weight larger than the whole budget cannot clear by waiting, so it is never retried.
+          const transientInFlight = details.reason !== "weight_exceeds_budget"
+            && (details.reason === "in_flight_budget_exhausted" || details.limitSource === "openrouter_in_flight_budget" || (providerMessage !== undefined && /in-flight/i.test(providerMessage)));
+          if (!creditRetried && transientInFlight) {
             // In-flight contention is transient: wait briefly once, without using up a normal retry attempt.
             creditRetried = true;
             creditRetryActive = true;
-            console.info(JSON.stringify({ event: "transcription_credit_retry", delayMs: creditRetryDelayMs }));
-            await sleepWithSignal(this.sleepImplementation, creditRetryDelayMs, requestSignal);
+            const delayMs = creditRetryMilliseconds(response.headers.get("retry-after"));
+            console.info(JSON.stringify({ event: "transcription_credit_retry", delayMs, ...(details.reason ? { reason: details.reason } : {}) }));
+            await sleepWithSignal(this.sleepImplementation, delayMs, requestSignal);
             attempts -= 1;
             continue;
           }
@@ -269,6 +274,12 @@ function retryAfterMilliseconds(value: string | null): number | null {
   return Math.max(0, Math.min(2_000, milliseconds));
 }
 
+/** A 402 Retry-After is in seconds; a missing or invalid value falls back to the default delay. */
+function creditRetryMilliseconds(value: string | null): number {
+  const seconds = value !== null && /^\s*\d+(\.\d+)?\s*$/u.test(value) ? Number(value) : Number.NaN;
+  return Number.isFinite(seconds) ? Math.min(3_000, Math.max(800, seconds * 1_000)) : creditRetryDelayMs;
+}
+
 async function discardBody(response: Response): Promise<void> {
   try {
     await response.body?.cancel();
@@ -281,14 +292,23 @@ async function discardBody(response: Response): Promise<void> {
  * OpenRouter's error message plus the upstream provider name, clipped. Error bodies describe the failure (credits,
  * quota, provider outage) and never echo the audio, so they are safe to log; anything key-like is masked anyway.
  */
-async function openRouterErrorMessage(response: Response): Promise<string | undefined> {
+async function openRouterErrorDetails(response: Response): Promise<{ message?: string; reason?: string; limitSource?: string }> {
   const text = await response.text().catch(() => "");
-  if (!text) return undefined;
+  if (!text) return {};
   let message = text;
+  let reason: string | undefined;
+  let limitSource: string | undefined;
   try {
-    const body = JSON.parse(text) as { error?: { message?: unknown; metadata?: { provider_name?: unknown; raw?: unknown } } };
+    const body = JSON.parse(text) as { error?: { message?: unknown; metadata?: { provider_name?: unknown; raw?: unknown; reason?: unknown; limit_source?: unknown } } };
     const parts = [body.error?.message, body.error?.metadata?.provider_name, body.error?.metadata?.raw].filter((part): part is string => typeof part === "string" && part.length > 0);
     if (parts.length) message = parts.join(" | ");
+    if (typeof body.error?.metadata?.reason === "string") reason = body.error.metadata.reason;
+    if (typeof body.error?.metadata?.limit_source === "string") limitSource = body.error.metadata.limit_source;
   } catch { /* Not JSON: keep the raw text. */ }
-  return message.replace(/sk-[A-Za-z0-9-_]{8,}/gu, "sk-***").replace(/\s+/gu, " ").trim().slice(0, 300) || undefined;
+  const masked = message.replace(/sk-[A-Za-z0-9-_]{8,}/gu, "sk-***").replace(/\s+/gu, " ").trim().slice(0, 300) || undefined;
+  return { message: masked, reason, limitSource };
+}
+
+async function openRouterErrorMessage(response: Response): Promise<string | undefined> {
+  return (await openRouterErrorDetails(response)).message;
 }

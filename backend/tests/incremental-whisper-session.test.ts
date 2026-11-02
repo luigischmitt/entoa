@@ -69,7 +69,7 @@ describe("IncrementalWhisperSession", () => {
     expect(events.captions).toBeGreaterThan(0);
   });
 
-  it("commits segments in order even when they finish out of order, and keeps text hidden until earlier ones are done", async () => {
+  it("commits segments in order, one request at a time, and keeps text hidden until earlier ones are done", async () => {
     const { session, calls, events } = build();
     session.markSpeech();
     feed(session, 10, speech);
@@ -77,12 +77,14 @@ describe("IncrementalWhisperSession", () => {
     session.markSpeech();
     feed(session, 10, speech);
     const second = session.endTurn(1_500);
-    expect(calls).toHaveLength(2);
-    calls[1]!.resolve("second part.");
-    await tick();
-    expect(session.committedText()).toBe("");
-    expect(events.turnEnds).toEqual([]);
+    // The second segment waits for the first one: one Whisper request at a time.
+    expect(calls).toHaveLength(1);
     calls[0]!.resolve("first part,");
+    await tick();
+    expect(calls).toHaveLength(2);
+    expect(session.committedText()).toBe("first part,");
+    expect(events.turnEnds).toEqual([]);
+    calls[1]!.resolve("second part.");
     await Promise.all([first, second]);
     expect(session.committedText()).toBe("first part, second part.");
     // Speech resumed after the first cut: only the second pause signals a turn end.
@@ -237,10 +239,11 @@ describe("IncrementalWhisperSession", () => {
     void session.endTurn(1_500);
     feed(session, 15, speech);
     const flushing = session.flush(5_000);
+    expect(calls).toHaveLength(1);
+    calls[0]!.resolve("Head words.");
+    await tick();
     expect(calls).toHaveLength(2);
     calls[1]!.resolve("tail words.");
-    await tick();
-    calls[0]!.resolve("Head words.");
     await expect(flushing).resolves.toBe("Head words. tail words.");
     expect(session.diagnostics()).toMatchObject({ segmentsTranscribed: 2, tailMs: 1_500 });
     expect(session.diagnostics().maxSegmentLatencyMs).toBeGreaterThanOrEqual(0);
@@ -308,14 +311,15 @@ describe("IncrementalWhisperSession", () => {
     session.markSpeech();
     feed(session, 6, speech); // segment 1
     feed(session, 6, speech); // segment 2
+    expect(calls).toHaveLength(1); // queued behind segment 1
+    await failSegment((i) => calls[i]!, 0); // retry of segment 1 is calls[1]; segment 2 waits behind it
     expect(calls).toHaveLength(2);
-    await failSegment((i) => calls[i]!, 0); // retry of segment 1 is calls[2]
-    expect(calls).toHaveLength(3);
-    calls[2]!.reject(boom());
+    calls[1]!.reject(boom());
     await tick();
+    expect(calls).toHaveLength(3); // segment 2 starts once the failed segment settled
     expect(session.failed).toBe(false);
     expect(events.failures).toEqual([]);
-    calls[1]!.resolve("After the gap.");
+    calls[2]!.resolve("After the gap.");
     await tick();
     expect(session.committedText()).toBe("After the gap.");
     feed(session, 6, speech); // segment 3
@@ -394,15 +398,78 @@ describe("IncrementalWhisperSession", () => {
     expect(calls).toHaveLength(1);
     session.markSpeech();
     feed(session, 5, speech);
-    const ending = session.endTurn(1_500); // tail at the pause
-    expect(calls).toHaveLength(2);
+    const ending = session.endTurn(1_500); // tail at the pause, queued behind the background segment
     expect(session.diagnostics()).toMatchObject({ tailStartedAtSilence: 1 });
-    await new Promise((resolve) => setTimeout(resolve, 90));
-    expect(calls).toHaveLength(3); // only the tail was hedged
+    expect(calls).toHaveLength(1);
     calls[0]!.resolve("Background.");
+    await tick();
+    expect(calls).toHaveLength(2);
+    await new Promise((resolve) => setTimeout(resolve, 90));
+    expect(calls).toHaveLength(3); // the tail was hedged after 30 ms
     calls[2]!.resolve("Tail.");
     await ending;
     expect(session.committedText()).toBe("Background. Tail.");
+  });
+
+  it("does not start a segment's Whisper call until the previous segment settled", async () => {
+    const { session, calls } = build();
+    session.markSpeech();
+    feed(session, 10, speech);
+    const first = session.endTurn(1_500);
+    session.markSpeech();
+    feed(session, 10, speech);
+    const second = session.endTurn(1_500);
+    expect(calls).toHaveLength(1);
+    await tick();
+    expect(calls).toHaveLength(1);
+    calls[0]!.resolve("One.");
+    await first;
+    await tick();
+    expect(calls).toHaveLength(2);
+    calls[1]!.resolve("Two.");
+    await second;
+    expect(session.committedText()).toBe("One. Two.");
+  });
+
+  it("a rejected segment does not block the next queued segment", async () => {
+    const { session, calls } = build();
+    session.markSpeech();
+    feed(session, 10, speech);
+    const first = session.endTurn(1_500);
+    session.markSpeech();
+    feed(session, 10, speech);
+    const second = session.endTurn(1_500);
+    calls[0]!.reject(new TranscriptionUnavailableError("bad", { providerStatus: "rejected", attempts: 1 }));
+    await first;
+    await tick();
+    expect(calls).toHaveLength(2);
+    calls[1]!.resolve("Still here.");
+    await second;
+    expect(session.failed).toBe(false);
+    expect(session.committedText()).toBe("Still here.");
+    expect(session.diagnostics()).toMatchObject({ segmentsFailed: 1, segmentsTranscribed: 1 });
+  });
+
+  it("with the hedge options unset, the tail still hedges after 1500 ms and a background segment does not hedge", async () => {
+    const { session, calls } = build({ softCutMinBufferedMs: 1_000 });
+    session.markSpeech();
+    feed(session, 12, speech);
+    feed(session, 4, quiet); // soft cut: background segment
+    expect(calls).toHaveLength(1);
+    await new Promise((resolve) => setTimeout(resolve, 1_700));
+    expect(calls).toHaveLength(1);
+    calls[0]!.resolve("Background.");
+    await tick();
+    session.markSpeech();
+    feed(session, 12, speech);
+    const ending = session.endTurn(1_500);
+    expect(calls).toHaveLength(2);
+    await new Promise((resolve) => setTimeout(resolve, 1_700));
+    expect(calls).toHaveLength(3); // tail hedge after 1500 ms
+    calls[2]!.resolve("Tail.");
+    await ending;
+    expect(session.committedText()).toBe("Background. Tail.");
+    expect(session.diagnostics()).toMatchObject({ segmentHedges: 1, segmentHedgeWins: 1 });
   });
 
   it("soft-cuts a long buffered segment at a short pause so the tail after the last cut stays short", async () => {

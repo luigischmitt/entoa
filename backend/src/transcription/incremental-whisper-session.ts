@@ -25,9 +25,9 @@ export type IncrementalWhisperOptions = {
   speechThreshold: number;
   /** Per-segment Whisper time limit (one attempt group, hedge included). A failed group is retried once. Default 8000. */
   segmentTimeoutMs?: number;
-  /** A segment request still pending after this long is raced against an identical second request (first success wins). 0 disables. Default 2500. */
+  /** A background segment request still pending after this long is raced against an identical second request (first success wins). Unset means off; an explicit 0 disables every hedge, including the tail's. */
   segmentHedgeAfterMs?: number;
-  /** Hedge delay for a segment on the critical path (the tail cut at the end-of-answer pause or at finalization). Default 1500; 0 disables. */
+  /** Hedge delay for a segment on the critical path (the tail cut at the end-of-answer pause or at finalization). Default 1500; 0 disables. With `segmentHedgeAfterMs` set above 0, the earlier of the two applies. */
   tailHedgeAfterMs?: number;
   /** Pause (consecutive quiet frames) that cuts a long buffered segment early, without ending the turn. 0 disables. Default 400. */
   softCutSilenceMs?: number;
@@ -56,6 +56,11 @@ const hallucinations = new Set(["you", "thank you", "thanks", "thanks for watchi
 const hallucinationSpeechMs = 1_200;
 /** Consecutive background segment failures tolerated (each leaves a gap) before the whole session is abandoned. */
 const maxConsecutiveSegmentFailures = 3;
+/**
+ * Background hedge delay when `segmentHedgeAfterMs` is unset. Off: at low OpenRouter balance a duplicate Whisper call fills
+ * the in-flight budget, so the hedge would starve the next segment with HTTP 402.
+ */
+const defaultSegmentHedgeAfterMs = 0;
 
 /** Content-free reason the incremental session was abandoned (the caller then transcribes the full audio). */
 export type SessionFailureDetail = "segment_error" | "segment_timeout" | "flush_timeout";
@@ -105,6 +110,9 @@ export class IncrementalWhisperSession implements StreamingTurnSession {
   // Reason of the first tolerated segment failure: reported as the session failure when the answer ends with that gap.
   private gapDetail: SessionFailureDetail | null = null;
   private detail: SessionFailureDetail | null = null;
+  // Segment gate (see `runInSegmentGate`): a segment's request starts only after the previous one settled.
+  private segmentBusy = false;
+  private readonly segmentWaiters: Array<() => void> = [];
 
   constructor(private readonly options: IncrementalWhisperOptions) {}
 
@@ -340,15 +348,42 @@ export class IncrementalWhisperSession implements StreamingTurnSession {
       this.drain();
       return segment;
     }
-    segment.promise = this.transcribeSegment(segment, pcm, speechMs, critical);
+    // One Whisper request at a time per answer, for OpenRouter's in-flight budget (about two simultaneous calls at low balance;
+    // a third gets HTTP 402). Segments run in cut order; a failed or aborted segment settles and never blocks the next one.
+    segment.promise = this.runInSegmentGate(async () => {
+      if (this.closed) {
+        pcm.fill(0);
+        return;
+      }
+      await this.transcribeSegment(segment, pcm, speechMs, critical);
+    });
     return segment;
+  }
+
+  /**
+   * Runs `work` once every earlier segment of this answer has settled, in cut order. Idle gates start `work` synchronously;
+   * otherwise the gate is handed over FIFO without releasing it, so no other segment can slip in between.
+   */
+  private async runInSegmentGate(work: () => Promise<void>): Promise<void> {
+    if (this.segmentBusy) await new Promise<void>((resolve) => this.segmentWaiters.push(resolve));
+    else this.segmentBusy = true;
+    try {
+      await work();
+    } finally {
+      const next = this.segmentWaiters.shift();
+      if (next) next();
+      else this.segmentBusy = false;
+    }
   }
 
   /** The tail is on the critical path of the answer end, so it is hedged earlier than background segments (never later). */
   private tailHedgeAfterMs(): number {
-    const regular = this.options.segmentHedgeAfterMs ?? 2_500;
+    // An explicit zero disables every hedge.
+    if (this.options.segmentHedgeAfterMs === 0) return 0;
+    const regular = this.options.segmentHedgeAfterMs ?? defaultSegmentHedgeAfterMs;
     const tail = this.options.tailHedgeAfterMs ?? 1_500;
-    return regular === 0 ? 0 : tail === 0 ? regular : Math.min(regular, tail);
+    if (tail === 0) return regular;
+    return regular > 0 ? Math.min(regular, tail) : tail;
   }
 
   /** One attempt group: a request raced against a hedge request after `segmentHedgeAfterMs`, limited to `segmentTimeoutMs`. */
@@ -364,7 +399,7 @@ export class IncrementalWhisperSession implements StreamingTurnSession {
           throw error;
         }
       },
-      hedgeAfterMs: critical ? this.tailHedgeAfterMs() : this.options.segmentHedgeAfterMs ?? 2_500,
+      hedgeAfterMs: critical ? this.tailHedgeAfterMs() : this.options.segmentHedgeAfterMs ?? defaultSegmentHedgeAfterMs,
       tryReserve: () => ({ active: true, release: () => undefined }),
       signal,
       onOutcome: (outcome) => {
