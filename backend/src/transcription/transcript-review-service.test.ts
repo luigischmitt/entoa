@@ -34,4 +34,21 @@ describe("OpenRouter transcript review", () => {
     await expect(disabled.review(Buffer.from("wav"), draft, null)).resolves.toBeNull();
     expect(fetchImplementation).toHaveBeenCalledTimes(1);
   });
+
+  it("caps max_tokens to the draft length", async () => {
+    const fetchImplementation = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => response(draft));
+    const service = new OpenRouterTranscriptReviewService({ key: "secret", fetchImplementation });
+    await service.review(Buffer.from("wav"), draft, null);
+    expect(JSON.parse(String(fetchImplementation.mock.calls[0]![1]!.body)).max_tokens).toBe(Math.ceil(draft.length / 2) + 300);
+
+    const longDraft = "word ".repeat(2_000);
+    await service.review(Buffer.from("wav"), longDraft, null);
+    expect(JSON.parse(String(fetchImplementation.mock.calls[1]![1]!.body)).max_tokens).toBe(2_000);
+  });
+
+  it("treats a length-truncated completion as a failed review", async () => {
+    const truncated = () => new Response(JSON.stringify({ choices: [{ message: { content: draft.slice(0, 20) }, finish_reason: "length" }] }), { status: 200 });
+    const service = new OpenRouterTranscriptReviewService({ key: "secret", fetchImplementation: async () => truncated() });
+    await expect(service.review(Buffer.from("wav"), draft, null)).resolves.toBeNull();
+  });
 });
