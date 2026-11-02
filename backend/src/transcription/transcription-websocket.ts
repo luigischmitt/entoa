@@ -18,7 +18,7 @@ import type { TranscriptReviewService } from "./transcript-review-service.js";
 import { defaultRetainedAnswerAudio, type RetainedAnswerAudio } from "./retained-answer-audio.js";
 
 type ClientMessage =
-  | { type: "start"; accessToken?: unknown; version: 2; sampleRate: number; channels: 1; encoding: "s16le"; speechThreshold: number; captions?: unknown; question?: unknown; plannedQuestion?: unknown; contextAnswers?: unknown; transcriptionEngine?: unknown }
+  | { type: "start"; accessToken?: unknown; version: 2; sampleRate: number; channels: 1; encoding: "s16le"; speechThreshold: number; captions?: unknown; conversation?: unknown; question?: unknown; plannedQuestion?: unknown; contextAnswers?: unknown; transcriptionEngine?: unknown }
   | { type: "level"; value: number }
   | { type: "finalize"; reason: "manual" | "silence" }
   | { type: "follow-up-candidate"; turnId: unknown; revision: unknown; question: unknown; anchor: unknown }
@@ -286,6 +286,16 @@ export type StreamingOptions = {
   flushTimeoutMs?: number;
 };
 
+/**
+ * Shorter pause graces for a conversation (sent as `conversation: true` in the start message): the reaction must land while
+ * the person is still deciding to continue, not 4.5 s after they stopped. Only the three grace values change.
+ */
+export const CONVERSATION_GRACE_OPTIONS = { answerGraceMs: 1_800, incompleteGraceMs: 3_000, shortAnswerGraceMs: 2_500 } as const;
+
+export function conversationGraceOptions(options: StreamingOptions): StreamingOptions {
+  return { ...options, ...CONVERSATION_GRACE_OPTIONS };
+}
+
 /** Select the pause grace from committed text; this value is used only as a duration, never logged with text. */
 export function answerEndGraceMs(transcript: string, options: Pick<StreamingOptions, "answerGraceMs" | "incompleteGraceMs" | "shortAnswerGraceMs" | "minAnswerWords">): number {
   const minimumWords = options.minAnswerWords ?? 6;
@@ -376,6 +386,8 @@ export function attachTranscriptionWebSocket(
     // The incremental Whisper session of this answer; null when no streaming options were given (plain full-audio Whisper path).
     let streamSession: StreamingTurnSession | null = null;
     let requestedEngine: RequestedEngine | null = null;
+    // Set by the start message: a conversation session uses the shorter pause graces (conversationGraceOptions).
+    let conversationTiming = false;
     let graceTimer: ReturnType<typeof setTimeout> | null = null;
     // Provisional answer for next-turn preparation (never logged; only the count is).
     let prepareTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1213,6 +1225,7 @@ export function attachTranscriptionWebSocket(
           const parsedEngine = parseTranscriptionEngine(message.transcriptionEngine);
           if (parsedEngine === undefined) logStreamDiagnostic({ status: "invalid_message", field: "start.transcriptionEngine" });
           requestedEngine = parsedEngine ?? null;
+          conversationTiming = message.conversation === true;
           captionsEnabled = streaming !== null && message.captions === true;
           whisperQuestion = sanitizeQuestion(message.question);
           interviewerQuestion = streaming?.answerCompletion ? sanitizeQuestion(message.question) : null;
@@ -1237,7 +1250,7 @@ export function attachTranscriptionWebSocket(
                 runPlannedCoverageCheck(streamSession?.committedText() || turnTranscript);
                 // Use committed text, not just the tail: Whisper can return a short tail after a longer first segment.
                 const committedTranscript = streamSession?.committedText() || turnTranscript;
-                const graceMs = answerEndGraceMs(committedTranscript, streaming);
+                const graceMs = answerEndGraceMs(committedTranscript, conversationTiming ? conversationGraceOptions(streaming) : streaming);
                 // Local-VAD turns arrive after their segment was transcribed: time grace and prepare from the pause, not from now.
                 const elapsedMs = info?.silenceStartedAt !== undefined ? Math.max(0, Date.now() - info.silenceStartedAt) : 0;
                 const prepareAfterMs = streaming.prepareAfterMs ?? 0;

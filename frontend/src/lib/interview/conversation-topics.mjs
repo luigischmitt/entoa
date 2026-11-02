@@ -1,10 +1,12 @@
 export const RECENT_TOPICS_STORAGE_KEY = "tuc:recent-conversation-topics";
 export const RECENT_TOPICS_LIMIT = 24;
 
-const topic = (id, category, title, opening, lines) => ({
+const topic = (id, category, title, subject, opening, lines) => ({
   id,
   category,
   title,
+  // Lowercase noun phrase for "Today, let's talk about ${subject}." (the intro of the plan's opening).
+  subject,
   opening,
   paths: lines.map((line, index) => ({ id: `p${index + 1}`, line })),
 });
@@ -12,6 +14,7 @@ const topic = (id, category, title, opening, lines) => ({
 export const CONVERSATION_TOPICS = [
   // daily-life
   topic("morning-routine", "daily-life", "Rotina da manhã",
+    "your morning routine",
     "Okay, I'm a toucan, so my morning starts with sunshine and a very loud yawn. How does your morning usually begin?",
     [
       "Last week I watched the sunrise from my favorite branch. What did you do first when you woke up today?",
@@ -21,6 +24,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine every morning started with fresh mango and warm sun. What would you do first with that perfect start?",
     ]),
   topic("small-things-happy", "daily-life", "Pequenas alegrias do dia",
+    "small things that make you happy",
     "Psst, I have a secret: I get very happy about tiny things, like a ripe papaya. What small thing made you smile this week?",
     [
       "Yesterday a bird sang outside my window, and I stopped to listen. What little moment has stayed with you lately?",
@@ -30,6 +34,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine saving one tiny moment from every day in a little jar. Which tiny moment would you put in it first?",
     ]),
   topic("weekend-plans", "daily-life", "Planos de fim de semana",
+    "your weekend plans",
     "Weekends are my favorite, because the forest gets extra gossip and extra sun. What do you like to do when the weekend finally arrives?",
     [
       "Last Saturday I sat in a tree and listened to the wind for hours. What is the best way you spent your last free day?",
@@ -39,6 +44,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a weekend with no plans and no phone, just you and the sun. What would you do with all those free hours?",
     ]),
   topic("cozy-corner", "daily-life", "O cantinho da casa",
+    "your favorite cozy corner at home",
     "Every home has a special corner that feels like a hug, I think. Where is your favorite spot to relax at home?",
     [
       "Last winter I found a warm spot by the window and stayed there all afternoon. What is one place you always go to when you want to rest?",
@@ -48,6 +54,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine your home was built in a tree with a view of the ocean. What would you change first to make it feel perfect?",
     ]),
   topic("household-chores", "daily-life", "Tarefas do dia a dia",
+    "household chores",
     "Chores are like tiny dragons that appear every day, but I sort of like them. What is the chore you dislike the most?",
     [
       "Yesterday I cleaned my favorite branch and found a shiny stone under it. What is the funniest thing you have found while cleaning?",
@@ -59,6 +66,7 @@ export const CONVERSATION_TOPICS = [
 
   // food
   topic("favorite-fruit", "food", "Frutas favoritas",
+    "your favorite fruits",
     "Fruit is basically my whole personality, so I am biased. Which fruit would you pick if you could only eat one for a year?",
     [
       "My first real fruit memory is a sweet mango in a hot market. What fruit has a special place in your memory?",
@@ -68,6 +76,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a tree that grows any fruit you want, once a day. Which fruit would you ask it for first?",
     ]),
   topic("street-food", "food", "Comida de rua",
+    "street food",
     "Street food smells like adventure, and I would fly to any market for it. What is the best snack you have found on the street?",
     [
       "Once I tried a warm corn snack at a busy fair, and I still think about it. What is a food you remember from a lively place?",
@@ -77,6 +86,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a food truck that appears only when you feel hungry for something new. What would you hope it serves?",
     ]),
   topic("cooking-something-simple", "food", "Cozinhar algo simples",
+    "simple home cooking",
     "I can't hold a spoon with my beak, so I just watch cooks and judge their pans. What is one easy meal you know how to make?",
     [
       "Last month I watched a cook make soup with a wooden spoon and a lot of laughter. What is a meal you could cook without thinking?",
@@ -86,6 +96,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a kitchen where every dish turns out perfect on the first try. What would you cook first in that magic kitchen?",
     ]),
   topic("breakfast-or-not", "food", "Café da manhã",
+    "breakfast habits",
     "Some people skip breakfast, and I think that is a very strange idea. What do you usually eat in the morning, if anything?",
     [
       "Once I ate a fruit breakfast so big that I could barely fly. What is the biggest breakfast you have ever enjoyed?",
@@ -95,6 +106,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a breakfast that tastes like your favorite memory from long ago. What would be on that plate?",
     ]),
   topic("sweet-things", "food", "Coisas doces",
+    "sweet desserts",
     "My beak gets sticky very fast around sweet things, and I love it. What dessert do you always want, even after a big meal?",
     [
       "Last summer I found a bowl of very ripe guava and ate almost all of it. What sweet treat did you enjoy the most lately?",
@@ -106,6 +118,7 @@ export const CONVERSATION_TOPICS = [
 
   // travel
   topic("dream-destination", "travel", "Destino dos sonhos",
+    "your dream destination",
     "Birds travel a lot, but I mostly fly between my three favorite trees. Where is the one place you dream about visiting someday?",
     [
       "Last year I flew over a river so wide that I forgot to blink. What place in the world would make you stop and stare?",
@@ -115,6 +128,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine you could fly for one day and visit any place on Earth. Where would you land first?",
     ]),
   topic("short-escape", "travel", "Viagem perto de casa",
+    "short trips close to home",
     "A short trip close to home can feel like a big adventure, trust me. What is a nearby place you would love to explore?",
     [
       "Last month I visited a small waterfall just a short flight from my tree. What is the nearest place you go when you want an escape?",
@@ -124,6 +138,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a train that takes you anywhere in an hour, with no tickets needed. Where would you go first?",
     ]),
   topic("waiting-and-watching", "travel", "Momentos de viagem",
+    "little stories from waiting in line",
     "Airports are full of tiny stories, and I love listening to them from above. What is something interesting you have noticed while waiting in line?",
     [
       "Once I watched a man laugh at his own hat in a very busy hall. What small moment in a crowded place made you smile?",
@@ -133,6 +148,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine you had a travel buddy who never gets tired and always knows the best snacks. What would you ask them to show you first?",
     ]),
   topic("where-to-sleep", "travel", "Onde dormir",
+    "where you like to sleep when travelling",
     "I have slept in a tree hole, a palm nest, and a very cozy bush. Where do you like to sleep when you are away from home?",
     [
       "Last spring I slept in a nest that smelled like fresh leaves. What kind of place would make you feel really cozy?",
@@ -142,6 +158,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a hotel built inside a giant fruit tree with a view of the sea. What would you want to see from your window?",
     ]),
   topic("packing-tricks", "travel", "Arrumar a mala",
+    "packing for a trip",
     "Packing is an art that I still struggle with, because a bird has only one bag. What is the one thing you never forget to pack?",
     [
       "Last trip I packed a whole banana tree, which was a terrible idea. What is the silliest item you would pack for a trip?",
@@ -153,6 +170,7 @@ export const CONVERSATION_TOPICS = [
 
   // movies-series
   topic("favorite-movie", "movies-series", "Filme favorito",
+    "your favorite movies",
     "Movies are like tiny windows into other forests, and I watch them with my head tilted. Which movie has stayed in your mind for a long time?",
     [
       "Last night I watched a cartoon about a brave fox, and I cried a little. What is the last movie that made you feel something?",
@@ -162,6 +180,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a movie about your own life, with a soundtrack you love. What would the first scene show?",
     ]),
   topic("series-to-binge", "movies-series", "Série para maratonar",
+    "series you can binge-watch",
     "Watching a whole season in one day sounds like fun to me. Which show would you recommend to a curious bird?",
     [
       "Once I followed a detective show in a forest, and I got very confused. What show made you excited to see the next episode?",
@@ -171,6 +190,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine you are the main character of a show that airs every night. What would your first episode be about?",
     ]),
   topic("animated-favorites", "movies-series", "Desenhos animados",
+    "cartoons you still love",
     "Cartoons are a great way to learn, and they make even a toucan look wise. What cartoon do you still love to watch when you want to relax?",
     [
       "Last week I watched a cartoon about a clever penguin who built a boat. What was the last cartoon that made you laugh out loud?",
@@ -180,6 +200,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine you could join a cartoon for one day and be any character. Which character would you pick to be?",
     ]),
   topic("documentary-nights", "movies-series", "Documentários e curiosidades",
+    "documentaries and curious facts",
     "Documentaries are like a cup of tea for my curious brain, slow and full of interesting details. What is one topic you could watch about all day?",
     [
       "Once I watched a film about bees, and now I think about them every morning. What topic has made you curious after watching something?",
@@ -189,6 +210,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a documentary about your favorite hobby, with a big voice narrating everything. What would the narrator say first?",
     ]),
   topic("superhero-films", "movies-series", "Filmes de super-herói",
+    "superhero movies",
     "Heroes in movies always have such cool gadgets and capes. If you were a hero in a film, what would your special gadget be?",
     [
       "I once pretended to fly off a branch and almost fell into a bush. What would your first superhero move look like?",
@@ -200,6 +222,7 @@ export const CONVERSATION_TOPICS = [
 
   // music
   topic("favorite-song-moods", "music", "Música para cada humor",
+    "music for every mood",
     "Music can turn a dull afternoon into a little party, and I think birds know it. What song makes you feel the most alive?",
     [
       "Last week I sang along to a song with the wind, and the trees loved it. What song did you sing loudly recently?",
@@ -209,6 +232,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine you could write a song about your favorite place. What would the chorus sound like?",
     ]),
   topic("dream-instrument", "music", "Instrumento dos sonhos",
+    "musical instruments",
     "I cannot play any instrument, but I would love to play a tiny drum. Which instrument would you most like to learn one day?",
     [
       "Once I tapped a hollow log like a drum, and the forest looked surprised. What sound would you make if you played for the first time?",
@@ -218,6 +242,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a magic instrument that plays whatever song you hum. What song would you ask it to play first?",
     ]),
   topic("live-shows", "music", "Show ao vivo",
+    "live concerts and shows",
     "Concerts look like just noise to some people, but I call them pure magic. What would be your dream moment at a live show?",
     [
       "Once I heard a band play in a big tree, and the whole forest danced. What kind of music would you love to hear live?",
@@ -227,6 +252,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a musician sang a song just for you while you cooked. What song would you ask for?",
     ]),
   topic("rhythm-and-dance", "music", "Ritmo e dança",
+    "music and dancing",
     "When music starts, my feet forget that I am a bird and want to dance. What is a rhythm that makes you move without thinking?",
     [
       "Last summer a drum beat made me spin around a branch three times. What song is impossible for you to sit still to?",
@@ -236,6 +262,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a dance class where the teacher is a very dramatic parrot. What would your first move be?",
     ]),
   topic("songs-in-english", "music", "Músicas em inglês",
+    "songs in English",
     "Singing in English is a great way to practice, and I love catchy repeated lines. Which English song do you sing without even thinking?",
     [
       "Once I sang a song in English, and I forgot half the words. What line of a song do you remember most easily?",
@@ -247,6 +274,7 @@ export const CONVERSATION_TOPICS = [
 
   // sports
   topic("favorite-sport", "sports", "Esporte favorito",
+    "your favorite sports",
     "Sports look like running and shouting to most people, but I see little stories in them. What sport do you enjoy watching or playing the most?",
     [
       "Once I tried to race a squirrel up a tree, and I lost by a lot. What is a sport you would like to try one day?",
@@ -256,6 +284,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine you could be a champion in any sport for one day. Which sport would you choose to win?",
     ]),
   topic("outdoor-games", "sports", "Brincadeiras ao ar livre",
+    "outdoor games",
     "Outdoor games are the best, because the wind plays along and the grass is always ready. What outdoor game do you enjoy the most?",
     [
       "Last spring I played hide and seek with a squirrel, and I did not win. What is a game you could play in a park?",
@@ -265,6 +294,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a park where every game is invented by the people who visit it. What game would you create there?",
     ]),
   topic("sports-dreams", "sports", "Sonhos esportivos",
+    "sports you would love to master",
     "Athletes make it look so easy, and I wonder what their secret is. What sport would you love to be really good at?",
     [
       "I once watched a swimmer glide across a lake with perfect style. What would your perfect sports moment look like?",
@@ -274,6 +304,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a sport invented just for birds, with branches and wind. What would you call it?",
     ]),
   topic("beach-games", "sports", "Esporte na praia",
+    "beach games",
     "Sand, sun, and waves make the perfect place for a game. What beach game would you like to try with friends?",
     [
       "Last summer I kicked a ball on the sand, and it flew into the sea. What is the funniest thing that happened during a game?",
@@ -283,6 +314,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a beach game where the waves are the referees. What rules would you make for that game?",
     ]),
   topic("sports-and-rest", "sports", "Esporte e descanso",
+    "rest after a busy day",
     "Resting is a skill, and I think I am an expert at it. How do you like to rest after a busy day?",
     [
       "Once I slept on a branch in the sun for three hours. What is your favorite way to relax after moving around a lot?",
@@ -294,6 +326,7 @@ export const CONVERSATION_TOPICS = [
 
   // work-career
   topic("dream-work-hypo", "work-career", "Trabalho dos sonhos",
+    "dream jobs",
     "If I could have any job, I would probably guard the tallest fruit tree. What kind of work would make you proud to talk about?",
     [
       "Last month I pretended to be a tour guide for a very sleepy lizard. What is a kind of work you would enjoy trying for a week?",
@@ -303,6 +336,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a workplace inside a giant tree, with a view of the whole forest. What would you do there every morning?",
     ]),
   topic("useful-skills", "work-career", "Habilidades úteis",
+    "useful skills to learn",
     "Skills are useful everywhere, like listening well and staying calm. Which skill do you think is most useful to learn first?",
     [
       "Once I learned to count my seeds, and it helped me feel organized. What is a small skill that surprised you when you learned it?",
@@ -312,6 +346,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a skill that makes everyone smile when you use it. What would it be?",
     ]),
   topic("new-beginnings", "work-career", "Começar algo novo",
+    "starting something new",
     "Starting something new is like flying from a high branch for the first time. What is one new thing you would like to start this year?",
     [
       "The first time I flew, I wobbled a lot and landed on a fern. What first step would you take in a new area?",
@@ -321,6 +356,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine you could start over with a fresh plan and no past mistakes. What would your first goal be?",
     ]),
   topic("teamwork-stories", "work-career", "Trabalho em equipe",
+    "working well as a team",
     "Birds in a flock work together, and I think that is very smart. What makes a group of people work well together for you?",
     [
       "Once I helped a group of ants carry a big leaf, and it was amazing. What kind of group activity do you enjoy most?",
@@ -330,6 +366,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a team of birds, fish, and squirrels solving one problem together. What problem would they solve first?",
     ]),
   topic("favorite-tools", "work-career", "Ferramentas favoritas",
+    "favorite tools",
     "Good tools make every task easier, and I think they should be a bit beautiful too. What tool do you like to use the most?",
     [
       "Once I used a stick to dig for worms, and it worked very well. What is the strangest tool you have ever tried?",
@@ -341,6 +378,7 @@ export const CONVERSATION_TOPICS = [
 
   // tech
   topic("gadgets-wish", "tech", "Aparelhos e gadgets",
+    "fun gadgets",
     "Gadgets are fun, but a good map and a nice friend are pretty useful too. What gadget would you love to have just for fun?",
     [
       "Once I found a shiny stone that beeped, and I still do not know why. What tiny gadget would you invent if you could make any one?",
@@ -350,6 +388,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a gadget that can turn any sound into a song. What would you want it to turn into music first?",
     ]),
   topic("helpful-apps", "tech", "Aplicativos úteis",
+    "apps that help with daily life",
     "Apps can help you learn a language, and a little reminder can feel like a friendly bird. Which app do you use the most in your day?",
     [
       "Once I set a reminder to eat a mango, and it worked perfectly. What reminder would you like your phone to send every morning?",
@@ -359,6 +398,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine an app that helps you practice English while you walk through a park. What would you want it to say to you?",
     ]),
   topic("robots-future", "tech", "Robôs no futuro",
+    "robots in the future",
     "Being an AI, I feel a little friendly toward robots, even the clumsy ones. What would you like a robot to help you with?",
     [
       "Last week I watched a little robot try to climb a step and fall over. What task would you give a robot first?",
@@ -368,6 +408,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a robot that could only help you with one thing for the rest of your life. What would you choose?",
     ]),
   topic("learning-online", "tech", "Aprender online",
+    "learning online",
     "Learning online can feel like a cozy classroom in your pocket, I think. What do you enjoy most when you learn from a screen?",
     [
       "I watched a short video about how seeds grow, and I was amazed. What is one video that taught you something new?",
@@ -377,6 +418,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a course taught by the wisest owl in the forest. What would you most want to learn from that owl?",
     ]),
   topic("phone-habits", "tech", "Hábitos no celular",
+    "phone habits",
     "Phones are great, but they can steal our attention like a shiny thing. How do you use your phone when you have free time?",
     [
       "Once I spent an hour looking at a pretty flower photo and forgot my plans. What do you enjoy doing on your phone when you relax?",
@@ -388,6 +430,7 @@ export const CONVERSATION_TOPICS = [
 
   // money-goals
   topic("saving-dreams", "money-goals", "Economizar para sonhar",
+    "saving money for a dream",
     "Saving a little bit for a dream feels like collecting seeds for a future tree. What dream would you love to save for?",
     [
       "Last year I saved shiny stones in a nest, and I felt very proud. What is a small thing you would like to save up for?",
@@ -397,6 +440,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a jar that grows a little every time you learn a new word. What would you save up for in that jar?",
     ]),
   topic("yearly-goals", "money-goals", "Metas para o ano",
+    "goals for the year",
     "Plans work best with big dreams and small steps, like a garden. What goal would you like to reach this year?",
     [
       "Last spring I planted a tiny seed and checked it every morning. What goal would you like to start working on?",
@@ -406,6 +450,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a magic calendar that shows you the best day to start something new. What would you start on that day?",
     ]),
   topic("free-joys", "money-goals", "Alegrias que não custam nada",
+    "free little joys",
     "The best joys are often free, like sunshine, a warm breeze, or a good song. What free thing makes your day better?",
     [
       "Once I sat in the sun for an hour and felt completely happy. What free activity do you enjoy when you have some time?",
@@ -415,6 +460,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a day where everything you enjoy is free and open to you. How would you spend the first hour?",
     ]),
   topic("what-matters-most", "money-goals", "O que importa para você",
+    "what matters most to you",
     "People chase big things, and others enjoy small things, and both are fine. What do you value most in your life right now?",
     [
       "Last year I chose to rest more, and it felt surprisingly good. What is one thing you want to focus on lately?",
@@ -424,6 +470,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine you could ask a wise tree one question about your future. What would you ask?",
     ]),
   topic("dream-list", "money-goals", "Lista de sonhos",
+    "your dream list",
     "Dreams are like fruit on a branch, and my list grows every season. What is the first item you would write on your list?",
     [
       "Last winter I added a moonlit swim to my list, and I still want it. What is a dream you think about often?",
@@ -435,6 +482,7 @@ export const CONVERSATION_TOPICS = [
 
   // people-relationships
   topic("good-friend-qualities", "people-relationships", "Qualidades de um amigo",
+    "qualities of a good friend",
     "Good friends are like tall trees that give shade when the sun gets too strong. What quality do you value most in a friend?",
     [
       "Once a friend shared her fruit with me when I was very hungry. What is a small kindness that touched your heart?",
@@ -444,6 +492,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a friend who always knows the best snack for any mood. What snack would you ask them for today?",
     ]),
   topic("making-new-friends", "people-relationships", "Fazer novos amigos",
+    "making new friends",
     "Making new friends can feel awkward, but it is also a little bit like a treasure hunt. How do you usually start talking to someone new?",
     [
       "Last month I met a shy frog by the river, and we became good friends. What is a simple way to start a chat with a stranger?",
@@ -453,6 +502,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a park where everyone you meet becomes a friend for life. What would you say to the first person you see?",
     ]),
   topic("small-kindness", "people-relationships", "Pequenos gestos gentis",
+    "small acts of kindness",
     "Kindness spreads like a yawn, and I think that is a wonderful thing. What small act of kindness made your day better?",
     [
       "Once a squirrel gave me a nut when I looked very sad. What is a kind thing you enjoy doing for others?",
@@ -462,6 +512,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a day when everyone gave a small compliment to a stranger. What compliment would you like to give?",
     ]),
   topic("neighbors-community", "people-relationships", "Vizinhos e comunidade",
+    "neighbors and your community",
     "Neighbors are like branches of the same tree, always close but a bit noisy. What is your favorite way to say hello to people nearby?",
     [
       "Last week a neighbor bird gave me a shiny leaf and asked for nothing. What is a small way you connect with people around you?",
@@ -471,6 +522,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a street where every house has a garden full of fruit. What would you grow in a garden like that?",
     ]),
   topic("keeping-in-touch", "people-relationships", "Manter contato",
+    "keeping in touch with loved ones",
     "Sending a message to someone you care about is like sending a tiny song across the forest. Who would you like to talk to more often?",
     [
       "Last spring I sent a letter to a friend who lives far away, and it arrived with a feather. How do you like to keep in touch?",
@@ -482,6 +534,7 @@ export const CONVERSATION_TOPICS = [
 
   // memories
   topic("happy-memory", "memories", "Lembrança feliz",
+    "a happy memory",
     "Some memories feel like warm sunlight, even years later. What is one happy memory that always makes you smile?",
     [
       "I remember a summer day when I ate too many berries and laughed for hours. What memory do you think about when you need a smile?",
@@ -491,6 +544,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine you could visit one happy memory again for one hour. Which memory would you pick?",
     ]),
   topic("first-times", "memories", "Primeiras vezes",
+    "first times you remember",
     "The first time I flew, I wobbled and landed on a fern, and I still giggle. What is a first time that you remember clearly?",
     [
       "My first real swim in a lake felt cold, wild, and amazing. What is one first that you still remember well?",
@@ -500,6 +554,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine you could have a first time for anything, with no fear at all. What would you try first?",
     ]),
   topic("song-memories", "memories", "Lembranças em música",
+    "songs that bring back memories",
     "Songs can take you back to a sunny afternoon in one second, which feels like magic. Which song brings back a special moment for you?",
     [
       "Once I heard a tune in the forest and remembered my first flight. What song always reminds you of a good moment?",
@@ -509,6 +564,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a playlist that tells the story of your life in twelve songs. Which song would be the first one?",
     ]),
   topic("favorite-place-memory", "memories", "Lugar que eu lembro",
+    "places that feel calm to you",
     "Some places stay in our hearts forever, like a little secret garden. What place do you think about when you want to feel calm?",
     [
       "Last year I found a waterfall hidden behind a wall of green leaves. What place feels magical to you, even if you only dream about it?",
@@ -518,6 +574,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine you could paint a picture of your favorite place from memory. What colors would you use first?",
     ]),
   topic("childhood-games", "memories", "Brincadeiras antigas",
+    "games from your childhood",
     "Old games sound wonderful to me, even though I never had a childhood. What game do you remember playing when you were little?",
     [
       "I once played a clapping game with a group of bees, and it was loud. What is a game you loved when you were young?",
@@ -529,6 +586,7 @@ export const CONVERSATION_TOPICS = [
 
   // hypotheticals
   topic("if-you-could-fly", "hypotheticals", "Se pudesse voar",
+    "places you would fly to",
     "If I could fly to any place, I would choose a tall mountain with fresh wind. Where would you go if you could fly for one day?",
     [
       "I tried flying once from a low branch, and I landed in a bush. What would your first flight look like?",
@@ -538,6 +596,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine you could fly for an hour every week, and no one would notice. What would you do with that free time?",
     ]),
   topic("time-travel", "hypotheticals", "Viagem no tempo",
+    "visiting the past",
     "If I had a time machine, I would visit the forest a thousand years ago and say hello. Which time would you like to visit for a day?",
     [
       "I think it would be funny to watch the first trees grow tall. What time would you visit to see something amazing?",
@@ -547,6 +606,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine you could bring one thing from today to a time long ago. What would you bring to show them?",
     ]),
   topic("invisible-for-a-day", "hypotheticals", "Invisível por um dia",
+    "being invisible for a day",
     "Invisibility would be great, because I could sneak into the fruit market for a snack. What would you do first if nobody could see you?",
     [
       "Once I hid behind a leaf, and a lizard walked right past me without seeing me. What is the funniest thing you would do without being seen?",
@@ -556,6 +616,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine you became invisible only when you were happy. What would make you happy enough to disappear for a while?",
     ]),
   topic("perfect-day", "hypotheticals", "Dia perfeito",
+    "your perfect day",
     "Sunshine, a ripe mango, and a long chat in the trees make my perfect day. What would your perfect day look like?",
     [
       "Last summer I had a day like that, and I felt light all afternoon. What would you do first on a perfect day off?",
@@ -565,6 +626,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a day where time moves slowly and every hour feels like a gift. What would you spend that time on?",
     ]),
   topic("talking-animals", "hypotheticals", "Falar com os animais",
+    "talking to animals",
     "Talking animals would tell the funniest stories, I think. Which animal would you like to chat with for an hour?",
     [
       "I once heard a parrot tell a joke, and I still think about it. What would you ask a cat if it could answer you?",
@@ -576,6 +638,7 @@ export const CONVERSATION_TOPICS = [
 
   // nature-animals
   topic("favorite-animal", "nature-animals", "Animal favorito",
+    "favorite animals",
     "Animals have the best personalities, even the quiet ones, and I love them all. Which animal do you think is the most interesting?",
     [
       "Once I saw a sleepy sloth hanging from a branch, and it winked at me. What is your favorite animal to watch?",
@@ -585,6 +648,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine you could swap places with an animal for one day. Which one would you pick?",
     ]),
   topic("forest-sounds", "nature-animals", "Sons da floresta",
+    "sounds of nature",
     "A forest is never quiet, because there are birds, frogs, and wind all talking at once. What sound in nature do you love the most?",
     [
       "Last morning I heard frogs singing near the river, and it sounded like a concert. What is a nature sound that calms you?",
@@ -594,6 +658,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a forest where every tree made a different musical note. What song would that forest play for you?",
     ]),
   topic("plants-and-gardens", "nature-animals", "Plantas e jardins",
+    "plants and gardens",
     "Plants are patient friends, and they never complain when you forget them for a day. What kind of plant would you choose to keep near your window?",
     [
       "Last spring I planted a tiny seed and checked it every morning. What is a plant you find beautiful?",
@@ -603,6 +668,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a garden where every plant gives a new fruit each morning. Which fruit would you like to find first?",
     ]),
   topic("ocean-life", "nature-animals", "Vida no mar",
+    "the ocean and its secrets",
     "The ocean is huge and full of secrets, and I think it is the most mysterious place. What would you most like to see under the waves?",
     [
       "Once I watched a dolphin jump near a boat, and it made me clap my wings. What sea creature would you love to see up close?",
@@ -612,6 +678,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine you could breathe underwater for a day. Where would you go first?",
     ]),
   topic("weather-moods", "nature-animals", "Clima e humor",
+    "how weather affects your mood",
     "Weather changes my mood very quickly, and I think that is a fun feature. How does the weather change the way you feel?",
     [
       "Last week it rained all afternoon, and I sat by the window with warm tea. What is your favorite kind of weather?",
@@ -623,6 +690,7 @@ export const CONVERSATION_TOPICS = [
 
   // brazil-culture
   topic("festas-do-brasil", "brazil-culture", "Festas populares",
+    "popular festivals in Brazil",
     "Brazilian festivals are full of color, music, and warm food, and I always feel invited. What celebration do you enjoy the most?",
     [
       "Once I watched colorful flags flutter over a village square, and I felt very happy. What is a celebration where you feel most relaxed?",
@@ -632,6 +700,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a festival where every stall serves a different fruit drink. Which drink would you try first?",
     ]),
   topic("comidas-tipicas", "brazil-culture", "Comidas típicas do Brasil",
+    "typical Brazilian food",
     "Brazilian food has so many flavors, from sweet fruits to hot and savory stews. Which typical dish do you love the most?",
     [
       "Once a friend cooked a big pot of feijoada, and I smelled it from far away. What dish reminds you of a really good meal?",
@@ -641,6 +710,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a market where every stall sells a different Brazilian snack. Which one would you buy first?",
     ]),
   topic("sotaques-do-brasil", "brazil-culture", "Sotaques do Brasil",
+    "regional accents in Brazil",
     "Brazil has so many accents, and each one sounds like a different song. Which regional accent do you find the most charming to hear?",
     [
       "Once I heard a fisherman speak with a sing-song voice that made me smile. What is a voice or accent you enjoy hearing?",
@@ -650,6 +720,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine every region of the country had its own festival of words. What word would you add to that festival?",
     ]),
   topic("natureza-brasileira", "brazil-culture", "Natureza brasileira",
+    "nature in Brazil",
     "Brazil has beaches, rivers, and forests that make a bird very happy. What part of the country's nature would you love to explore first?",
     [
       "Once I flew over a green valley and saw a river that shined like silver. What natural place makes you feel proud?",
@@ -659,6 +730,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a national park where every animal has a friendly guide. Which guide would you choose to follow?",
     ]),
   topic("girias-e-expressoes", "brazil-culture", "Gírias e expressões",
+    "slang and funny expressions",
     "Every language has funny words, and Brazilian Portuguese has plenty of them. Which expression from your own language makes you laugh?",
     [
       "Once I heard a funny saying about a sleepy cat, and I still repeat it. What is a word you love to say with friends?",
@@ -670,6 +742,7 @@ export const CONVERSATION_TOPICS = [
 
   // learning
   topic("english-fun-words", "learning", "Palavras em inglês",
+    "fun English words",
     "English has some words that sound funny to me, like a squeaky branch. Which English word do you think is the most fun to say?",
     [
       "Once I learned a new word about berries, and I used it with everyone I met. What new word have you learned recently?",
@@ -679,6 +752,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a word that changes its meaning every time you say it. Which word would you want to test first?",
     ]),
   topic("learning-mistakes", "learning", "Errar e aprender",
+    "learning from mistakes",
     "Mistakes are part of learning, and I make them all the time, especially with my beak. What is a funny mistake you made while learning?",
     [
       "Last week I said a word wrong, and an owl corrected me with a smile. What do you do when you make a language mistake?",
@@ -688,6 +762,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a teacher who loves your mistakes and turns them into jokes. What kind of joke would make you laugh the most?",
     ]),
   topic("hobbies-for-practice", "learning", "Aprender com hobbies",
+    "hobbies that help you practice",
     "Learning becomes much easier when it looks like play, like a game in the sun. What hobby could help you practice English without feeling like studying?",
     [
       "Once I learned a song in another language just by singing it every morning. What hobby would make learning feel natural to you?",
@@ -697,6 +772,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a hobby that teaches you a new word every time you do it. Which hobby would you choose for that?",
     ]),
   topic("talking-with-the-world", "learning", "Conversas com o mundo",
+    "talking with people around the world",
     "Talking with people from around the world is like having a little window to other forests. Who would you love to talk with, if you could pick anyone?",
     [
       "Once I chatted with a green parrot who told me about her rainy island. What do you wonder about people in other countries?",
@@ -706,6 +782,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a video call where everyone speaks a different language, but you still understand. What would you say first?",
     ]),
   topic("study-routine", "learning", "Rotina de estudo",
+    "study routines",
     "A good routine can be very simple, like one song and ten new words each morning. What would a good learning routine look like to you?",
     [
       "I once tried to study for an hour, but I kept looking at a shiny beetle. What helps you stay focused when you practice?",
@@ -717,6 +794,7 @@ export const CONVERSATION_TOPICS = [
 
   // fun-opinions
   topic("unpopular-opinion", "fun-opinions", "Uma opinião ousada",
+    "underrated foods",
     "Here is a small, silly opinion from a toucan: pineapple belongs on everything. What is one food you think is underrated?",
     [
       "Once I told a squirrel that acorns are overrated, and he was offended. What is a silly opinion you hold?",
@@ -726,6 +804,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine you could change one everyday rule for the whole world. What would your new rule be?",
     ]),
   topic("best-day-of-week", "fun-opinions", "Melhor dia da semana",
+    "your favorite day of the week",
     "Monday is secretly a good day, because it starts the week with hope. Which day of the week feels best to you?",
     [
       "Last Monday I flew around the tree twice just to feel excited. What part of the week do you enjoy most?",
@@ -735,6 +814,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a week with an extra day that only you can design. What would that day be like?",
     ]),
   topic("silly-laughs", "fun-opinions", "Coisas engraçadas",
+    "things that make you laugh",
     "Hiccups are the funniest sound in the world, and I refuse to argue. What sound makes you laugh the most?",
     [
       "Once a frog hiccupped so loudly that the whole pond started laughing. What is the funniest sound you have heard lately?",
@@ -744,6 +824,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a comedy show where all the comedians are animals. Which animal would be the funniest on stage?",
     ]),
   topic("style-and-clothes", "fun-opinions", "Estilo e roupas",
+    "style and clothes",
     "Feathers are my style, and I think clothes say a lot about a person. What is your favorite way to dress when you feel relaxed?",
     [
       "Once I wore a big red leaf as a hat, and everyone in the forest noticed. What piece of clothing makes you feel confident?",
@@ -753,6 +834,7 @@ export const CONVERSATION_TOPICS = [
       "Imagine a clothing shop that only sells things made of fruit. What would you buy first?",
     ]),
   topic("puzzles-and-riddles", "fun-opinions", "Quebra-cabeças e enigmas",
+    "puzzles and riddles",
     "Puzzles make my beak tingle with excitement, especially the ones with tricky riddles. What kind of puzzle do you enjoy solving?",
     [
       "Last week I solved a riddle about a tree that talks, and I felt very clever. What is a puzzle that made you think hard?",
@@ -813,7 +895,7 @@ export function rememberConversationTopic(storage, id) {
 export function topicToConversationPlan(topic) {
   return {
     title: topic.title,
-    opening: topic.opening,
+    opening: `Hi, I'm Tuck! Today, let's talk about ${topic.subject}. ${topic.opening}`,
     paths: topic.paths.map((path) => ({ id: path.id, line: path.line })),
   };
 }

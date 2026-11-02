@@ -25,6 +25,8 @@ export interface ConversationTopic {
   id: string;
   category: ConversationCategory;
   title: string;
+  /** Lowercase noun phrase for the intro: "Today, let's talk about ${subject}." */
+  subject: string;
   opening: string;
   paths: ConversationPath[];
 }

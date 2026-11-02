@@ -13,7 +13,7 @@ const maxHistoryTextLength = 2_000;
 const maxTranscriptLength = 4_000;
 const maxIdLength = 40;
 const maxPathLineLength = 300;
-const turnKeys = ["topic", "paths", "usedPathIds", "phase", "remainingSeconds", "history", "transcript"];
+const turnKeys = ["topic", "paths", "usedPathIds", "phase", "remainingSeconds", "history", "transcript", "silent"];
 const phases: ConversationPhase[] = ["warmup", "explore", "closing"];
 
 export type ConversationTurnBody = {
@@ -24,6 +24,7 @@ export type ConversationTurnBody = {
   remainingSeconds: number;
   history: ConversationLine[];
   transcript: string;
+  silent?: boolean;
 };
 
 function isRecord(value: unknown): value is UnknownRecord {
@@ -49,7 +50,8 @@ function isLine(value: unknown): value is ConversationLine {
 
 function parseConversationTurn(body: unknown): ConversationTurnBody | null {
   if (!isRecord(body) || !hasOnlyKeys(body, turnKeys)) return null;
-  const { topic, paths, usedPathIds, phase, remainingSeconds, history, transcript } = body;
+  const { topic, paths, usedPathIds, phase, remainingSeconds, history, transcript, silent } = body;
+  if (silent !== undefined && typeof silent !== "boolean") return null;
   if (!boundedText(topic, maxConversationTopicLength) || !boundedText(transcript, maxTranscriptLength)) return null;
   if (!Array.isArray(paths) || paths.length < 1 || paths.length > maxPaths || !paths.every(isPath)) return null;
   if (!Array.isArray(usedPathIds) || usedPathIds.length > maxUsedPathIds || !usedPathIds.every((id) => boundedText(id, maxIdLength))) return null;
@@ -57,7 +59,7 @@ function parseConversationTurn(body: unknown): ConversationTurnBody | null {
   if (typeof remainingSeconds !== "number" || !Number.isFinite(remainingSeconds) || remainingSeconds < 0) return null;
   if (!Array.isArray(history) || history.length > maxHistoryLines || !history.every(isLine)) return null;
 
-  return { topic, paths, usedPathIds, phase: phase as ConversationPhase, remainingSeconds, history, transcript };
+  return { topic, paths, usedPathIds, phase: phase as ConversationPhase, remainingSeconds, history, transcript, ...(silent ? { silent } : {}) };
 }
 
 function parseConversationPlanTopic(body: unknown): string | null {

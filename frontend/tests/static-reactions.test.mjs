@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { ACKNOWLEDGEMENT_PHRASES, createAcknowledgementPlayer } from "../src/lib/interview/acknowledgement.mjs";
-import { CONVERSATION_REACTIONS, reactionAudioPath, reactionFileName } from "../src/lib/interview/static-reactions.mjs";
+import { CONVERSATION_REACTIONS, loadStaticReaction, reactionAudioPath, reactionFileName } from "../src/lib/interview/static-reactions.mjs";
 import { DEFAULT_INTERVIEWER_VOICE, INTERVIEWER_VOICE_OPTIONS } from "../src/lib/interview/voices.mjs";
 
 test("reaction file names are lowercase, dash-separated and mp3", () => {
@@ -48,4 +48,19 @@ test("the player falls back to loadBlob when the static audio is missing", async
   await player.preload();
   assert.deepEqual(loaded, ["Okay.", "Got it."]);
   assert.equal(player.loadedCount, 2);
+});
+
+test("the azure reaction path lives apart from the Kokoro one, per voice", () => {
+  assert.equal(reactionAudioPath("en-US-AvaNeural", "Got it.", "azure"), "/audio/reactions-azure/en-US-AvaNeural/got-it.mp3");
+  assert.equal(reactionAudioPath("en-US-AvaNeural", "Got it.", "kokoro"), "/audio/reactions/en-US-AvaNeural/got-it.mp3");
+  assert.equal(reactionAudioPath("en-US-AvaNeural", "Got it."), "/audio/reactions/en-US-AvaNeural/got-it.mp3", "kokoro is the default source");
+  assert.equal(reactionAudioPath("not-a-voice", "Okay.", "azure"), `/audio/reactions-azure/${DEFAULT_INTERVIEWER_VOICE}/okay.mp3`);
+});
+
+test("loadStaticReaction fetches the path of its source and rejects a missing file", async () => {
+  const requested = [];
+  const fetcher = async (url) => { requested.push(url); return { ok: url.includes("reactions-azure"), status: 404, blob: async () => new Blob(["x"]) }; };
+  assert.ok(await loadStaticReaction("en-US-AvaNeural", "Okay.", "azure", fetcher) instanceof Blob);
+  await assert.rejects(loadStaticReaction("en-US-AvaNeural", "Okay.", "kokoro", fetcher), /Static reaction unavailable: 404/);
+  assert.deepEqual(requested, ["/audio/reactions-azure/en-US-AvaNeural/okay.mp3", "/audio/reactions/en-US-AvaNeural/okay.mp3"]);
 });

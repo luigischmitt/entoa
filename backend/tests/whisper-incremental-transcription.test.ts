@@ -239,6 +239,18 @@ describe("timing from the pause, not from text arrival", () => {
     // Counting from the text (1.2 s later) would give at least 3.2 s.
     expect(sincePause).toBeLessThan(2_900);
   });
+
+  it("a conversation session ends the turn after the short conversation grace, a normal session keeps its own grace", async () => {
+    const whisper = createWhisper(["I worked on payments for several years."]);
+    const { connect } = await startServer(whisper.service, incremental({ answerGraceMs: 4_000, incompleteGraceMs: 4_000 }));
+    const { socket, waitFor } = await connect({ conversation: true });
+    await speak(socket, 800, 0.05);
+    await speak(socket, 500, 0.001);
+    const complete = await waitFor("complete", 5_000);
+    const sincePause = complete.at - whisper.callTimes[0]!;
+    expect(sincePause).toBeGreaterThanOrEqual(1_700);
+    expect(sincePause).toBeLessThan(3_200);
+  });
 });
 
 describe("answer-provisional and captions", () => {

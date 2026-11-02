@@ -281,3 +281,72 @@ test("scheduling is skipped when audio is not loaded or the answer no longer app
   assert.deepEqual(diagnostics.filter((event) => event.kind === "ack_skipped").map((event) => event.reason), ["not_applicable"]);
   assert.equal(player.schedule() !== null, true, "a new turn schedules again");
 });
+
+test("an Azure session plays the Azure copy of the phrase, never the Kokoro one", async () => {
+  const { player, chunks } = playerHarness({
+    phrases: ["Okay.", "Got it."],
+    loadBlob: async (phrase) => new Blob([`kokoro ${phrase}`]),
+    azureBlob: async (phrase) => new Blob([`azure ${phrase}`]),
+    voiceSource: () => "azure",
+  });
+  await player.preload();
+  const handle = player.play({ recent: [] });
+  assert.equal(handle.phrase, "Okay.");
+  assert.equal(await chunks[0].blob.text(), "azure Okay.");
+  handle.cancel();
+  assert.equal(chunks.length, 1);
+});
+
+test("an Azure session with no Azure copy of the phrase picks one that has a copy, and plays nothing when none has", async () => {
+  const diagnostics = [];
+  const { player, chunks } = playerHarness({
+    phrases: ["Okay.", "Got it.", "Thanks."],
+    loadBlob: async (phrase) => new Blob([phrase]),
+    azureBlob: async (phrase) => { if (phrase !== "Got it.") throw new Error("404"); return new Blob([`azure ${phrase}`]); },
+    voiceSource: () => "azure",
+    onDiagnostic: (event) => diagnostics.push(event),
+  });
+  await player.preload();
+  const handle = player.play({ recent: [] });
+  assert.equal(handle.phrase, "Got it.", "only Got it. has an Azure copy");
+  handle.cancel();
+  await player.whenIdle();
+
+  const none = playerHarness({
+    phrases: ["Okay.", "Got it."],
+    loadBlob: async (phrase) => new Blob([phrase]),
+    azureBlob: async () => { throw new Error("404"); },
+    voiceSource: () => "azure",
+    onDiagnostic: (event) => diagnostics.push(event),
+  });
+  await none.player.preload();
+  assert.equal(none.player.play(), null);
+  assert.equal(none.chunks.length, 0);
+  assert.ok(diagnostics.some((event) => event.kind === "ack_skipped" && event.reason === "no_matching_voice"));
+});
+
+test("a Kokoro or unknown voice source keeps playing the Kokoro blobs, never the Azure ones", async () => {
+  for (const source of ["kokoro", null, "openrouter"]) {
+    const { player, chunks } = playerHarness({
+      phrases: ["Okay."],
+      loadBlob: async (phrase) => new Blob([`kokoro ${phrase}`]),
+      azureBlob: async (phrase) => new Blob([`azure ${phrase}`]),
+      voiceSource: () => source,
+    });
+    await player.preload();
+    const handle = player.play({ recent: [] });
+    assert.equal(await chunks[0].blob.text(), "kokoro Okay.", String(source));
+    handle.cancel();
+  }
+});
+
+test("a failing Azure copy never fails the preload of the Kokoro phrases", async () => {
+  const { player } = playerHarness({
+    phrases: ["Okay.", "Got it."],
+    loadBlob: async (phrase) => new Blob([phrase]),
+    azureBlob: async () => { throw new Error("down"); },
+    voiceSource: () => null,
+  });
+  await player.preload();
+  assert.equal(player.loadedCount, 2);
+});

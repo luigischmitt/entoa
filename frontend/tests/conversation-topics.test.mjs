@@ -235,6 +235,26 @@ test("topicToConversationPlan returns title, opening and paths for the room", ()
   const plan = topicToConversationPlan(topic);
   assert.deepEqual(Object.keys(plan).sort(), ["opening", "paths", "title"]);
   assert.equal(plan.title, topic.title);
-  assert.equal(plan.opening, topic.opening);
+  assert.ok(plan.opening.startsWith("Hi, I'm Tuck! Today, let's talk about "), plan.opening);
+  assert.ok(plan.opening.includes(topic.opening), "the original opening is kept after the intro");
+  assert.ok(plan.opening.endsWith(topic.opening));
   assert.deepEqual(plan.paths, topic.paths);
+});
+
+test("every topic has a subject of 2 to 7 words, with no final period, that reads after the intro", () => {
+  for (const topic of CONVERSATION_TOPICS) {
+    assert.equal(typeof topic.subject, "string", topic.id);
+    const words = wordCount(topic.subject);
+    assert.ok(words >= 2 && words <= 7, `${topic.id}: "${topic.subject}" has ${words} words`);
+    assert.doesNotMatch(topic.subject, /\.$/u, topic.id);
+    assert.doesNotMatch(topic.subject, /[?!,;:]/u, `${topic.id} subject is a plain phrase`);
+    assert.ok(topic.subject.trim() === topic.subject, topic.id);
+  }
+});
+
+test("the plan opening names the subject in the intro, once", () => {
+  for (const topic of CONVERSATION_TOPICS) {
+    const plan = topicToConversationPlan(topic);
+    assert.equal(plan.opening, `Hi, I'm Tuck! Today, let's talk about ${topic.subject}. ${topic.opening}`, topic.id);
+  }
 });
