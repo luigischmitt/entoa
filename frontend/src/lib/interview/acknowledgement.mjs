@@ -182,6 +182,7 @@ export function createAcknowledgementPlayer(options) {
         track.addEventListener("error", cleanup, { once: true });
         try {
           options.onChunkAudio?.({
+            kind: "reaction",
             chunkIndex: 0,
             chunkCount: 1,
             endsWithQuestion: false,

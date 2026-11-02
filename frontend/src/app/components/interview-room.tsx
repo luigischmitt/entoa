@@ -27,6 +27,7 @@ import { appendInterviewReportPair, buildAzureAnswerRecords, type AzureAssessmen
 import { uploadAnswerClip } from "@/lib/interview/answer-clips";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useAudioInputs } from "../hooks/use-audio-inputs";
+import { EndCallDialog } from "./end-call-dialog";
 import { storeMicrophoneDeviceId } from "@/lib/interview/mic-device.mjs";
 import { useInterviewPersistence } from "../hooks/use-interview-persistence";
 import type { LocalInterviewCheckpoint } from "@/lib/interview/local-checkpoint.mjs";
@@ -694,6 +695,8 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
     rememberClosingLine(reason, closingLines[reason]);
     setClosingReason(reason);
     setClosingLead(lead);
+    // A repeat or explanation slowed the last question (spokenTurn.speed); the closing is spoken at the person's normal speed.
+    setSpokenTurn(null);
     transitionPhase("closing");
     return true;
   };
@@ -1802,35 +1805,13 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
         <EndCallDialog
           open={endOpen}
           canFinish={phase !== "closing" && phase !== "ending"}
+          copy={{ title: t("Encerrar a entrevista?"), finish: t("Encerrar e ver relatório "), finishingHint: t("A entrevista já está sendo encerrada."), leave: t("Sair sem concluir"), keepGoing: t("Continuar na entrevista") }}
           onClose={() => setEndOpen(false)}
           onFinish={() => { setEndOpen(false); finishNow(); }}
           onLeave={() => { setEndOpen(false); leaveInterview(); }}
         />
       </div>
     </main>
-  );
-}
-
-/** End-call flow: finish with a report, leave without concluding, or go back to the call. */
-function EndCallDialog({ open, canFinish, onClose, onFinish, onLeave }: { open: boolean; canFinish: boolean; onClose: () => void; onFinish: () => void; onLeave: () => void }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
-  return (
-    <dialog ref={dialogRef} className="mt-dialog" aria-labelledby="end-call-title" onClose={onClose} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <div className="mt-dialog-body">
-        <h2 id="end-call-title" className="mt-dialog-title">{t("Encerrar a entrevista?")}</h2>
-        <button type="button" className="mt-dialog-btn mt-dialog-primary" onClick={onFinish} disabled={!canFinish} autoFocus={canFinish}>
-          {t("Encerrar e ver relatório ")}{!canFinish && <small>{t("A entrevista já está sendo encerrada.")}</small>}
-        </button>
-        <button type="button" className="mt-dialog-btn mt-dialog-danger" onClick={onLeave}>{t("Sair sem concluir")}</button>
-        <button type="button" className="mt-dialog-btn" onClick={onClose} autoFocus={!canFinish}>{t("Continuar na entrevista")}</button>
-      </div>
-    </dialog>
   );
 }
 
