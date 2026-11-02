@@ -8,6 +8,8 @@ import {
   isConversationEnd,
   nextUsedPathIds,
   shouldReact,
+  MAX_SILENCE_NUDGES,
+  silenceWaitMs,
 } from "../src/lib/interview/conversation-policy.mjs";
 
 const plan = {
@@ -87,4 +89,23 @@ test("any transcript with at least two words gets a reaction", () => {
   assert.equal(shouldReact("Yes"), false);
   assert.equal(shouldReact("   "), false);
   assert.equal(shouldReact(null), false);
+});
+
+test("silence waits longer after a question than after a statement", () => {
+  assert.equal(silenceWaitMs("What did you do first?"), 12_000);
+  assert.equal(silenceWaitMs("Tell me about your morning."), 7_000);
+  assert.equal(silenceWaitMs(""), 7_000);
+  assert.equal(silenceWaitMs(null), 7_000);
+  assert.equal(MAX_SILENCE_NUDGES, 2);
+});
+
+test("a silent turn asks the backend with silent true and the silence marker instead of an answer", () => {
+  const plan = { title: "Music", opening: "Hi?", paths: [{ id: "p1", line: "What song?" }] };
+  const silent = buildConversationTurnRequest({ plan, elapsedSeconds: 30, durationMinutes: 5, lines: [{ speaker: "tuck", text: "Hi?" }], transcript: "ignored", silent: true });
+  assert.equal(silent.silent, true);
+  assert.equal(silent.transcript, "(silence)");
+  assert.deepEqual(silent.history, [{ speaker: "tuck", text: "Hi?" }]);
+  const spoken = buildConversationTurnRequest({ plan, elapsedSeconds: 30, durationMinutes: 5, transcript: "I like jazz" });
+  assert.equal("silent" in spoken, false);
+  assert.equal(spoken.transcript, "I like jazz");
 });

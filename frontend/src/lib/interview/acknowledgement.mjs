@@ -87,6 +87,8 @@ export function createAcknowledgementPlayer(options) {
     return loadBlob(phrase);
   };
   const blobs = new Map();
+  // Azure copies of the phrases, used only while the session's voice is Azure (never mixed with the Kokoro blobs).
+  const azureBlobs = new Map();
   let preloading = null;
   let lastPhrase = null;
   const now = options.now ?? (() => Date.now());
@@ -110,8 +112,11 @@ export function createAcknowledgementPlayer(options) {
       preloading ??= (async () => {
         for (const phrase of phrases) {
           try { blobs.set(phrase, await loadPhraseBlob(phrase)); } catch { /* A missing phrase is simply never picked. */ }
+          if (options.azureBlob) {
+            try { azureBlobs.set(phrase, await options.azureBlob(phrase)); } catch { /* No Azure copy: never played in an Azure session. */ }
+          }
         }
-        diagnose("ack_preloaded", { loaded: blobs.size, total: phrases.length });
+        diagnose("ack_preloaded", { loaded: blobs.size, total: phrases.length, azureLoaded: azureBlobs.size });
       })();
       return preloading;
     },
@@ -124,10 +129,17 @@ export function createAcknowledgementPlayer(options) {
     play({ recent = [], answerFinalAt = null } = {}) {
       if (current) return null;
       if (questionStarted) { diagnose("ack_skipped", { reason: "question_started" }); return null; }
-      const phrase = pickAcknowledgement({ phrases, available: [...blobs.keys()], recent, lastPhrase });
+      // The phrase is picked from every phrase with audio; the blob then comes from the session's voice source. An Azure
+      // session never plays a Kokoro file: when the phrase has no Azure copy another phrase with one is used, and when
+      // none has one nothing is said (a wrong voice is worse than no reaction).
+      const azureSession = options.voiceSource?.() === "azure";
+      const phrase = pickAcknowledgement({ phrases, available: [...new Set([...blobs.keys(), ...azureBlobs.keys()])], recent, lastPhrase });
       if (!phrase) return null;
-      lastPhrase = phrase;
-      const blob = blobs.get(phrase);
+      const source = azureSession ? azureBlobs : blobs;
+      const chosen = source.has(phrase) ? phrase : pickAcknowledgement({ phrases, available: [...source.keys()], recent, lastPhrase });
+      if (!chosen) { diagnose("ack_skipped", { reason: "no_matching_voice" }); return null; }
+      lastPhrase = chosen;
+      const blob = source.get(chosen);
       let url = null;
       let audio = null;
       let timer = null;
@@ -150,7 +162,7 @@ export function createAcknowledgementPlayer(options) {
         if (current === handle) current = null;
         finish();
       };
-      const handle = { phrase, promise: done, cancel: cleanup };
+      const handle = { phrase: chosen, promise: done, cancel: cleanup };
       const startedAt = now();
       const finishDiagnostics = () => { lastEndedAt = now(); diagnose("ack_ended", { ackDurationMs: Math.max(0, lastEndedAt - startedAt) }); };
       done.then(finishDiagnostics);
@@ -194,7 +206,7 @@ export function createAcknowledgementPlayer(options) {
      */
     schedule({ recent = [], shouldPlay = () => true } = {}) {
       if (current || pending) return null;
-      if (blobs.size === 0) { diagnose("ack_skipped", { reason: "not_loaded" }); return null; }
+      if (blobs.size === 0 && azureBlobs.size === 0) { diagnose("ack_skipped", { reason: "not_loaded" }); return null; }
       questionStarted = false;
       lastEndedAt = null;
       const answerFinalAt = now();

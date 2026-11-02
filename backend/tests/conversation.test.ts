@@ -105,7 +105,7 @@ describe("conversation turn service", () => {
     ["WRAP", "WRAP"],
     ["END", "END"],
   ])("replaces a %s that contains a question with the closing line", async (_label, move) => {
-    const result = await turnService(fakeFetch({ say: "Thanks for the chat, what else did you cook?", move, pathId: null })).reply(turnInput());
+    const result = await turnService(fakeFetch({ say: "Thanks for the chat, what else did you cook?", move, pathId: null })).reply(turnInput({ transcript: "I have to go now" }));
     expect(result).toMatchObject({ move: "WRAP", pathId: null, outcome: "invalid" });
     expect(result.say).toBe(closingLine);
   });
@@ -120,6 +120,27 @@ describe("conversation turn service", () => {
     const asked = "What did you cook for dinner last night?";
     const result = await turnService(fakeFetch({ say: `Pasta after a long day sounds great to me. ${asked}`, move: "FOLLOW", pathId: null })).reply(turnInput({ history: [{ speaker: "tuck", text: asked }] }));
     expect(result).toEqual({ say: "Pasta after a long day sounds great to me.", move: "FOLLOW", pathId: null, outcome: "repeated" });
+  });
+
+  it("never ends on a stray recognised word, and carries on with a path", async () => {
+    const result = await turnService(fakeFetch({ say: "Goodbye, it was lovely to chat with you today.", move: "END", pathId: null })).reply(turnInput({ transcript: "Bye. 100. Yes." }));
+    expect(result).toMatchObject({ say: paths[0]!.line, move: "NEW_PATH", pathId: "p1" });
+  });
+
+  it.each(["I have to go now", "can we stop here?", "quero encerrar", "tchau, Tuck"])("ends when the person asks to stop: %s", async (transcript) => {
+    const result = await turnService(fakeFetch({ say: "Of course, thanks for the chat!", move: "END", pathId: null })).reply(turnInput({ transcript }));
+    expect(result).toMatchObject({ move: "END", outcome: "decided" });
+  });
+
+  it("hands over a question after a short reply when the model only commented", async () => {
+    const result = await turnService(fakeFetch({ say: "That sounds like a really lovely way to spend the day.", move: "FOLLOW", pathId: null })).reply(turnInput({ transcript: "Yes." }));
+    expect(result).toMatchObject({ move: "NEW_PATH", pathId: "p1", outcome: "decided" });
+    expect(result.say).toContain(paths[0]!.line);
+  });
+
+  it("hands over a question after a silence", async () => {
+    const result = await turnService(fakeFetch({ say: "It's a calm moment here in the forest today.", move: "FOLLOW", pathId: null })).reply(turnInput({ transcript: "(silence)", silent: true }));
+    expect(result).toMatchObject({ move: "NEW_PATH", pathId: "p1" });
   });
 
   it("keeps the reaction and drops the question of a wrap-up", async () => {

@@ -76,6 +76,13 @@ test("the start message carries the planned question and context answers only wi
   assert.equal("plannedQuestion" in buildStreamStartMessage({ ...base, plannedQuestion: "Which metrics?" }), false);
 });
 
+test("the start message carries conversation timing only when it is set", () => {
+  const base = { accessToken: "ws-token", speechThreshold: 0.025, sampleRate: 16_000, question: "Why?" };
+  assert.equal(buildStreamStartMessage({ ...base, conversation: true }).conversation, true);
+  assert.equal("conversation" in buildStreamStartMessage(base), false);
+  assert.equal("conversation" in buildStreamStartMessage({ ...base, conversation: false }), false);
+});
+
 test("an UNAUTHENTICATED stream error maps to the session-expired message", () => {
   assert.match(transcriptionFailureMessage("UNAUTHENTICATED"), /sessão expirou/u);
 });

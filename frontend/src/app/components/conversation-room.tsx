@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { MicrophoneCapture, type MicControls, type VoiceCaptureState, type VoiceTranscriptionState } from "@/components/interview/microphone-capture";
 import { createSpeechFeed, toucanStateFor } from "@/components/interview/toucan/toucan-engine.mjs";
 import { AssessmentSocketRegistry } from "@/lib/interview/assessment-socket-registry.mjs";
-import { buildConversationTurnRequest, fallbackConversationTurn, isConversationEnd, nextUsedPathIds, shouldReact, type ConversationLine, type ConversationPlanInput } from "@/lib/interview/conversation-policy.mjs";
+import { buildConversationTurnRequest, fallbackConversationTurn, isConversationEnd, MAX_SILENCE_NUDGES, nextUsedPathIds, shouldReact, silenceWaitMs, type ConversationLine, type ConversationPlanInput } from "@/lib/interview/conversation-policy.mjs";
 import { requestConversationTurn } from "@/lib/interview/conversation";
 import { conversationAssessmentSamples } from "@/lib/interview/conversation-report.mjs";
 import { pairInterviewTurns } from "@/lib/interview/report";
@@ -58,6 +58,9 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
   const usedPathIdsRef = useRef<string[]>([]);
   const leftRef = useRef(false);
   const submittingRef = useRef(false);
+  // Tuck's prompts after silence in a row; any speech from the person resets it.
+  const silenceNudgesRef = useRef(0);
+  const onSilenceRef = useRef<() => void>(() => undefined);
   const abortRef = useRef<AbortController | null>(null);
   const secondsRef = useRef(0);
   const [autoCaptureKey, setAutoCaptureKey] = useState<string | null>(null);
@@ -171,28 +174,27 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
   const speechSegments = useMemo(() => splitInterviewerSpeech(tuckLine), [tuckLine]);
   const { activeSegment, speechMessage, retrySpeech } = useSpeechPlayback(speechSegments, onTuckSpoken, isTuckTurn && config.playInterviewerAudio, undefined, preloadReactions, speechSpeed, speechFeed.push, waitForReaction, config.voice);
 
+  // Silence while the microphone listens (no speech yet, nothing transcribing): Tuck nudges after silenceWaitMs. Any speech
+  // detected, or a transcription starting, changes these inputs and cancels the timer.
+  useEffect(() => {
+    if (phase !== "answering" || voiceCaptureState !== "listening" || voiceTranscription.status === "pending") return;
+    if (silenceNudgesRef.current >= MAX_SILENCE_NUDGES) return;
+    const timer = window.setTimeout(() => onSilenceRef.current(), silenceWaitMs(tuckLine));
+    return () => window.clearTimeout(timer);
+  }, [phase, tuckLine, voiceCaptureState, voiceTranscription.status]);
+
   // The time is up while the person is not speaking: the conversation ends now (a spoken answer is always finished first).
   useEffect(() => {
     if (timeLimitReached && phase === "answering" && canSkipVoiceQuestion(voiceCaptureState, voiceTranscription.status)) endConversation();
   }, [endConversation, phase, timeLimitReached, voiceCaptureState, voiceTranscription.status]);
 
-  const submitTurn = async (transcript: string) => {
-    submittingRef.current = true;
+  // Asks Tuck for the next line (or the fallback) and presents it. Shared by a spoken answer and by a silent nudge; the
+  // sequence moves on by two, so the microphone remounts and the capture it held is discarded.
+  const takeTuckTurn = async (personLines: ConversationLine[], transcript: string, silent: boolean) => {
     const tuckSequence = sequenceRef.current;
-    const personLines: ConversationLine[] = [...linesRef.current, { speaker: "person", text: transcript }];
-    linesRef.current = personLines;
-    setLines(personLines);
-    record({ sequenceNumber: tuckSequence + 1, speaker: "candidate", content: transcript });
-    // The reviewed transcript may already have arrived; otherwise the report waits for it, as it does for voice assessments.
-    if (!reviewedSequencesRef.current.has(tuckSequence)) pendingReviewedRef.current.add(tuckSequence);
-    setVoiceTranscription({ status: "idle" });
-    setVoiceCaptureState("idle");
-    setAnswerError(null);
-    setPhase("advancing");
-    if (shouldReact(transcript)) acknowledgements.schedule({ shouldPlay: () => !leftRef.current && phaseRef.current === "advancing" });
     const controller = new AbortController();
     abortRef.current = controller;
-    const body = buildConversationTurnRequest({ plan, usedPathIds: usedPathIdsRef.current, elapsedSeconds: secondsRef.current, durationMinutes, lines: personLines, transcript });
+    const body = buildConversationTurnRequest({ plan, usedPathIds: usedPathIdsRef.current, elapsedSeconds: secondsRef.current, durationMinutes, lines: personLines, transcript, silent });
     const reply = await requestConversationTurn(body, AbortSignal.any([controller.signal, AbortSignal.timeout(5_000)]))
       .catch(() => fallbackConversationTurn({ plan, usedPathIds: usedPathIdsRef.current, phase: body.phase }));
     if (leftRef.current) return;
@@ -209,6 +211,36 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
     submittingRef.current = false;
     setPhase(isConversationEnd(reply) || body.phase === "closing" ? "closing" : "speaking");
   };
+
+  const submitTurn = async (transcript: string) => {
+    submittingRef.current = true;
+    const tuckSequence = sequenceRef.current;
+    const personLines: ConversationLine[] = [...linesRef.current, { speaker: "person", text: transcript }];
+    linesRef.current = personLines;
+    setLines(personLines);
+    silenceNudgesRef.current = 0;
+    record({ sequenceNumber: tuckSequence + 1, speaker: "candidate", content: transcript });
+    // The reviewed transcript may already have arrived; otherwise the report waits for it, as it does for voice assessments.
+    if (!reviewedSequencesRef.current.has(tuckSequence)) pendingReviewedRef.current.add(tuckSequence);
+    setVoiceTranscription({ status: "idle" });
+    setVoiceCaptureState("idle");
+    setAnswerError(null);
+    setPhase("advancing");
+    if (shouldReact(transcript)) acknowledgements.schedule({ shouldPlay: () => !leftRef.current && phaseRef.current === "advancing" });
+    await takeTuckTurn(personLines, transcript, false);
+  };
+
+  // The person stayed silent long enough: Tuck prompts again, without a reaction and without recording any answer.
+  const nudgeSilence = async () => {
+    if (phaseRef.current !== "answering" || submittingRef.current || leftRef.current) return;
+    if (secondsRef.current >= durationMinutes * 60 || silenceNudgesRef.current >= MAX_SILENCE_NUDGES) return;
+    silenceNudgesRef.current += 1;
+    submittingRef.current = true;
+    setVoiceCaptureState("idle");
+    setPhase("advancing");
+    await takeTuckTurn(linesRef.current, "", true);
+  };
+  useEffect(() => { onSilenceRef.current = () => { void nudgeSilence(); }; });
 
   const idle = phase !== "answering";
   const captionsForced = phase === "closing" || !config.playInterviewerAudio || Boolean(speechMessage);
@@ -350,6 +382,7 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
         <MicrophoneCapture
           key={sequence}
           disabled={idle}
+          conversationTiming
           assessmentSockets={assessmentSockets}
           assessmentContext={assessmentContext}
           onLevel={meter.push}
@@ -362,7 +395,10 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
             if (transcript) void submitTurn(transcript);
             else setAnswerError("Não consegui ouvir sua resposta. Tente falar de novo.");
           }}
-          onCaptureStateChange={setVoiceCaptureState}
+          onCaptureStateChange={(state) => {
+            if (state === "detected") silenceNudgesRef.current = 0;
+            setVoiceCaptureState(state);
+          }}
           autoStartSignal={autoCaptureKey === String(sequence) ? autoCaptureKey : null}
           micEngine={micEngine}
           onAssessmentChange={(attemptId, assessment, context) => setVoiceAssessments((current) => ({ ...current, [attemptId]: { ...context, state: assessment } }))}

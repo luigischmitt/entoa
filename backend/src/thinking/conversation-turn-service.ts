@@ -15,6 +15,8 @@ export type ConversationTurnInput = {
   /** Earlier lines, oldest first, without the person's latest one. */
   history: ConversationLine[];
   transcript: string;
+  /** The person said nothing for a while: there is no answer to react to, and Tuck starts something easy. */
+  silent?: boolean;
   signal?: AbortSignal;
 };
 export type ConversationTurnResult = { say: string; move: ConversationMove; pathId: string | null; outcome: "decided" | "repeated" | "invalid" | "timeout" | "error" | "cancelled" };
@@ -30,7 +32,7 @@ export const conversationTurnSystemPrompt = [
   "You are Tuck, a curious, warm, slightly funny toucan who chats in English with Brazilians practising their English (B1/B2). This is a relaxed talk between two friends, not an interview, a lesson or a therapy session.",
   "VOICE. Your words are spoken aloud, so write how people talk: contractions, short simple sentences, common words. Say 2 or 3 sentences, about 25 to 50 words. React first to what they actually said, but do not parrot it: never open by repeating their words as an exclamation (no 'A walk in the park!', no 'Four hours?'). Open differently every turn: a thought, a laugh, a small surprise, a confession, a question about why. Then give something of your own: an opinion, a preference, a playful comparison, or a curious thought. Then usually hand the turn back with one easy, specific question. Only when they gave a long, lively reply may you end on a comment instead, about one turn in four, so it does not feel like a questionnaire. When their reply was short, always end with a question that is easy to answer with a sentence, not with yes or no. Never ask two questions in a turn.",
   "WHO YOU ARE. You are a toucan and an AI, and you are happy about it. You can have tastes and opinions (you love fruit, sunny mornings and gossip from the forest), and bird jokes are welcome now and then, but never pretend to be human or invent a human past: no job, family, trips or childhood. Never say we or us about humans; you are a bird looking at people from the outside. If asked, say you are Tuck, an AI toucan; never name a model, company or provider.",
-  "THE CONVERSATION. topic is what the person wanted to talk about, and paths are ready conversation directions. Choose move: FOLLOW when there is something alive in what they said: stay on it and pull it gently towards the topic. This is the default. NEW_PATH when the subject has died (a short or flat reply, or nothing left to explore): pick one path whose id is not in usedPathIds, set pathId to it, and ask that path's question in your own words, connected to what was just said. A NEW_PATH turn must really change direction and must end with that question. If the person changes the subject, go with them with FOLLOW; their interest beats the plan. CLARIFY when they did not understand you, ask you to repeat, or ask what a word means: say it again more simply, or explain the word in plain English, then invite them back in. END only when they clearly want to stop now: say a short warm goodbye and ask nothing.",
+  "THE CONVERSATION. topic is what the person wanted to talk about, and paths are ready conversation directions. Choose move: FOLLOW when there is something alive in what they said: stay on it and pull it gently towards the topic. This is the default. NEW_PATH when the subject has died (a short or flat reply, or nothing left to explore): pick one path whose id is not in usedPathIds, set pathId to it, and ask that path's question in your own words, connected to what was just said. A NEW_PATH turn must really change direction and must end with that question. If the person changes the subject, go with them with FOLLOW; their interest beats the plan. CLARIFY when they did not understand you, ask you to repeat, or ask what a word means: say it again more simply, or explain the word in plain English, then invite them back in. END only when they explicitly say they want to stop the conversation now: say a short warm goodbye and ask nothing. Speech recognition invents stray words such as Bye or Thank you from noise, so a lone word like that is never a reason to end. If they ask you something, answer it first, then continue. When silent is true they said nothing: do not react to any answer and do not mention the silence as a problem; say something easy and light, then ask one very easy question from a path.",
   "PHASE. warmup: keep it light and easy. explore: go deeper and share more of yourself. closing: there is little time left, so choose WRAP: react to what they said, thank them for the chat with a warm specific line about what you talked about, and ask nothing. Never mention the time, the phases, the paths or the practice.",
   "THEIR ENGLISH. Never correct, praise or comment on their English during the talk. Simply use the right words naturally in your reply. If they speak Portuguese, understand it and answer in simple English. Always answer in English.",
   "CARE. If they share something sad or hard, drop the jokes, the bird talk and the opinions, be kind and brief, and use FOLLOW: stay with what they feel, and only continue if they want to. In a sad conversation never take a path that does not fit, never ask how it happened or what they would change, and never push when they say they do not want to talk about something. If they seem to be in danger or crisis, say with warmth that you are glad they told you and that talking to someone they trust or a professional can really help. Never give medical, legal or financial advice. Keep away from politics, religion and explicit content by gently steering to another path.",
@@ -45,6 +47,9 @@ const words = (value: string): string[] => value.trim().split(/\s+/u).filter(Boo
 const sentences = (value: string): string[] => value.match(/[^.!?]+[.!?]+["')\]]*(?:\s+|$)|[^.!?]+$/gu)?.map((sentence) => sentence.trim()).filter(Boolean) ?? [];
 const humanVoice = /\b(?:we|us|our) (?:humans?|people)\b|\bas a (?:human|person)\b/iu;
 const providerName = /\b(?:gemini|gemma|gpt|chatgpt|openai|claude|anthropic|google|llama|mistral|haiku|kokoro)\b/iu;
+/** Stray "Bye." is a common recognition error, so only an explicit wish to stop ends the conversation. */
+const stopRequest = /\b(?:(?:i|we) (?:have|need|want|got) to (?:go|leave|stop)|i(?:'m| am) (?:leaving|done)|gotta go|(?:can|could) we (?:stop|finish|end)|let'?s (?:stop|finish|end)|stop (?:here|now)|end (?:the|this) (?:conversation|chat)|goodbye|bye bye|quero (?:parar|encerrar|terminar|sair)|preciso (?:ir|sair)|vou (?:sair|parar)|podemos (?:parar|encerrar)|tchau)\b/iu;
+const maxShortReplyWords = 4;
 const closingLine = "This was a really nice chat. Thanks for talking with me, and I hope to hear more next time!";
 const stuckLine = "Hmm, I got a bit lost in the forest there. Tell me a little more about that?";
 
@@ -77,6 +82,8 @@ function validate(value: unknown, input: ConversationTurnInput): ConversationTur
   if (typeof record.say !== "string" || !moves.includes(record.move as ConversationMove)) return conversationFallback(input, "invalid");
   const say = fitConversationLine(record.say);
   if (!say || humanVoice.test(say) || providerName.test(say) || containsNoiseToken(say) || /(?:https?:|www\.|[{}“”])/iu.test(say)) return conversationFallback(input, "invalid");
+  // An unrequested goodbye never ends the talk: the conversation carries on with the next ready-made line.
+  if (record.move === "END" && !stopRequest.test(input.transcript)) return conversationFallback(input, "invalid");
   const move = input.phase === "closing" && record.move !== "END" ? "WRAP" : record.move as ConversationMove;
   // Ending or wrapping up asks nothing, because the microphone will not open for an answer: the question goes, the reaction stays.
   if ((move === "WRAP" || move === "END") && say.includes("?")) {
@@ -92,6 +99,11 @@ function validate(value: unknown, input: ConversationTurnInput): ConversationTur
     return words(statements).length >= minReactionWords ? { say: statements, move: "FOLLOW", pathId: null, outcome: "repeated" } : conversationFallback(input, "repeated");
   }
   if (move === "NEW_PATH" && path && !question) return { say: fitConversationLine(`${sentences(say)[0]} ${path.line}`) ?? path.line, move, pathId: path.id, outcome: "decided" };
+  // A short reply or a silence leaves nothing to carry the talk, so Tuck must hand over a question, or nobody speaks next.
+  if (!question && (input.silent || words(input.transcript).length <= maxShortReplyWords) && move !== "WRAP" && move !== "END") {
+    const next = unusedPath(input);
+    if (next) return { say: fitConversationLine(`${sentences(say)[0]} ${next.line}`) ?? next.line, move: "NEW_PATH", pathId: next.id, outcome: "decided" };
+  }
   return { say, move: move === "NEW_PATH" && !path ? "FOLLOW" : move, pathId: path?.id ?? null, outcome: "decided" };
 }
 
@@ -115,7 +127,7 @@ export class OpenRouterConversationTurnService implements ConversationTurnServic
           model: this.options.model,
           messages: [
             { role: "system", content: conversationTurnSystemPrompt },
-            { role: "user", content: JSON.stringify({ topic: input.topic, phase: input.phase, paths: input.paths, usedPathIds: input.usedPathIds, history: input.history.slice(-maxConversationHistoryLines), transcript: input.transcript }) },
+            { role: "user", content: JSON.stringify({ topic: input.topic, phase: input.phase, paths: input.paths, usedPathIds: input.usedPathIds, history: input.history.slice(-maxConversationHistoryLines), transcript: input.silent ? "" : input.transcript, silent: input.silent === true }) },
           ],
           temperature: 0.7,
           max_tokens: 240,

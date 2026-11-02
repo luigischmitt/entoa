@@ -7,6 +7,10 @@ const HISTORY_TEXT_LENGTH = 2000;
 const TRANSCRIPT_LENGTH = 4000;
 export const CONVERSATION_CLOSING_LINE = "This was a really nice chat. Thanks for talking with me!";
 export const CONVERSATION_FOLLOW_LINE = "Tell me a little more about that?";
+/** Silence after Tuck's line: a question gets longer to think; after this many nudges in a row Tuck stops prompting. */
+export const MAX_SILENCE_NUDGES = 2;
+const SILENCE_QUESTION_WAIT_MS = 12_000;
+const SILENCE_STATEMENT_WAIT_MS = 7_000;
 
 const clip = (text, length) => String(text ?? "").trim().slice(0, length);
 
@@ -24,8 +28,13 @@ function remainingConversationSeconds(elapsedSeconds, durationMinutes) {
   return Math.max(0, total - Math.max(0, Number(elapsedSeconds) || 0));
 }
 
-/** The body of POST /api/v1/thinking/conversation-turn (the backend validates every field). */
-export function buildConversationTurnRequest({ plan, usedPathIds = [], elapsedSeconds, durationMinutes, lines = [], transcript }) {
+/** How long the person may stay silent after Tuck's line before Tuck nudges them: longer after a question. */
+export function silenceWaitMs(tuckLine) {
+  return String(tuckLine ?? "").includes("?") ? SILENCE_QUESTION_WAIT_MS : SILENCE_STATEMENT_WAIT_MS;
+}
+
+/** The body of POST /api/v1/thinking/conversation-turn (the backend validates every field). A silent turn has no answer: `silent: true`. */
+export function buildConversationTurnRequest({ plan, usedPathIds = [], elapsedSeconds, durationMinutes, lines = [], transcript, silent = false }) {
   const history = lines
     .filter((line) => (line?.speaker === "tuck" || line?.speaker === "person") && clip(line.text, HISTORY_TEXT_LENGTH) !== "")
     .slice(-HISTORY_LINES)
@@ -37,7 +46,8 @@ export function buildConversationTurnRequest({ plan, usedPathIds = [], elapsedSe
     phase: conversationPhase(elapsedSeconds, durationMinutes),
     remainingSeconds: remainingConversationSeconds(elapsedSeconds, durationMinutes),
     history,
-    transcript: clip(transcript, TRANSCRIPT_LENGTH),
+    transcript: silent ? "(silence)" : clip(transcript, TRANSCRIPT_LENGTH),
+    ...(silent ? { silent: true } : {}),
   };
 }
 

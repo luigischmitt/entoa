@@ -11,12 +11,16 @@ export type ConversationTurnRequest = {
   remainingSeconds: number;
   history: ConversationLine[];
   transcript: string;
+  silent?: true;
 };
 
 export const CONVERSATION_WARMUP_SECONDS: number;
 export const CONVERSATION_CLOSING_SECONDS: number;
 export const CONVERSATION_CLOSING_LINE: string;
 export const CONVERSATION_FOLLOW_LINE: string;
+export const MAX_SILENCE_NUDGES: number;
+
+export function silenceWaitMs(tuckLine: string | null | undefined): number;
 
 export function conversationPhase(elapsedSeconds: number, durationMinutes: number): ConversationPhaseName;
 export function buildConversationTurnRequest(input: {
@@ -26,6 +30,7 @@ export function buildConversationTurnRequest(input: {
   durationMinutes: number;
   lines?: ConversationLine[];
   transcript: string;
+  silent?: boolean;
 }): ConversationTurnRequest;
 export function nextUsedPathIds(usedPathIds: string[] | undefined, reply: Pick<ConversationTurnReply, "pathId"> | null | undefined): string[];
 export function fallbackConversationTurn(input: { plan: ConversationPlanInput; usedPathIds?: string[]; phase: ConversationPhaseName }): ConversationTurnReply;
