@@ -165,7 +165,8 @@
   width: calc(100% - 24px);
   max-width: 44rem;
   max-height: 45%;
-  margin: auto 12px 30px;
+  /* Clear the speaking-name chip (bottom 12px, ~25px tall at every width) with an ~11px gap. Landscape phones override below. */
+  margin: auto 12px 48px;
   overscroll-behavior: contain;
   overflow-y: auto;
   border-radius: 12px;
@@ -203,7 +204,7 @@
   .mt-candidate .mt-name { left: 6px; bottom: 6px; padding: 3px 8px; font-size: 0.6875rem; }
   .mt-candidate::after { border-width: 2px; }
   /* The caption never runs under the picture-in-picture: leave its height to what is left below it (floor: 3 lines). */
-  .mt-caption { max-height: max(6rem, min(45%, calc(100% - 13.5rem))); }
+  .mt-caption { max-height: max(6rem, min(45%, calc(100% - 14.625rem))); }
 }
 
 /* ---- Dock: toasts above a floating control bar. ---- */
