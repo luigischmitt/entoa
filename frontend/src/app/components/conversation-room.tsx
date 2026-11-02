@@ -88,9 +88,8 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
   const speechFeed = useMemo(() => createSpeechFeed(), []);
   // The instant static reactions ("Oh, really?") after an answer of two words or more.
   const [acknowledgements] = useState(() => createInterviewerAcknowledgements(speechFeed.push, config.voice, speechSpeed, CONVERSATION_REACTIONS));
-  const [initialSpeed] = useState(speechSpeed);
-  useEffect(() => { if (initialSpeed === 1) void acknowledgements.preload(); }, [acknowledgements, initialSpeed]);
-  // At other speeds they are synthesized, so they wait for the quiet moment after the first line, as in the interview.
+  useEffect(() => { void acknowledgements.preload(); }, [acknowledgements]);
+  // Already loaded when the room opens; kept for the quiet moment after the first line, as in the interview.
   const preloadReactions = useCallback(() => { void acknowledgements.preload(); }, [acknowledgements]);
   const leaveRef = useRef(onLeave);
   useEffect(() => { leaveRef.current = onLeave; });

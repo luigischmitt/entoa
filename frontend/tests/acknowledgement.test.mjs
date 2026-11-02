@@ -350,3 +350,18 @@ test("a failing Azure copy never fails the preload of the Kokoro phrases", async
   await player.preload();
   assert.equal(player.loadedCount, 2);
 });
+
+test("a static reaction plays at the session speed; a synthesized one plays at 1x because its audio already has the speed", async () => {
+  const staticHarness = playerHarness({ speed: 0.95, staticBlob: async (phrase) => new Blob([`static:${phrase}`]) });
+  await staticHarness.player.preload();
+  const handle = staticHarness.player.play({ recent: [] });
+  assert.equal(staticHarness.audios[0].playbackRate, 0.95);
+  staticHarness.audios[0].listeners.ended();
+  await handle.promise;
+
+  const synthesized = playerHarness({ speed: 0.95, staticBlob: async () => { throw new Error("missing"); } });
+  await synthesized.player.preload();
+  const second = synthesized.player.play({ recent: [] });
+  assert.equal(synthesized.audios[0].playbackRate, 1);
+  second.cancel();
+});

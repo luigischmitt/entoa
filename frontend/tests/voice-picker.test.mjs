@@ -63,7 +63,7 @@ test("speech speed persists per browser and falls back safely", () => {
   assert.equal(readStoredInterviewerSpeechSpeed(storage), 0.85);
   storage.setItem(interviewerSpeechSpeedStorageKey, "abc");
   assert.equal(readStoredInterviewerSpeechSpeed(storage), DEFAULT_INTERVIEWER_SPEECH_SPEED);
-  storeInterviewerSpeechSpeed(storage, 1);
+  storeInterviewerSpeechSpeed(storage, DEFAULT_INTERVIEWER_SPEECH_SPEED);
   assert.equal(storage.map.has(interviewerSpeechSpeedStorageKey), false);
 });
 
@@ -72,8 +72,8 @@ test("speech speed accepts custom values inside 0.7–1.3 in 0.05 steps", () => 
   assert.equal(resolveInterviewerSpeechSpeed(0.87), 0.85);
   assert.equal(resolveInterviewerSpeechSpeed(0.5), 0.7);
   assert.equal(resolveInterviewerSpeechSpeed(2), 1.3);
-  assert.equal(resolveInterviewerSpeechSpeed(Number.NaN), 1);
-  assert.equal(resolveInterviewerSpeechSpeed(undefined), 1);
+  assert.equal(resolveInterviewerSpeechSpeed(Number.NaN), DEFAULT_INTERVIEWER_SPEECH_SPEED);
+  assert.equal(resolveInterviewerSpeechSpeed(undefined), DEFAULT_INTERVIEWER_SPEECH_SPEED);
   assert.equal(stepInterviewerSpeechSpeed(1, -1), 0.95);
   assert.equal(stepInterviewerSpeechSpeed(0.7, -1), 0.7);
   assert.equal(stepInterviewerSpeechSpeed(1.25, 1), 1.3);

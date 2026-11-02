@@ -89,6 +89,7 @@ export function createWebAudioTrack(url, deps = {}) {
   let ended = false;
   let disposed = false;
   let preload = "none";
+  let playbackRate = 1;
 
   const emit = (type) => { for (const listener of [...(listeners.get(type) ?? [])]) listener({ type }); };
   const stopTicking = () => { if (tick !== null) { stopTick(tick); tick = null; } };
@@ -119,8 +120,11 @@ export function createWebAudioTrack(url, deps = {}) {
       if (!buffer) return 0;
       if (ended) return buffer.duration;
       if (paused || !source) return 0;
-      return Math.min(buffer.duration, Math.max(0, context.currentTime - startedAt));
+      return Math.min(buffer.duration, Math.max(0, (context.currentTime - startedAt) * playbackRate));
     },
+    /** Like HTMLMediaElement.playbackRate, read when the next play() starts. Web Audio resamples, so the pitch moves with it. */
+    get playbackRate() { return playbackRate; },
+    set playbackRate(value) { if (Number.isFinite(value) && value > 0) playbackRate = value; },
     /** Resolves the decoded AudioBuffer (decoding at most once): lets the avatar reuse it instead of decoding again. */
     whenDecoded() { return decode(); },
     get preload() { return preload; },
@@ -150,6 +154,7 @@ export function createWebAudioTrack(url, deps = {}) {
       if (disposed) throw domError("AbortError", "Track was released.");
       source = context.createBufferSource();
       source.buffer = decoded;
+      if (playbackRate !== 1) source.playbackRate.value = playbackRate;
       gain = context.createGain();
       gain.gain.value = 1;
       source.connect(gain);

@@ -76,13 +76,12 @@ export function prewarmInterviewerClosing(utterance: string, voice?: string, spe
 
 /** The instant "Okay." / "Got it." player: its phrases are synthesized once (preload) and then played from memory. */
 export function createInterviewerAcknowledgements(onChunkAudio: SpeechPlaybackOptions["onChunkAudio"], voice?: string, speed = 1, phrases?: string[]) {
-  // At speed 1 the static files are used, in the session's voice source (Azure or Kokoro). Other speeds ask /speech, which already follows the pin.
-  const staticReactions = speed === 1;
+  // The static files (recorded at 1x) are used at any speed, in the session's voice source (Azure or Kokoro); they play at `speed` via playbackRate.
   return createAcknowledgementPlayer({
     endpoint: speechEndpoint, fetcher: authorizedFetch, voice, speed, phrases, onChunkAudio, onDiagnostic: reportAudioDiagnostic,
-    staticBlob: staticReactions ? (phrase) => loadStaticReaction(voice, phrase, "kokoro") : undefined,
-    azureBlob: staticReactions ? (phrase) => loadStaticReaction(voice, phrase, "azure") : undefined,
-    voiceSource: staticReactions ? getInterviewVoiceSource : undefined,
+    staticBlob: (phrase) => loadStaticReaction(voice, phrase, "kokoro"),
+    azureBlob: (phrase) => loadStaticReaction(voice, phrase, "azure"),
+    voiceSource: getInterviewVoiceSource,
   });
 }
 

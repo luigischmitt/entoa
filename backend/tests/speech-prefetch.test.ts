@@ -386,7 +386,7 @@ describe("static phrase prefetch", () => {
     expect(events).not.toContain("prefetch_dropped");
   });
 
-  it("leaves the acknowledgements to the client's static files at speed 1, and synthesizes them at other speeds", async () => {
+  it("leaves the acknowledgements to the client's static files at any speed", async () => {
     const { InterviewerSpeechPrefetcher } = await import("../src/speech/interviewer-prefetcher.js");
     const phraseTexts = ACKNOWLEDGEMENT_PHRASES.map((phrase) => normalizeTextForSpeech(phrase.trim()));
     const synthesizedAt = async (speed: number) => {
@@ -400,7 +400,7 @@ describe("static phrase prefetch", () => {
     expect(atSpeedOne.length).toBeGreaterThan(0);
     for (const text of phraseTexts) expect(atSpeedOne).not.toContain(text);
     const atSpeedOnePointOne = await synthesizedAt(1.1);
-    for (const text of phraseTexts) expect(atSpeedOnePointOne).toContain(text);
+    for (const text of phraseTexts) expect(atSpeedOnePointOne).not.toContain(text);
   });
 
   it("warms static phrases for the requested voice and speed before answering, then reuses cache hits", async () => {
@@ -424,11 +424,13 @@ describe("static phrase prefetch", () => {
       expect(answered).toBe(false);
       release();
       expect((await pending).status).toBe(202);
-      expect(calls).toHaveLength(staticSpeechTexts().length);
+      const acknowledgements = new Set(ACKNOWLEDGEMENT_PHRASES.map((phrase) => normalizeTextForSpeech(phrase.trim())));
+      const warmedCount = staticSpeechTexts().filter((text) => !acknowledgements.has(text)).length;
+      expect(calls).toHaveLength(warmedCount);
       expect(calls.every((call) => call.voice === "bf_emma" && call.speed === 1.2)).toBe(true);
 
       expect((await request(app).post("/api/v1/speech/warmup").send({ voice: "not-a-voice", speed: 5 })).status).toBe(202);
-      expect(calls.slice(staticSpeechTexts().length).every((call) => call.voice === "am_echo" && call.speed === 1)).toBe(true);
+      expect(calls.slice(warmedCount).every((call) => call.voice === "am_echo" && call.speed === 1)).toBe(true);
       const afterDefault = calls.length;
       expect((await request(app).post("/api/v1/speech/warmup").send({ voice: "not-a-voice", speed: 5 })).status).toBe(202);
       expect(calls).toHaveLength(afterDefault);
