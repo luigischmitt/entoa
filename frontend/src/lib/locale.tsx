@@ -1327,6 +1327,10 @@ const englishCopy: Record<string, string> = {
   "Encerrar a conversa?": "End the conversation?",
   "A conversa já está sendo encerrada.": "The conversation is already ending.",
   "Continuar na conversa": "Continue the conversation",
+  "Carregando…": "Loading…",
+  "Abrindo o Entoa…": "Opening Entoa…",
+  "Abrindo a sala…": "Opening the room…",
+  "Abrindo o início…": "Opening home…",
 };
 
 const interpolate = (text: string, values?: Record<string, string | number>) => values

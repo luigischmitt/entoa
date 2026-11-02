@@ -3,7 +3,7 @@
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { startTransition, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition, type CSSProperties } from "react";
 import {
   ArrowUpRight,
   Home,
@@ -36,6 +36,7 @@ import { mergeVoiceSeries, voiceMetricSummary, voiceTrendCopy, voiceTrendMetrics
 import { CountUp } from "@/components/ui/count-up";
 import { useLocale } from "@/lib/locale";
 import { authorizedFetch } from "@/lib/auth/backend-auth";
+import { finishNavigation, startNavigation } from "@/lib/navigation-progress.mjs";
 
 import "./components/shell.css";
 
@@ -629,6 +630,9 @@ export default function App({ initialView = "home" }: { initialView?: InitialVie
   const voiceReadiness = useVoiceReadiness(true);
   const resolvedInitialView = initialView;
   const [view, setView] = useState<View>(resolvedInitialView);
+  // The view the person asked for: the sidebar highlights it at once, while the content waits for the lazy chunk.
+  const [requestedView, setRequestedView] = useState<View>(resolvedInitialView);
+  const [isSwitchingView, startViewTransition] = useTransition();
   const dashboardPrefetchStarted = useRef(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [startError, setStartError] = useState(false);
@@ -685,8 +689,15 @@ export default function App({ initialView = "home" }: { initialView?: InitialVie
     };
   }, [initialView, prefetchDashboardData]);
 
+  useEffect(() => {
+    if (!isSwitchingView) return;
+    startNavigation();
+    return () => finishNavigation();
+  }, [isSwitchingView]);
+
   const navigate = (nextView: View) => {
-    startTransition(() => setView(nextView));
+    setRequestedView(nextView);
+    startViewTransition(() => setView(nextView));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -695,7 +706,7 @@ export default function App({ initialView = "home" }: { initialView?: InitialVie
       <a href="#main-content" className="skip-link">{t("Pular para o conteúdo")}</a>
       <div className="flex min-h-dvh">
         <Navigation
-          view={view}
+          view={requestedView}
           onNavigate={navigate}
           onPrefetch={(target) => {
             preloadView(target);
@@ -739,8 +750,13 @@ export default function App({ initialView = "home" }: { initialView?: InitialVie
                   prewarmInterviewerUtterance(composeContextualOpening(config, getFixedInterviewQuestions(config)[0].prompt), config.voice);
                 }
                 // The interview lives on its own route; the configuration travels in a single-use sessionStorage hand-off.
-                if (storeRoomHandoff(window.sessionStorage, config)) router.push("/interview");
-                else setStartError(true);
+                if (storeRoomHandoff(window.sessionStorage, config)) {
+                  startNavigation();
+                  router.push("/interview");
+                  return true;
+                }
+                setStartError(true);
+                return false;
               }}
             />
           )}

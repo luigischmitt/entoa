@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist_Mono } from "next/font/google";
 
 import { AuthSessionGuard } from "@/components/auth/auth-session-guard";
+import { NavigationProgress } from "@/components/ui/navigation-progress";
 import { instrumentSans, instrumentSerif } from "@/lib/fonts";
 import { ThemeColorSync, THEME_COLORS } from "@/components/theme/theme-color-sync";
 import { THEME_BOOTSTRAP_SCRIPT } from "@/lib/theme/color-scheme.mjs";
@@ -48,6 +49,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <ThemeColorSync />
         <AuthSessionGuard />
+        <NavigationProgress />
         {children}
       </body>
     </html>

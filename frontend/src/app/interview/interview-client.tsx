@@ -10,6 +10,8 @@ import { getLocalSessionUserId } from "@/lib/auth/browser-session";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { InterviewConfig } from "@/lib/interview/types";
 import { useLocale } from "@/lib/locale";
+import { startNavigation } from "@/lib/navigation-progress.mjs";
+import { RouteLoading } from "@/components/ui/loading-state";
 
 import { ConversationRoom } from "../components/conversation-room";
 import { InterviewRoom } from "../components/interview-room";
@@ -31,6 +33,11 @@ export default function InterviewClient() {
   const [resumeCheckpoint, setResumeCheckpoint] = useState<LocalInterviewCheckpoint | null>(null);
   const consumedRef = useRef(false);
 
+  const leaveToDashboard = () => {
+    startNavigation();
+    router.replace("/dashboard");
+  };
+
   useEffect(() => {
     // Strict Mode re-runs effects: the hand-off is single-use, so only the first run may read it.
     if (consumedRef.current) return;
@@ -48,18 +55,21 @@ export default function InterviewClient() {
       if (checkpoint) {
         setResumeCheckpoint(checkpoint);
         setConfig(checkpoint.config);
-      } else router.replace(setupPath);
+      } else {
+        startNavigation();
+        router.replace(setupPath);
+      }
     })();
   }, [router]);
 
-  if (!config) return <div className="min-h-dvh bg-[var(--ds-ink)]" role="status" aria-label={t("Abrindo a sala de entrevista")} />;
+  if (!config) return <RouteLoading label={t("Abrindo a sala…")} />;
 
   return (
     <div lang={locale === "en" ? "en" : "pt-BR"}>
       <SessionExpiredNotice />
       {config.mode === "conversation" && config.conversationPlan
-        ? <ConversationRoom config={config} plan={config.conversationPlan} onLeave={() => router.replace("/dashboard")} />
-        : <InterviewRoom config={config} resumeCheckpoint={resumeCheckpoint} onLeave={() => router.replace("/dashboard")} />}
+        ? <ConversationRoom config={config} plan={config.conversationPlan} onLeave={leaveToDashboard} />
+        : <InterviewRoom config={config} resumeCheckpoint={resumeCheckpoint} onLeave={leaveToDashboard} />}
     </div>
   );
 }
