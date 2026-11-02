@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  analyseSamples, beakTargetAt, clamp, createClockInterpolator, createToucanEngine, genericBeakTarget, HeadPoser, JAW, JawModel, mouthWedgePath,
-  NodScheduler, PhraseListener, sat, Spring, toucanStateFor, valueNoise,
+  analyseSamples, BEAK_POSES, beakTargetAt, BeakPoser, clamp, createClockInterpolator, createToucanEngine, genericBeakTarget, HeadPoser, JAW, JawModel,
+  mouthWedgePath, NodScheduler, PhraseListener, sat, Spring, toucanStateFor, valueNoise,
 } from "../src/components/interview/toucan/toucan-engine.mjs";
 
 const SR = 22_050;
@@ -65,6 +65,29 @@ test("jaw spring stays within 0..1.15 for any input, opens fast, releases slower
   const early = new JawModel();
   early.step(1 / 60, 1);
   assert.ok(early.mouth < 0.5, "attack takes ~35 ms, it is not instant");
+});
+
+test("beak poser: only named poses, holds of 55 ms (30 ms to close), and silence reaches closed within 0.1 s", () => {
+  const rng = seeded(31);
+  const p = new BeakPoser();
+  const named = new Set(Object.values(BEAK_POSES));
+  let run = { pose: 0, t0: -9 };
+  for (let i = 0; i < 60 * 30; i += 1) {
+    const t = i / 60;
+    const pose = p.pick(t, rng() * 1.05, rng());
+    assert.ok(named.has(pose), `pose ${pose}`);
+    if (pose !== run.pose) {
+      const hold = t - run.t0;
+      assert.ok(hold >= (pose === BEAK_POSES.closed ? 0.03 : 0.055) - 1e-9, `hold ${hold.toFixed(3)} s before ${pose}`);
+      run = { pose, t0: t };
+    }
+  }
+  const t0 = 30;
+  for (let i = 0; i < 6; i += 1) p.pick(t0 + i / 60, 0.8, 0);
+  assert.equal(p.pose, BEAK_POSES.open);
+  let closedAt = null;
+  for (let i = 6; i < 30 && closedAt === null; i += 1) if (p.pick(t0 + i / 60, 0, 0) === BEAK_POSES.closed) closedAt = (i - 6) / 60;
+  assert.ok(closedAt !== null && closedAt <= 0.1 + 1e-9, `closed after ${closedAt} s of silence`);
 });
 
 test("spring: critically damped does not overshoot; retargeting keeps velocity", () => {

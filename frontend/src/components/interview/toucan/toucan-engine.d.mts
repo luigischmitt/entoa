@@ -48,6 +48,8 @@ export function analyseBuffer(buffer: { getChannelData(channel: number): Float32
 export function beakTargetAt(features: AudioFeatures, pos: number, t: number): { target: number; chatter: number; env: number; cons: number };
 export function genericBeakTarget(t: number): number;
 export class JawModel { mouth: number; level: number; step(dt: number, target: number, chatter?: number): number }
+export const BEAK_POSES: { closed: number; tip: number; part: number; mid: number; open: number };
+export class BeakPoser { pose: number; since: number; pick(t: number, target: number, cons: number): number }
 export const NOD: { single: { A: number; dn: number; up: number }; double: { A: number; dn: number; up: number; at: number }[] };
 export class NodScheduler { count: number; add(t0: number, kind: "single" | "double"): void; rotation(t: number): number }
 export class HeadPoser {

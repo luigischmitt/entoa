@@ -36,7 +36,7 @@ export const noise = (t, s) => 0.62 * valueNoise(t / 2.9, s) + 0.28 * valueNoise
 
 /* ------------------------------------------------------------------ beak */
 
-export const JAW = { omega: 28, zeta: 0.7, attack: 0.035, release: 0.11, chatter: 0.025, chatterHz: 9.2, lookahead: 0.06, maxAngle: 10 };
+export const JAW = { omega: 42, zeta: 0.62, attack: 0.016, release: 0.05, chatter: 0.025, chatterHz: 9.2, lookahead: 0.07, maxAngle: 13 };
 
 /**
  * Offline analysis of a whole decoded channel (5 ms hop): loudness envelope, a zero-crossing proxy for hiss
@@ -135,6 +135,21 @@ export class JawModel {
     this.mouth = clamp(this.spring.x + chatter * (target > 0.2 ? 1 : 0), 0, 1.15);
     if (target === 0 && this.level < 0.01 && this.mouth < 0.015) { this.mouth = 0; this.spring.x = 0; this.spring.v = 0; this.level = 0; }
     return this.mouth;
+  }
+}
+
+/** Named beak openings: like a cartoon mouth, the beak holds a few poses instead of tracking loudness. */
+export const BEAK_POSES = { closed: 0, tip: 0.2, part: 0.42, mid: 0.68, open: 1 };
+
+/** Picks the held pose; a pose stays at least 55 ms before it changes (closing is allowed after 30 ms). */
+export class BeakPoser {
+  constructor() { this.pose = 0; this.since = -9; }
+  pick(t, target, cons) {
+    const P = BEAK_POSES;
+    const want = target < 0.1 ? P.closed : cons > 0.55 && target < 0.6 ? P.tip : target < 0.34 ? P.part : target < 0.68 ? P.mid : P.open;
+    if (want === this.pose) return this.pose;
+    if (t - this.since >= (want === P.closed ? 0.03 : 0.055)) { this.pose = want; this.since = t; }
+    return this.pose;
   }
 }
 
@@ -435,6 +450,7 @@ export function createToucanEngine({ root, rng = Math.random, reducedMotion = ()
   const PHR = new Spring(0, 2.6);
   const PHR2 = new Spring(0, 5);
   const jaw = new JawModel();
+  const beakPoser = new BeakPoser();
   const nods = new NodScheduler();
   const listener = new PhraseListener(rng);
   const poser = new HeadPoser(rng);
@@ -540,8 +556,10 @@ export function createToucanEngine({ root, rng = Math.random, reducedMotion = ()
         }
         if (pos >= 0) {
           const b = beakTargetAt(f, pos, t);
-          target = b.target;
-          chatter = b.chatter;
+          // Held poses: the raw loudness target only picks a named opening; a pose change to "open" lifts the head.
+          const before = beakPoser.pose;
+          target = beakPoser.pick(t, b.target, b.cons);
+          if (target === BEAK_POSES.open && before < BEAK_POSES.open) S.lift.v += 10 * M();
           // Phrase boundaries: a small head turn toward the viewer, or a brief glance aside.
           while (cur.pz < f.pauses.length && f.pauses[cur.pz].t0 <= pos) {
             const z = f.pauses[cur.pz]; cur.pz += 1;
@@ -642,13 +660,13 @@ export function createToucanEngine({ root, rng = Math.random, reducedMotion = ()
     attr(el.body, "transform", `translate(${f2(p.bX)} 0) rotate(${f2(p.bT)} 150 236) translate(110 236) scale(${p.sx.toFixed(4)} ${p.sy.toFixed(4)}) translate(-110 -236)`);
     attr(el.tail, "transform", `rotate(${f2(tl + p.bT)} 125 205)`);
     attr(el.skin, "d", skinPath(tf));
-    // Beak: the lower mandible hinges at the gape (max ~10 deg: slim wedge); the upper lifts a touch.
+    // Beak: the lower mandible hinges at the gape (max ~13 deg: slim wedge); the upper lifts with it.
     attr(el.beak, "transform", `rotate(${f2(-S.turn.x * 3.5)} 219 90)`);
     const ang = `rotate(${f2(mouth * JAW.maxAngle)} 223 94)`;
     attr(el.lower, "transform", ang);
     attr(el.mouth, "transform", ang);
     attr(el.wedge, "d", mouthWedgePath(mouth));
-    const up = mouth * 1.1 + S.lift.x;
+    const up = mouth * 1.8 + S.lift.x;
     attr(el.upper, "transform", `rotate(${f2(-up)} 213 74) translate(0 ${f2(-up * 0.3)})`);
     attr(el.bib, "d", bibPath(tf, p));
     // Eye.
