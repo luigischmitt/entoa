@@ -2,33 +2,47 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
-import { MicrophoneCapture, type MicControls, type VoiceAssessmentState, type VoiceCaptureState, type VoiceTranscriptionState } from "@/components/interview/microphone-capture";
+import { MicrophoneCapture, type MicControls, type VoiceCaptureState, type VoiceTranscriptionState } from "@/components/interview/microphone-capture";
 import { createSpeechFeed, toucanStateFor } from "@/components/interview/toucan/toucan-engine.mjs";
 import { AssessmentSocketRegistry } from "@/lib/interview/assessment-socket-registry.mjs";
 import { buildConversationTurnRequest, fallbackConversationTurn, isConversationEnd, nextUsedPathIds, shouldReact, type ConversationLine, type ConversationPlanInput } from "@/lib/interview/conversation-policy.mjs";
 import { requestConversationTurn } from "@/lib/interview/conversation";
+import { conversationAssessmentSamples } from "@/lib/interview/conversation-report.mjs";
+import { pairInterviewTurns } from "@/lib/interview/report";
+import { buildAzureAnswerRecords, summarizeAzureAssessments } from "@/lib/interview/report-metrics.mjs";
+import { replaceCandidateTurnContent } from "@/lib/interview/report-incremental.mjs";
+import { renameInterview } from "@/lib/interview/persistence";
 import { canSkipVoiceQuestion, finalTranscriptForSubmission } from "@/lib/interview/session-policy.mjs";
 import { resolveInterviewerSpeechSpeed, storeInterviewerSpeechSpeed } from "@/lib/interview/interviewer-speech-speed.mjs";
 import { resolveInterviewerCaption, splitInterviewerSpeech } from "@/lib/interview/speech-playback.mjs";
 import { CONVERSATION_REACTIONS } from "@/lib/interview/static-reactions.mjs";
+import type { ProgressRecord } from "@/lib/interview/progress-insights.mjs";
 import type { InterviewConfig, InterviewPhase } from "@/lib/interview/types";
 import { useLocale } from "@/lib/locale";
 import { useInterviewPersistence } from "../hooks/use-interview-persistence";
+import { useConversationReport, type ConversationAssessmentEntry } from "../hooks/use-conversation-report";
 import { useInterviewSession } from "../hooks/use-interview-session";
 import { useMicEngine } from "../hooks/use-mic-engine";
 import { createInterviewerAcknowledgements, prewarmInterviewerUtterance, useSpeechPlayback, useSpeechWarmup } from "../hooks/use-speech-playback";
 import { CallDock, CandidateTile, InterviewerTile, Toast, useCandidateCamera, useMicLevelMeter } from "./call-stage";
+import { InterviewReport } from "./interview-report";
 import "./interview-room.css";
 
 type ConversationTurn = { sequenceNumber: number; speaker: "interviewer" | "candidate"; content: string | null };
-type AssessmentEntry = { questionLabel: string; sequenceNumber: number; round?: number; state: VoiceAssessmentState };
+type AssessmentEntry = ConversationAssessmentEntry;
+const noProgressRecords: ProgressRecord[] = [];
+
+function formatClock(seconds: number) {
+  const safeSeconds = Math.max(0, seconds);
+  return `${String(Math.floor(safeSeconds / 60)).padStart(2, "0")}:${String(safeSeconds % 60).padStart(2, "0")}`;
+}
 
 /**
  * Free conversation with Tuck. Sequence numbers follow the interview room: Tuck's line N, the person's answer N+1,
  * Tuck's next line N+2. The room is never resumed: interview-client drops stored conversation checkpoints.
  */
 export function ConversationRoom({ config, plan, onLeave }: { config: InterviewConfig; plan: ConversationPlanInput; onLeave: () => void }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   useSpeechWarmup();
   const durationMinutes = Math.max(5, Number.parseInt(config.duration, 10) || 5);
   const [phase, setPhaseState] = useState<InterviewPhase>("introducing");
@@ -40,6 +54,7 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
   const [lines, setLines] = useState<ConversationLine[]>(() => [{ speaker: "tuck", text: plan.opening }]);
   const linesRef = useRef(lines);
   const [turns, setTurns] = useState<ConversationTurn[]>(() => [{ sequenceNumber: 1, speaker: "interviewer", content: plan.opening }]);
+  const turnsRef = useRef(turns);
   const usedPathIdsRef = useRef<string[]>([]);
   const leftRef = useRef(false);
   const submittingRef = useRef(false);
@@ -51,6 +66,12 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
   const [voiceCaptureState, setVoiceCaptureState] = useState<VoiceCaptureState>("idle");
   // Kept like the interview room does: the report of a conversation reads these.
   const [voiceAssessments, setVoiceAssessments] = useState<Record<string, AssessmentEntry>>({});
+  const voiceAssessmentsRef = useRef(voiceAssessments);
+  useEffect(() => { voiceAssessmentsRef.current = voiceAssessments; }, [voiceAssessments]);
+  // Answers still waiting for their reviewed transcript (one per Tuck line), and the reviews already received.
+  const pendingReviewedRef = useRef(new Set<number>());
+  const reviewedSequencesRef = useRef(new Set<number>());
+  const reviewedAttemptsRef = useRef(new Set<string>());
   const [assessmentSockets] = useState(() => new AssessmentSocketRegistry());
   const [captionsPreference, setCaptionsPreference] = useState(config.showQuestionCaptions);
   const [speechSpeed, setSpeechSpeed] = useState(() => resolveInterviewerSpeechSpeed(config.speechSpeed ?? 1));
@@ -76,11 +97,26 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
     activeQuestion: question, currentIndex: 0, questionSequenceNumber: sequence, followUpsAsked: 0,
     threadQuestions: [], recentFollowUpKinds: [], elapsedSeconds: seconds, turns, askedQuestionIds: [],
   }), [question, sequence, seconds, turns]);
-  const { persistenceMessage, enqueueTurn, abandonSession } = useInterviewPersistence(config, question, sequence, phase, snapshot);
+  const { sessionId, persistenceMessage, enqueueTurn, abandonSession, waitForSessionId, waitForCompletionSync } = useInterviewPersistence(config, question, sequence, phase, snapshot);
+  const updateTurns = (next: ConversationTurn[]) => {
+    turnsRef.current = next;
+    setTurns(next);
+  };
   const record = (turn: ConversationTurn) => {
-    setTurns((current) => [...current.filter((item) => item.sequenceNumber !== turn.sequenceNumber), turn].sort((a, b) => a.sequenceNumber - b.sequenceNumber));
+    updateTurns([...turnsRef.current.filter((item) => item.sequenceNumber !== turn.sequenceNumber), turn].sort((a, b) => a.sequenceNumber - b.sequenceNumber));
     enqueueTurn({ interviewId: "", ...turn });
   };
+  const readReportInputs = useCallback(() => ({
+    assessments: voiceAssessmentsRef.current,
+    turns: turnsRef.current,
+    pendingReviewed: pendingReviewedRef.current.size,
+  }), []);
+  // The report of the whole conversation, built once when it ends (see use-conversation-report).
+  const { reportState, answerClipPaths } = useConversationReport({ phase, locale, sessionId, readInputs: readReportInputs, waitForSessionId, waitForCompletionSync });
+  const azureSummary = useMemo(() => ({
+    ...summarizeAzureAssessments(conversationAssessmentSamples(voiceAssessments)),
+    answers: buildAzureAnswerRecords(Object.values(voiceAssessments), answerClipPaths),
+  }), [answerClipPaths, voiceAssessments]);
 
   const { engine: micEngine } = useMicEngine(phase !== "closing" && phase !== "ending", { deviceId: config.microphoneDeviceId ?? null });
   const camera = useCandidateCamera(config.candidateCameraEnabled, phase !== "ending");
@@ -147,6 +183,8 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
     linesRef.current = personLines;
     setLines(personLines);
     record({ sequenceNumber: tuckSequence + 1, speaker: "candidate", content: transcript });
+    // The reviewed transcript may already have arrived; otherwise the report waits for it, as it does for voice assessments.
+    if (!reviewedSequencesRef.current.has(tuckSequence)) pendingReviewedRef.current.add(tuckSequence);
     setVoiceTranscription({ status: "idle" });
     setVoiceCaptureState("idle");
     setAnswerError(null);
@@ -239,14 +277,36 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
     );
   };
 
-  /** The conversation is over: a calm message and a way back. The report can replace this later. */
+  /** The conversation is over: the report of the whole conversation, with a way back to the dashboard. */
   function renderEnding() {
+    const samples = conversationAssessmentSamples(voiceAssessments);
     return (
-      <main id="main-content" className="rm-root mx-auto flex min-h-dvh w-full max-w-xl flex-col items-start justify-center gap-6 px-4 py-10 sm:px-8">
-        <h1 className="ds-title">{t("Conversa encerrada")}</h1>
-        <button type="button" className="ds-btn ds-btn-soft" onClick={onLeave}>
-          <ArrowLeft className="size-4" aria-hidden="true" /> {t("Voltar ao dashboard")}
+      <main id="main-content" className="rm-root mx-auto min-h-dvh w-full max-w-7xl px-4 py-5 sm:px-8 sm:py-8">
+        <button type="button" className="ds-btn ds-btn-quiet -ml-3 mb-4 min-h-10 gap-2 px-3 text-sm" onClick={onLeave}>
+          <ArrowLeft className="size-4" aria-hidden="true" /> {t("Voltar ao dashboard ")}
         </button>
+        <InterviewReport
+          config={config}
+          elapsed={formatClock(seconds)}
+          totalClock={formatClock(durationMinutes * 60)}
+          answerCount={turns.filter((turn) => turn.speaker === "candidate" && turn.content?.trim()).length}
+          persistenceLabel=""
+          persistenceMessage={persistenceMessage}
+          feedbackSyncMessage={null}
+          reportState={reportState}
+          progressRecords={noProgressRecords}
+          currentInterviewId={sessionId ?? undefined}
+          customTitle={null}
+          onRename={sessionId ? (title) => renameInterview(sessionId, title) : undefined}
+          turns={pairInterviewTurns(turns)}
+          azureSummary={azureSummary}
+          coverage={{
+            available: samples.filter((entry) => entry.status === "available").length,
+            pending: samples.filter((entry) => entry.status === "pending").length,
+            total: samples.length,
+          }}
+          onLeave={onLeave}
+        />
       </main>
     );
   }
@@ -306,6 +366,19 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
           autoStartSignal={autoCaptureKey === String(sequence) ? autoCaptureKey : null}
           micEngine={micEngine}
           onAssessmentChange={(attemptId, assessment, context) => setVoiceAssessments((current) => ({ ...current, [attemptId]: { ...context, state: assessment } }))}
+          onReviewedTranscript={(attemptId, transcript, changed, context) => {
+            const sequence = context.sequenceNumber;
+            reviewedSequencesRef.current.add(sequence);
+            pendingReviewedRef.current.delete(sequence);
+            if (reviewedAttemptsRef.current.has(attemptId)) return;
+            reviewedAttemptsRef.current.add(attemptId);
+            if (!transcript || !changed) return;
+            // The reviewed text replaces the answer Tuck's line N led to (sequence N+1), so the report reads the corrected words.
+            const candidateSequence = sequence + 1;
+            if (!turnsRef.current.some((turn) => turn.sequenceNumber === candidateSequence && turn.speaker === "candidate")) return;
+            updateTurns(replaceCandidateTurnContent(turnsRef.current, candidateSequence, transcript));
+            enqueueTurn({ interviewId: "", sequenceNumber: candidateSequence, speaker: "candidate", content: transcript });
+          }}
         />
       </div>
     </main>

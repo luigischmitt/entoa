@@ -8,6 +8,10 @@ import type { JobDirection } from "./job-direction.mjs";
 import { answerOrdinalForSequence, pairInterviewTurns, summarizeAzureAssessments, type AzureAssessmentSample, type AzureMetricSummary, type InterviewReportTurn } from "./report-metrics.mjs";
 
 export type InterviewReport = {
+  /** Set on free conversations, which have no technical analysis; absent on interviews. */
+  reportKind?: "conversation";
+  /** Conversations only: sentences that were correct but can sound more natural. */
+  keepPhrases?: Array<{ sequenceNumber: number; said: string; natural: string; note: string }>;
   /** Optional per-answer analyses; absent on legacy reports or fallback-only reports. */
   turns?: InterviewTurnAnalysis[];
   /** Per-answer analysis coverage at report generation; omitted by legacy reports. */
@@ -40,7 +44,7 @@ export type InterviewReport = {
     evidenceStatus: "SUFFICIENT" | "LIMITED" | "INSUFFICIENT" | "NO_PATTERN_FOUND" | "CANDIDATES_REJECTED";
     patterns: Array<{ type: "GRAMMAR" | "WORD_CHOICE" | "FALSE_COGNATE" | "STRUCTURE"; sequenceNumber: number; evidence: string; suggestion: string; rephrasedExample: string; why?: string }>;
   };
-  priorities: Array<{ area: "TECHNICAL_CONTENT" | "ENGLISH_COMMUNICATION"; sequenceNumber: number; evidence: string; focus: string; exercise: string; vacancyCompetency?: string }>;
+  priorities: Array<{ area: "TECHNICAL_CONTENT" | "ENGLISH_COMMUNICATION"; sequenceNumber: number; evidence: string; focus: string; exercise?: string; vacancyCompetency?: string }>;
 };
 
 export type InterviewReportEvidenceCounts = {

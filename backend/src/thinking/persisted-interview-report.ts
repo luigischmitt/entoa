@@ -9,6 +9,8 @@ type InterviewRow = {
   focus: string | null;
   job_direction: unknown;
   status: string;
+  mode?: string | null;
+  conversation_topic?: string | null;
 };
 
 type InterviewTurnRow = { sequence_number: number; speaker: "interviewer" | "candidate"; content: string | null };
@@ -63,7 +65,7 @@ export function createSupabaseReportPersistence({ supabaseUrl, publishableKey, f
   return {
     async loadInterview(token, interviewId) {
       if (!validUuid.test(interviewId)) return null;
-      return one<InterviewRow>(token, "interviews", `?select=id,target_role,seniority,focus,job_direction,status&id=eq.${interviewId}&limit=1`);
+      return one<InterviewRow>(token, "interviews", `?select=id,target_role,seniority,focus,job_direction,status,mode,conversation_topic&id=eq.${interviewId}&limit=1`);
     },
     async loadTurns(token, interviewId) {
       return rest<InterviewTurnRow[]>(token, "interview_turns", `?select=sequence_number,speaker,content&interview_id=eq.${interviewId}&order=sequence_number.asc`);
@@ -198,7 +200,7 @@ export function createPersistedInterviewReportService(reportService: InterviewRe
         if (!interview) throw Object.assign(new Error("Interview not found."), { status: 404 });
         if (interview.status !== "completed") throw Object.assign(new Error("Interview is not complete."), { status: 409 });
         let existing = await persistence.loadFeedback(token, interviewId);
-        if (input.regenerate && existing?.status === "ready" && existing.analysis_version !== reportAnalysisVersion) {
+        if (input.regenerate && interview.mode !== "conversation" && existing?.status === "ready" && existing.analysis_version !== reportAnalysisVersion) {
           // Outdated reports are reset to pending so this request regenerates them; if another request already reset them, reload and follow the normal path.
           const reset = await persistence.resetOutdated(token, interviewId);
           existing = reset ?? await persistence.loadFeedback(token, interviewId);
@@ -221,6 +223,16 @@ export function createPersistedInterviewReportService(reportService: InterviewRe
             return question ? [{ sequenceNumber: question.sequence_number, question: question.content!.trim(), answer: turn.content!.trim() }] : [];
           });
         const totalChars = questionTurns.reduce((sum, turn) => sum + turn.question.length + turn.answer.length, 0);
+        if (interview.mode === "conversation") {
+          if (!reportService.generateConversation) throw new Error("Conversation reports are unavailable.");
+          if (questionTurns.length === 0 || questionTurns.length > 80 || questionTurns.some((turn) => turn.question.length > 800 || turn.answer.length > 5_000) || totalChars > 60_000) {
+            throw Object.assign(new Error("No valid submitted answers."), { status: 422 });
+          }
+          const { model, analysisVersion, ...analysis } = await reportService.generateConversation({ locale: input.locale, topic: interview.conversation_topic ?? "a free conversation", turns: questionTurns });
+          const saved = await persistence.saveReady(token, interviewId, analysis, model, analysisVersion);
+          const final = saved.analysis ?? analysis;
+          return { status: "ready" as const, report: { ...final, model: saved.model ?? model, analysisVersion: saved.analysis_version ?? analysisVersion }, feedback: saved };
+        }
         if (questionTurns.length === 0 || questionTurns.length > 30 || questionTurns.some((turn) => turn.question.length > 500 || turn.answer.length > 5_000) || totalChars > 30_000) {
           throw Object.assign(new Error("No valid submitted answers."), { status: 422 });
         }

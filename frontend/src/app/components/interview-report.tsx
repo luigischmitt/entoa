@@ -41,6 +41,12 @@ const reportLoadingSteps = [
   "Analisando seu inglês",
   "Juntando os sinais da sua voz",
 ];
+const conversationLoadingSteps = [
+  "Revisando a transcrição da conversa",
+  "Lendo o que funcionou na conversa",
+  "Analisando seu inglês",
+  "Juntando os sinais da sua voz",
+];
 const maxVisibleErrors = 8;
 const maxStrengths = 3;
 const maxPronunciationWords = 6;
@@ -131,11 +137,98 @@ function refLabel(sequenceNumber: number | null | undefined) {
   return sequenceNumber === null || sequenceNumber === undefined ? null : `${t("Resposta ")}${sequenceNumber}`;
 }
 
+/** "Seus erros de inglês": what the person said next to the natural English. Shared by the interview and the conversation document. */
+function ErrorBlock({ rows, reference, emptyText }: { rows: ReadyModel["errorRows"]; reference: ReadyModel["reference"]; emptyText: string }) {
+  const [showAllErrors, setShowAllErrors] = useState(false);
+  return (
+    <section className="rp-pblock rp-pblock-long">
+      <SectionHead title="Seus erros de inglês" hint="O que você disse e como fica natural em inglês." />
+      {rows.length > 0 ? (
+        <>
+          <div className="rp-errh" aria-hidden="true"><span>{t("Você disse")}</span><span>{t("O certo")}</span></div>
+          <ul className={`rp-errs${showAllErrors ? " is-all" : ""}`}>
+            {rows.map((row, index) => {
+              const meta = [row.note, refLabel(row.sequenceNumber === undefined ? null : reference(row.sequenceNumber))].filter(Boolean).join(" · ");
+              return (
+                <li key={`${row.sequenceNumber}-${index}`} className={index >= maxVisibleErrors ? "rp-extra" : undefined}>
+                  <p lang="en" className="rp-said">
+                    {mergeChanged(row.said).map((part, partIndex) => part.changed ? <s key={partIndex}>{part.text}</s> : <span key={partIndex}>{part.text}</span>)}
+                  </p>
+                  <p lang="en" className="rp-right">
+                    {mergeChanged(row.right).map((part, partIndex) => part.changed ? <u key={partIndex}>{part.text}</u> : <span key={partIndex}>{part.text}</span>)}
+                  </p>
+                  {meta && <small>{meta}</small>}
+                </li>
+              );
+            })}
+          </ul>
+          {rows.length > maxVisibleErrors && (
+            <button type="button" className="rp-inline-button rp-noprint" aria-expanded={showAllErrors} onClick={() => setShowAllErrors((value) => !value)}>
+              {showAllErrors ? t("Ver menos") : t("Ver todos os {n} erros", { n: rows.length })}
+            </button>
+          )}
+        </>
+      ) : (
+        <p className="rp-pnote">{t(emptyText)}</p>
+      )}
+    </section>
+  );
+}
+
+/** "Notas da sua voz": three scores, the pace facts and the words to review. Shared by both documents. */
+function VoiceBlock({ model, emptyText }: { model: Pick<ReadyModel, "voiceNotes" | "voiceFacts" | "pronunciation">; emptyText: string }) {
+  const { voiceFacts, pronunciation } = model;
+  const hasVoice = model.voiceNotes.some((note) => note.value !== null);
+  return (
+    <section className="rp-pblock">
+      <SectionHead title="Notas da sua voz" hint="Como sua fala soou: ritmo, pausas e pronúncia." />
+      {hasVoice ? (
+        <>
+          <ul className="rp-voice">
+            {model.voiceNotes.map((note) => (
+              <li key={note.key} style={{ "--p": `${note.value ?? 0}%` } as CSSProperties}>
+                <b>{note.value ?? "—"}</b>
+                <span>{t(note.label)}</span>
+                <small>{t(note.measure)}</small>
+              </li>
+            ))}
+          </ul>
+          <p className="rp-pnote">{t("De 0 a 100. A análise não avalia sotaque.")}</p>
+        </>
+      ) : (
+        <p className="rp-pnote">{t(emptyText)}</p>
+      )}
+      {voiceFacts && (
+        <div className="rp-voice-detail">
+          <p className="rp-psub">{t("Ritmo da fala")}</p>
+          <p className="rp-vfacts">
+            {voiceFacts.wordsPerMinute} {t("palavras/min")} · {voiceFacts.pauseCount} {t("pausas")}
+            {voiceFacts.longestPauseMs >= 1_000 ? <> · {t("pausa mais longa de ")}{Math.round(voiceFacts.longestPauseMs / 100) / 10} {t("s")}</> : null}
+            {voiceFacts.fillerCount > 0 ? <> · {voiceFacts.fillerCount} {t("hesitações")}</> : null}
+          </p>
+          <p className="rp-vinsight">{voiceFacts.insights.map((item, index) => <span key={item.key}>{index > 0 ? " " : ""}{t(item.key, item.values)}</span>)}</p>
+        </div>
+      )}
+      {pronunciation.length > 0 && (
+        <div className="rp-voice-detail">
+          <p className="rp-psub">{t("Palavras para revisar a pronúncia")}</p>
+          <ul className="rp-words">
+            {pronunciation.map((item) => (
+              <li key={item.word}>
+                <b lang="en">{item.word}</b>
+                <span>{t(phonemeTip(item.worstPhoneme, item.word))}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
 /** The document itself: the whole report, in the order it prints. */
 function ReadyDocument({ model, jobItems, dateLabel }: { model: ReadyModel; jobItems: JobCoverageItem[]; dateLabel: string }) {
-  const [showAllErrors, setShowAllErrors] = useState(false);
-  const { reference, errorRows, voiceFacts, pronunciation } = model;
-  const hasVoice = model.voiceNotes.some((note) => note.value !== null);
+  const { reference, errorRows } = model;
   return (
     <>
       {(model.summary || model.coverageNotice) && (
@@ -146,80 +239,8 @@ function ReadyDocument({ model, jobItems, dateLabel }: { model: ReadyModel; jobI
         </section>
       )}
       <ReportPart title="Seu inglês" hint="Como seu inglês soou para o entrevistador." style={rise(1)}>
-        <section className="rp-pblock rp-pblock-long">
-          <SectionHead title="Seus erros de inglês" hint="O que você disse e como fica natural em inglês." />
-          {errorRows.length > 0 ? (
-            <>
-              <div className="rp-errh" aria-hidden="true"><span>{t("Você disse")}</span><span>{t("O certo")}</span></div>
-              <ul className={`rp-errs${showAllErrors ? " is-all" : ""}`}>
-                {errorRows.map((row, index) => {
-                  const meta = [row.note, refLabel(row.sequenceNumber === undefined ? null : reference(row.sequenceNumber))].filter(Boolean).join(" · ");
-                  return (
-                    <li key={`${row.sequenceNumber}-${index}`} className={index >= maxVisibleErrors ? "rp-extra" : undefined}>
-                      <p lang="en" className="rp-said">
-                        {mergeChanged(row.said).map((part, partIndex) => part.changed ? <s key={partIndex}>{part.text}</s> : <span key={partIndex}>{part.text}</span>)}
-                      </p>
-                      <p lang="en" className="rp-right">
-                        {mergeChanged(row.right).map((part, partIndex) => part.changed ? <u key={partIndex}>{part.text}</u> : <span key={partIndex}>{part.text}</span>)}
-                      </p>
-                      {meta && <small>{meta}</small>}
-                    </li>
-                  );
-                })}
-              </ul>
-              {errorRows.length > maxVisibleErrors && (
-                <button type="button" className="rp-inline-button rp-noprint" aria-expanded={showAllErrors} onClick={() => setShowAllErrors((value) => !value)}>
-                  {showAllErrors ? t("Ver menos") : t("Ver todos os {n} erros", { n: errorRows.length })}
-                </button>
-              )}
-            </>
-          ) : (
-            <p className="rp-pnote">{t("Nenhum erro de inglês recorrente apareceu nesta entrevista.")}</p>
-          )}
-        </section>
-        <section className="rp-pblock">
-          <SectionHead title="Notas da sua voz" hint="Como sua fala soou: ritmo, pausas e pronúncia." />
-          {hasVoice ? (
-            <>
-              <ul className="rp-voice">
-                {model.voiceNotes.map((note) => (
-                  <li key={note.key} style={{ "--p": `${note.value ?? 0}%` } as CSSProperties}>
-                    <b>{note.value ?? "—"}</b>
-                    <span>{t(note.label)}</span>
-                    <small>{t(note.measure)}</small>
-                  </li>
-                ))}
-              </ul>
-              <p className="rp-pnote">{t("De 0 a 100. A análise não avalia sotaque.")}</p>
-            </>
-          ) : (
-            <p className="rp-pnote">{t("Sem sinais de voz suficientes nesta entrevista.")}</p>
-          )}
-          {voiceFacts && (
-            <div className="rp-voice-detail">
-              <p className="rp-psub">{t("Ritmo da fala")}</p>
-              <p className="rp-vfacts">
-                {voiceFacts.wordsPerMinute} {t("palavras/min")} · {voiceFacts.pauseCount} {t("pausas")}
-                {voiceFacts.longestPauseMs >= 1_000 ? <> · {t("pausa mais longa de ")}{Math.round(voiceFacts.longestPauseMs / 100) / 10} {t("s")}</> : null}
-                {voiceFacts.fillerCount > 0 ? <> · {voiceFacts.fillerCount} {t("hesitações")}</> : null}
-              </p>
-              <p className="rp-vinsight">{voiceFacts.insights.map((item, index) => <span key={item.key}>{index > 0 ? " " : ""}{t(item.key, item.values)}</span>)}</p>
-            </div>
-          )}
-          {pronunciation.length > 0 && (
-            <div className="rp-voice-detail">
-              <p className="rp-psub">{t("Palavras para revisar a pronúncia")}</p>
-              <ul className="rp-words">
-                {pronunciation.map((item) => (
-                  <li key={item.word}>
-                    <b lang="en">{item.word}</b>
-                    <span>{t(phonemeTip(item.worstPhoneme, item.word))}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </section>
+        <ErrorBlock rows={errorRows} reference={reference} emptyText="Nenhum erro de inglês recorrente apareceu nesta entrevista." />
+        <VoiceBlock model={model} emptyText="Sem sinais de voz suficientes nesta entrevista." />
       </ReportPart>
       <ReportPart title="Conteúdo técnico" hint="O que suas respostas mostraram e o que faltou." style={rise(2)}>
         {model.strengths.length > 0 && (
@@ -281,6 +302,89 @@ function ReadyDocument({ model, jobItems, dateLabel }: { model: ReadyModel; jobI
       )}
       <footer className="rp-pfoot ds-item" style={rise(4)}>
         {t("Entoa · Gerado a partir da sua entrevista simulada de {date}", { date: dateLabel })}
+      </footer>
+    </>
+  );
+}
+
+/** What a free conversation's report shows: no technical findings, gaps, seniority, focus or job coverage. */
+function buildConversationModel(result: InterviewReportResult, turns: Turns, azureSummary: AzureMetricSummary) {
+  return {
+    reference: (sequenceNumber: number) => answerOrdinalForSequence(turns, sequenceNumber),
+    summary: reportSummaryText(result),
+    worked: result.technicalContent.strengths,
+    keepPhrases: result.keepPhrases ?? [],
+    errorRows: buildErrorRows(result.englishCommunication.patterns),
+    voiceNotes: buildVoiceNotes(azureSummary),
+    voiceFacts: voiceDeliveryInterpretation(azureSummary.answers ?? []),
+    pronunciation: pronunciationWords(azureSummary),
+    priorities: result.priorities.flatMap((item) => item.focus?.trim() ? [{ title: item.focus.trim() }] : []),
+  };
+}
+
+type ConversationModel = ReturnType<typeof buildConversationModel>;
+
+/** "Frases para levar": sentences that were correct but can sound more natural, in the same two columns as the errors. */
+function KeepPhrasesBlock({ items }: { items: NonNullable<InterviewReportResult["keepPhrases"]> }) {
+  return (
+    <section className="rp-pblock rp-pblock-long">
+      <SectionHead title="Frases para levar" hint="Corretas, mas podem soar mais naturais." />
+      <div className="rp-errh" aria-hidden="true"><span>{t("Você disse")}</span><span>{t("Mais natural")}</span></div>
+      <ul className="rp-errs">
+        {items.map((item, index) => (
+          <li key={`${item.sequenceNumber}-${index}`}>
+            <p lang="en" className="rp-said">{item.said}</p>
+            <p lang="en" className="rp-right">{item.natural}</p>
+            <small>{item.note}</small>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** The conversation document: summary, what worked, English, voice and next steps. No technical part. */
+function ConversationDocument({ model, dateLabel }: { model: ConversationModel; dateLabel: string }) {
+  const { reference, errorRows, worked, keepPhrases, priorities } = model;
+  return (
+    <>
+      <section className="rp-pblock ds-item" style={rise(0)}>
+        <SectionHead title="Resumo da conversa" />
+        {model.summary && <p className="rp-psummary">{model.summary}</p>}
+      </section>
+      {worked.length > 0 && (
+        <section className="rp-pblock ds-item" style={rise(1)}>
+          <SectionHead title="O que funcionou" hint="O que soou bem no seu inglês." />
+          <ul className="rp-good">
+            {worked.map((item, index) => (
+              <li key={`${item.sequenceNumber}-${index}`}>
+                <span className="rp-good-body"><q lang="en" className="rp-good-q">{item.evidence}</q>{item.explanation}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <div className="ds-item" style={rise(2)}>
+        <ErrorBlock rows={errorRows} reference={reference} emptyText="Nenhum erro de inglês recorrente apareceu nesta conversa." />
+      </div>
+      {keepPhrases.length > 0 && (
+        <div className="ds-item" style={rise(3)}>
+          <KeepPhrasesBlock items={keepPhrases} />
+        </div>
+      )}
+      <div className="ds-item" style={rise(4)}>
+        <VoiceBlock model={model} emptyText="Sem sinais de voz suficientes nesta conversa." />
+      </div>
+      {priorities.length > 0 && (
+        <section className="rp-pblock ds-item" style={rise(5)}>
+          <SectionHead title="Para a próxima conversa" />
+          <ol className="rp-prio">
+            {priorities.map((item, index) => <li key={index}><b>{item.title}</b></li>)}
+          </ol>
+        </section>
+      )}
+      <footer className="rp-pfoot ds-item" style={rise(6)}>
+        {t("Entoa · Gerado a partir da sua conversa com o Tuck de {date}", { date: dateLabel })}
       </footer>
     </>
   );
@@ -355,6 +459,10 @@ export function InterviewReport({ config, elapsed, totalClock, answerCount, pers
   const reportDirection = reportState.result?.jobDirection ?? config.jobDirection;
   const isResume = config.interviewSource === "resume";
   const role = isResume ? t(RESUME_PRACTICE_LABEL) : config.role;
+  // A finished report decides by its own kind (historical reports have no config.mode); the setup's mode only words the report while it is pending.
+  const isConversationResult = reportState.result?.reportKind === "conversation";
+  const conversationMode = isConversationResult || (!reportState.result && config.mode === "conversation");
+  const conversationTitle = config.conversationPlan?.title?.trim() || t("Conversa com o Tuck");
   // The document date is the record's own date when this interview is in progress history, otherwise today. Computed once per record set.
   const reportDate = useMemo(() => {
     const record = currentInterviewId ? progressRecords.find((item) => item.id === currentInterviewId) : undefined;
@@ -362,7 +470,7 @@ export function InterviewReport({ config, elapsed, totalClock, answerCount, pers
     const parsed = value ? new Date(value) : null;
     return parsed && !Number.isNaN(parsed.getTime()) ? parsed : new Date();
   }, [progressRecords, currentInterviewId]);
-  const fileBase = useMemo(() => reportFileBase(displayTitle || role, reportDate), [displayTitle, role, reportDate]);
+  const fileBase = useMemo(() => reportFileBase(displayTitle || (conversationMode ? conversationTitle : role), reportDate), [conversationMode, conversationTitle, displayTitle, role, reportDate]);
   const startRename = () => {
     renameExitingRef.current = false;
     setRenameError(null);
@@ -406,13 +514,17 @@ export function InterviewReport({ config, elapsed, totalClock, answerCount, pers
   };
   const dateLabel = formatReportDate(reportDate, getCurrentLocale() === "en" ? "en" : "pt-BR");
   const seniorityLabel = t(seniorityLabels[normalizeSeniority(config.seniority)]);
-  const defaultTitle = `${role}${seniorityLabel && !isResume ? ` · ${seniorityLabel}` : ""}`;
+  const defaultTitle = conversationMode ? conversationTitle : `${role}${seniorityLabel && !isResume ? ` · ${seniorityLabel}` : ""}`;
   const shownTitle = displayTitle || defaultTitle;
   const focusLabel = t(normalizeFocus(config.focus) === "technical-depth" ? "Técnica" : "Equilibrada");
   const duration = historical ? elapsed : `${elapsed} / ${totalClock}`;
   const readyModel = useMemo(
-    () => reportState.result ? buildReadyModel(reportState.result, loadedTurns, azureSummary) : null,
-    [reportState.result, loadedTurns, azureSummary],
+    () => reportState.result && !isConversationResult ? buildReadyModel(reportState.result, loadedTurns, azureSummary) : null,
+    [isConversationResult, reportState.result, loadedTurns, azureSummary],
+  );
+  const conversationModel = useMemo(
+    () => reportState.result && isConversationResult ? buildConversationModel(reportState.result, loadedTurns, azureSummary) : null,
+    [isConversationResult, reportState.result, loadedTurns, azureSummary],
   );
   const jobItems = useMemo(
     () => !isResume && reportDirection?.priorityCompetencies?.length && reportState.result
@@ -422,6 +534,8 @@ export function InterviewReport({ config, elapsed, totalClock, answerCount, pers
   );
   const readyResult = reportState.status === "ready" ? reportState.result : undefined;
   const ready = readyResult && readyModel ? { model: readyModel } : null;
+  const readyAny = Boolean(readyResult && (readyModel || conversationModel));
+  const loadingSteps = conversationMode ? conversationLoadingSteps : reportLoadingSteps;
   return (
     <section ref={rootRef} className="rp-root mx-auto w-full max-w-4xl" aria-labelledby="interview-complete-title">
       {historical && <button type="button" className="ds-btn ds-btn-quiet mb-3" onClick={onLeave}>
@@ -434,7 +548,7 @@ export function InterviewReport({ config, elapsed, totalClock, answerCount, pers
           <Download width={14} height={14} aria-hidden="true" />
           {t("Exportar PDF")}
         </button>
-        {canRegenerate && onRegenerate && (
+        {canRegenerate && onRegenerate && !conversationMode && (
           <button type="button" className="ds-btn ds-btn-soft rp-regenerate rp-noprint" onClick={onRegenerate} disabled={retrying} aria-busy={retrying}>
             {t("Gerar com a análise nova")}
           </button>
@@ -455,7 +569,7 @@ export function InterviewReport({ config, elapsed, totalClock, answerCount, pers
       <article className="rp-paper" data-reveal="group" aria-busy={reportState.status === "pending" || loadingTurns}>
         <header className="rp-ptop">
           <div className="rp-brand"><Image src="/landing/tucano-mark.webp" width={18} height={21} alt="" unoptimized /><span>Entoa</span></div>
-          <span>{t("Relatório de entrevista")} · {dateLabel}</span>
+          <span>{t(conversationMode ? "Relatório de conversa" : "Relatório de entrevista")} · {dateLabel}</span>
         </header>
         <div className="rp-cover">
           <div className="rp-title-row">
@@ -483,7 +597,7 @@ export function InterviewReport({ config, elapsed, totalClock, answerCount, pers
           {renaming && <p className="rp-rename-hint">{t("Deixe vazio para voltar ao nome original.")}</p>}
           {renameError && <p className="rp-rename-error" role="alert">{t(renameError)}</p>}
           <dl className="rp-pfacts">
-            <div><dt>{t("Foco")}</dt><dd>{focusLabel}</dd></div>
+            {!conversationMode && <div><dt>{t("Foco")}</dt><dd>{focusLabel}</dd></div>}
             <div><dt>{t("Duração")}</dt><dd className="tabular-nums">{duration}</dd></div>
             <div><dt>{t("Respostas")}</dt><dd>{answerCount}</dd></div>
           </dl>
@@ -491,7 +605,7 @@ export function InterviewReport({ config, elapsed, totalClock, answerCount, pers
         {reportState.status === "pending" ? (
           <div className="rp-pending-wrap ld-fade">
             <div className="ds-card rp-card rp-pending" role="status" aria-live="polite">
-              <p className="rp-loading-step"><LoadingMark /><span key={loadingStep}>{t(reportLoadingSteps[loadingStep])}…</span></p>
+              <p className="rp-loading-step"><LoadingMark /><span key={loadingStep}>{t(loadingSteps[loadingStep] ?? loadingSteps[0])}…</span></p>
               <p className="rp-hint mt-2">{t("Você pode sair. O relatório continua sendo preparado; volte ao Progresso para ver o resultado.")}</p>
               {onRetry && <button type="button" className="btn ds-btn ds-btn-soft mt-4" onClick={onRetry} disabled={retrying} aria-busy={retrying}>
                 {retrying && <span className="loading loading-spinner loading-sm" aria-hidden="true" />}
@@ -509,7 +623,7 @@ export function InterviewReport({ config, elapsed, totalClock, answerCount, pers
           <div className="rp-stack">
             <div role="status" className="rp-alert">
               <h2 className="ds-label">
-                {t(loadedTurns.length ? (reportState.message ?? "O relatório continua indisponível. Tente novamente em instantes.") : "Não há respostas para analisar.")}
+                {t(loadedTurns.length ? (reportState.message ?? "O relatório continua indisponível. Tente novamente em instantes.") : conversationMode ? "Não há falas para analisar." : "Não há respostas para analisar.")}
               </h2>
               {loadedTurns.length > 0 && <p className="mt-1 text-sm leading-6">{t("Os sinais vocais disponíveis continuam abaixo.")}</p>}
               {loadedTurns.length > 0 && onRetry && (
@@ -522,11 +636,13 @@ export function InterviewReport({ config, elapsed, totalClock, answerCount, pers
             {loadedTurns.length > 0 && <CapturedAnswers turns={loadedTurns} />}
             <AzureVoiceReport summary={azureSummary} coverage={coverage} />
           </div>
+        ) : conversationModel ? (
+          <ConversationDocument model={conversationModel} dateLabel={dateLabel} />
         ) : ready ? (
           <ReadyDocument model={ready.model} jobItems={jobItems} dateLabel={dateLabel} />
         ) : null}
       </article>
-      {ready && <ReadyAppendix />}
+      {readyAny && <ReadyAppendix />}
       <div className="rp-foot">
         <button type="button" className={`ds-btn ${reportState.status === "pending" ? "ds-btn-quiet" : "ds-btn-cta-green"} rp-back`} onClick={onLeave}>{t(historical ? "Voltar ao Progresso " : "Voltar ao dashboard ")}
           <ArrowUpRight className="ds-arrow size-4" aria-hidden="true" />

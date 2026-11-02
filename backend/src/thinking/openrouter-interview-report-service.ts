@@ -19,6 +19,7 @@ import { analyzeEnglishEdit, repairTruncatedText, checkGrammarRuleLabel, isGener
 import {
   communicationClarities,
   communicationObservationTypes,
+  conversationReportVersion,
   type CommunicationClarity,
   type CommunicationObservationType,
   type InterviewReport,
@@ -91,6 +92,18 @@ const consolidationPrompt = [
   promptRules.vacancy,
   "For a TECHNICAL_CONTENT priority linked to a vacancy competency in its validated finding, use that same exact competency as vacancyCompetency and name it in focus. Otherwise vacancyCompetency must be null.",
   promptRules.untrusted,
+].join(" ");
+
+const conversationReportPrompt = [
+  "You are the reviewer behind Entoa. A Brazilian with B1/B2 English just had a free, relaxed spoken conversation in English with Tuck, a friendly toucan AI. This was not an interview, so there is nothing to pass: the goal is to help this person speak English more clearly, naturally and confidently in everyday talk, and to leave them wanting to practise again. The user message holds the topic and the turns: each question is what Tuck said and each answer is what the person said.",
+  promptRules.second, promptRules.language, promptRules.audit, promptRules.patterns, promptRules.why, promptRules.patternTypes, promptRules.whisper, promptRules.noInfer, promptRules.untrusted,
+  "Short answers are normal in a conversation: never criticise length, and treat Portuguese passages as not English, never as errors. Judge only the person's words, never Tuck's, and never the opinions, the facts or the quality of what they shared. If the conversation touched something sad or personal, keep a gentle tone and do not quote or comment on the painful part.",
+  "Return summary: 2 sentences, at most 300 characters, in the second person, like a friend who enjoys talking with you: what you talked about, how your English sounded overall, and the one habit that would help most. No scores and no levels.",
+  "Return worked: up to 3 concrete things the person really did well in English, each with sequenceNumber, evidence (an exact quote from that answer) and explanation (one short sentence saying why it worked: a good expression, a story told clearly, a natural connector). Never praise a topic or an opinion, and return fewer when there is little evidence.",
+  "Return patterns: the real English errors, following the English rules above, at most 6 in total and one per underlying pattern, ordered by how much each one affects understanding.",
+  "Return keepPhrases: up to 3 sentences that were correct but sounded translated or stiff, each with sequenceNumber, said (an exact quote from that answer), natural (how a friend would say the same thing, keeping the meaning) and note (one short sentence on when to use it). Never repeat an item from patterns.",
+  "Return priorities: 1 or 2 next steps for everyday conversation, each with the sequenceNumber of the answer that shows it, and focus (one short concrete sentence on what to try in the next conversation). Base them on the patterns above; if there are none, base them on the conversation itself.",
+  "Return clarity for the English overall.",
 ].join(" ");
 
 function promptForLocale(prompt: string, locale: ReportLocale | undefined): string {
@@ -473,6 +486,18 @@ function invalidReportResponse(cause?: unknown): never {
 
 type AnswerLookup = (sequenceNumber: unknown) => string | undefined;
 type QuestionLookup = AnswerLookup;
+const conversationReportSchema = {
+  type: "object", additionalProperties: false,
+  properties: {
+    summary: { type: "string", minLength: 1, maxLength: 340 },
+    clarity: claritySchema,
+    worked: { type: "array", maxItems: 3, items: { type: "object", additionalProperties: false, properties: { sequenceNumber: { type: "integer" }, evidence: { type: "string", minLength: 1, maxLength: 120 }, explanation: { type: "string", minLength: 1, maxLength: 160 } }, required: ["sequenceNumber", "evidence", "explanation"] } },
+    patterns: { type: "array", maxItems: 6, items: patternItemSchema },
+    keepPhrases: { type: "array", maxItems: 3, items: { type: "object", additionalProperties: false, properties: { sequenceNumber: { type: "integer" }, said: { type: "string", minLength: 1, maxLength: 160 }, natural: { type: "string", minLength: 1, maxLength: 200 }, note: { type: "string", minLength: 1, maxLength: 140 } }, required: ["sequenceNumber", "said", "natural", "note"] } },
+    priorities: { type: "array", maxItems: 2, items: { type: "object", additionalProperties: false, properties: { sequenceNumber: { type: "integer" }, focus: { type: "string", minLength: 1, maxLength: 160 } }, required: ["sequenceNumber", "focus"] } },
+  }, required: ["summary", "clarity", "worked", "patterns", "keepPhrases", "priorities"],
+} as const;
+
 type TechnicalItem = InterviewReport["technicalContent"]["strengths"][number];
 type PatternItem = InterviewReport["englishCommunication"]["patterns"][number];
 type PriorityItem = InterviewReport["priorities"][number];
@@ -835,6 +860,48 @@ function parseConsolidation(value: unknown, input: InterviewReportConsolidationI
   }, input.jobDirection, input.locale);
 }
 
+export function parseConversationReport(value: unknown, input: { locale?: ReportLocale; turns: InterviewReportInput["turns"] }): InterviewReport {
+  const locale = input.locale ?? "pt-BR";
+  const record = parseJsonRecord(value, ["summary", "clarity", "worked", "patterns", "keepPhrases", "priorities"]);
+  const summary = technicalSummary(record.summary, locale);
+  if (!summary || !communicationClarities.includes(record.clarity as CommunicationClarity)) invalidReportResponse();
+  const answerFor = answerLookup(input.turns);
+  const list = (field: unknown) => (Array.isArray(field) ? field : []).filter(isRecord);
+  const quoted = (item: Record<string, unknown>, field: unknown, maxLength: number) => {
+    const answer = answerFor(item.sequenceNumber);
+    return answer ? resolveCanonicalEvidence(answer, field, maxLength) : undefined;
+  };
+  const worked = list(record.worked).flatMap((item) => {
+    const evidence = quoted(item, item.evidence, 120);
+    const explanation = localizedField(normalizeFeedbackSentence(repairedField(item.explanation, 160), 160, 3), locale);
+    return evidence && explanation ? [{ sequenceNumber: item.sequenceNumber as number, evidence, explanation }] : [];
+  }).slice(0, 3);
+  const counts = newEvidenceCounts();
+  const patterns = dedupePatterns(validatePatternCandidates(list(record.patterns), answerFor, counts, locale), counts, 6);
+  const corrected = new Set(patterns.map((pattern) => normalizedFindingText(pattern.evidence)));
+  const keepPhrases = list(record.keepPhrases).flatMap((item) => {
+    const said = quoted(item, item.said, 160);
+    const natural = normalizeFeedbackSentence(item.natural, 200, 2);
+    const note = localizedField(normalizeFeedbackSentence(repairedField(item.note, 140), 140, 3), locale);
+    return said && natural && note && !corrected.has(normalizedFindingText(said)) && !isRephraseUnchanged(said, natural) ? [{ sequenceNumber: item.sequenceNumber as number, said, natural, note }] : [];
+  }).slice(0, 3);
+  const priorities = list(record.priorities).flatMap((item) => {
+    const answer = answerFor(item.sequenceNumber);
+    const focus = localizedField(normalizeFeedbackSentence(repairedField(item.focus, 160), 160, 3), locale);
+    if (!answer || !focus) return [];
+    const evidence = patterns.find((pattern) => pattern.sequenceNumber === item.sequenceNumber)?.evidence ?? answer.slice(0, 120);
+    return [{ area: "ENGLISH_COMMUNICATION" as const, sequenceNumber: item.sequenceNumber as number, evidence, focus }];
+  }).slice(0, 2);
+  return {
+    reportKind: "conversation",
+    locale,
+    keepPhrases,
+    technicalContent: { summary, strengths: worked, gaps: [] },
+    englishCommunication: { clarity: record.clarity as CommunicationClarity, evidenceStatus: englishEvidenceStatus(patterns.length, counts.candidates), patterns },
+    priorities,
+  };
+}
+
 /**
  * Offline evaluation seam. It returns only bounded counts and the parsed report;
  * raw provider text and candidate answers are never copied into diagnostics.
@@ -1001,6 +1068,20 @@ export class OpenRouterInterviewReportService implements InterviewReportService 
     const { report, diagnostics } = this.validated(input.turns.length, undefined, () => parseReport(content, input));
     logEvidenceValidation("full", diagnostics);
     return { ...report, model: this.options.model, analysisVersion: "v3" };
+  }
+
+  async generateConversation(input: { locale?: ReportLocale; topic: string; turns: InterviewReportInput["turns"] }): Promise<InterviewReport & { model: string; analysisVersion: typeof conversationReportVersion }> {
+    const content = await this.requestStructured({
+      schemaName: "conversation_report",
+      schema: schemaForLocale(conversationReportSchema, input.locale),
+      system: promptForLocale(conversationReportPrompt, input.locale),
+      user: { ...(input.locale ? { locale: input.locale } : {}), topic: input.topic, turns: input.turns },
+      maxTokens: 4_096,
+      timeoutMs: this.options.timeoutMs,
+      turnCount: input.turns.length,
+    });
+    const report = this.validated(input.turns.length, undefined, () => parseConversationReport(content, input));
+    return { ...report, model: this.options.model, analysisVersion: conversationReportVersion };
   }
 
   async analyzeTurn(input: InterviewTurnAnalysisInput): Promise<InterviewTurnAnalysis & { model: string }> {

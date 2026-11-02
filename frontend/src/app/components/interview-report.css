@@ -71,6 +71,8 @@
 .rp-good { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
 .rp-good li { display: flex; gap: 0.55rem; align-items: baseline; font-size: 0.9rem; line-height: 1.4; }
 .rp-good li::before { content: ""; width: 6px; height: 6px; flex: none; border-radius: 2px; background: var(--ds-green); transform: translateY(-1px); }
+.rp-good-body { display: grid; gap: 0.15rem; min-width: 0; }
+.rp-good-q { margin: 0; font-size: 0.8rem; line-height: 1.4; color: var(--ds-text-2); }
 
 /* Job competencies: small tiles, status in green, warning for partial, quiet for missing. */
 .rp-job { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; }
