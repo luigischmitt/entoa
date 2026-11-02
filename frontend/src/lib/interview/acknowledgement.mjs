@@ -6,7 +6,10 @@ import { acquireInterviewerAudio, releaseInterviewerAudio } from "./audio-unlock
 import { errorNameOf } from "./client-environment.mjs";
 import { applyPlaybackRate, createRateDeadline, fetchSpeechBlob, followPlaybackRate } from "./speech-playback.mjs";
 
-export const ACKNOWLEDGEMENT_PHRASES = ["Okay.", "Got it.", "Alright.", "Mm-hm, okay.", "Thanks.", "I got it.", "I understand what you mean."];
+/** The ones that fit right before a goodbye: no "let's see" or "let's go". */
+export const CLOSING_ACKNOWLEDGEMENTS = ["Mm-hm, okay, got it.", "Hmm, right, I see."];
+
+export const ACKNOWLEDGEMENT_PHRASES = ["Hmm, hmm, okay, let's see.", "Hmm, let me think.", "Mm-hm, okay, got it.", "Hmm, right, I see.", "Okay, let me see.", "Hmm, alright, let's go."];
 
 /** A natural beat between the end of the answer and the acknowledgement, and between the acknowledgement and the question. */
 export const ACKNOWLEDGEMENT_LEAD_MS = 450;
@@ -24,7 +27,7 @@ const normalize = (text) => text.toLocaleLowerCase().replace(/[^\p{L}\p{N}\s-]/g
 /** Opening word(s) that identify a family of acknowledgements, so "Okay, thanks." and "OK." count as the same one. */
 function acknowledgementFamily(text) {
   const words = normalize(text);
-  const families = [["okay", /^(?:okay|ok)\b/u], ["got it", /^(?:got it|i got it|gotcha)\b/u], ["alright", /^(?:alright|all right)\b/u], ["mm-hm", /^(?:mm-?hm+|mhm+|uh-?huh)\b/u], ["thanks", /^(?:thanks|thank you)\b/u], ["understand", /^i understand\b/u]];
+  const families = [["hmm", /^(?:hmm+|hm+)\b/u], ["okay", /^(?:okay|ok)\b/u], ["got it", /^(?:got it|i got it|gotcha)\b/u], ["alright", /^(?:alright|all right)\b/u], ["mm-hm", /^(?:mm-?hm+|mhm+|uh-?huh)\b/u]];
   return families.find(([, pattern]) => pattern.test(words))?.[0] ?? null;
 }
 

@@ -46,6 +46,7 @@ describe("data analyst calibration", () => {
     expect(result.report?.priorities).toEqual([]);
 
     const generic = run({
+      englishCommunication: { clarity: "MOSTLY_CLEAR", patterns: [{ type: "GRAMMAR", sequenceNumber: 2, evidence: "the best day for surf", suggestion: "Use a preposição correta antes do substantivo.", rephrasedExample: "the best day for surfing." }] },
       technicalContent: { summary: "Você descreveu seu uso de Python.", strengths: [item(4, "substitute that for my mean of my values", "Você substituiu valores incorretos pela média da coluna.")], gaps: [] },
       priorities: [
         { area: "TECHNICAL_CONTENT", sequenceNumber: 4, evidence: "substitute that for my mean of my values", focus: "Imputação pela média", exercise: "Pratique explicar como suas habilidades técnicas resolvem problemas específicos do cargo.", vacancyCompetency: null },

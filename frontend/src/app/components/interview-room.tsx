@@ -44,7 +44,7 @@ import { canAutoSubmitVoiceTranscript, canSkipVoiceQuestion, createOnceGate, fin
 import { canAskAnotherFollowUp } from "@/lib/interview/follow-up-policy.mjs";
 import { useInterviewSession } from "../hooks/use-interview-session";
 import { createInterviewerAcknowledgements, prewarmFixedInterviewerUtterance, prewarmFollowUpUtterance, prewarmInterviewerClosing, prewarmInterviewerUtterance, useSpeechPlayback, useSpeechWarmup, type SpeechTimingEvent } from "../hooks/use-speech-playback";
-import { isAcknowledgeableAnswer, pickAcknowledgement, stripLeadingAcknowledgement } from "@/lib/interview/acknowledgement.mjs";
+import { CLOSING_ACKNOWLEDGEMENTS, isAcknowledgeableAnswer, pickAcknowledgement, stripLeadingAcknowledgement } from "@/lib/interview/acknowledgement.mjs";
 import { closingReactionVariants, composeClosingLead, createClosingReactionTracker, isLastAnswerExpected, pickClosingFallbackReaction } from "@/lib/interview/closing-reaction.mjs";
 import { requestClosingReaction } from "@/lib/interview/closing-reaction-request";
 import { useMicEngine } from "../hooks/use-mic-engine";
@@ -675,7 +675,7 @@ export function InterviewRoom({ config, resumeCheckpoint = null, onLeave }: { co
       return acknowledgementOutcomeRef.current?.willPlay === true;
     },
     audio: config.playInterviewerAudio,
-    pickWord: () => pickAcknowledgement({ recent: recentAcknowledgementsRef.current }),
+    pickWord: () => pickAcknowledgement({ phrases: CLOSING_ACKNOWLEDGEMENTS, recent: recentAcknowledgementsRef.current }),
     fallbackReaction: detectClarificationRequest(answer, heardQuestion()) === null ? closingFallback : null,
     onSource: (source) => {
       if (source === "fallback") rememberClosingFallback(closingFallback);

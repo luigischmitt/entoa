@@ -231,7 +231,8 @@ describe("server chunking is identical to the client's", () => {
     expect([...CLOSING_FALLBACK_REACTIONS]).toEqual([...clientClosingReaction.CLOSING_FALLBACK_REACTIONS]);
     expect(composeInterviewClosing("So you traced it to the cache TTL.", INTERVIEW_CLOSINGS[2])).toBe(client.composeInterviewClosing("So you traced it to the cache TTL.", INTERVIEW_CLOSINGS[2]));
     expect(composeInterviewClosing()).toBe(client.composeInterviewClosing());
-    expect([...clientAck.ACKNOWLEDGEMENT_PHRASES]).toEqual(["Okay.", "Got it.", "Alright.", "Mm-hm, okay.", "Thanks.", "I got it.", "I understand what you mean."]);
+    expect([...ACKNOWLEDGEMENT_PHRASES]).toEqual([...clientAck.ACKNOWLEDGEMENT_PHRASES]);
+    expect([...ACKNOWLEDGEMENT_PHRASES]).toEqual(["Hmm, hmm, okay, let's see.", "Hmm, let me think.", "Mm-hm, okay, got it.", "Hmm, right, I see.", "Okay, let me see.", "Hmm, alright, let's go."]);
   });
 });
 
@@ -271,7 +272,7 @@ describe("interviewer prefetcher", () => {
   });
 
   it("lists the fixed phrases in their spoken form", () => {
-    expect(staticSpeechTexts()).toContain("Okay.");
+    expect(staticSpeechTexts()).toContain("Hmm, let me think.");
     for (const reaction of CLOSING_FALLBACK_REACTIONS) expect(staticSpeechTexts()).toContain(reaction);
     for (const closing of [...INTERVIEW_CLOSINGS, ...INTERVIEW_ENDED_CLOSINGS]) {
       for (const text of interviewerChunkTexts(closing)) expect(staticSpeechTexts()).toContain(text);

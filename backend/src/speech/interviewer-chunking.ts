@@ -144,7 +144,7 @@ export function composeAcknowledgedQuestion(acknowledgement: string | null | und
   return [acknowledgement?.trim(), question.trim()].filter(Boolean).join(" ");
 }
 
-export const ACKNOWLEDGEMENT_PHRASES = ["Okay.", "Got it.", "Alright.", "Mm-hm, okay.", "Thanks.", "I got it.", "I understand what you mean."];
+export const ACKNOWLEDGEMENT_PHRASES = ["Hmm, hmm, okay, let's see.", "Hmm, let me think.", "Mm-hm, okay, got it.", "Hmm, right, I see.", "Okay, let me see.", "Hmm, alright, let's go."];
 export const ACKNOWLEDGEMENT_MIN_WORDS = 5;
 
 /** Mirrors the client's closing lines (frontend speech-playback.mjs), so every variant is cached ahead of the interview. */
