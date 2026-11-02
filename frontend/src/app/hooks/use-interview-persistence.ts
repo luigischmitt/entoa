@@ -76,7 +76,6 @@ export function useInterviewPersistence(
     localWriteOkRef.current = ok;
     if (ok && mountedRef.current && !sessionIdRef.current) {
       setPersistenceState("local");
-      setPersistenceMessage("Sessão salva neste navegador. A sincronização com sua conta está pendente.");
     }
     if (!ok) markUnsafe();
     return ok;
