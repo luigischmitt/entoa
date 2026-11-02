@@ -4,7 +4,7 @@ import { createApp } from "../src/app.js";
 import type { AccessTokenVerifier } from "../src/auth/access-token-verifier.js";
 import type { SpeechConfig } from "../src/speech/config.js";
 import { genericConversationPlan, OpenRouterConversationPlanService, type ConversationPlanService } from "../src/thinking/conversation-plan-service.js";
-import { fitConversationLine, OpenRouterConversationTurnService, maxConversationSentences, maxConversationWords, type ConversationTurnInput, type ConversationTurnService } from "../src/thinking/conversation-turn-service.js";
+import { fitConversationLine, isMeaningQuestion, OpenRouterConversationTurnService, maxConversationSentences, maxConversationWords, type ConversationTurnInput, type ConversationTurnService } from "../src/thinking/conversation-turn-service.js";
 
 const speechConfig: SpeechConfig = { provider: "fake", interviewerVoice: "en-US-AndrewNeural", defaultSpeed: 1, format: "mp3" };
 const stuckLine = "Hmm, I got a bit lost in the forest there. Tell me a little more about that?";
@@ -173,6 +173,71 @@ describe("conversation turn service", () => {
   });
 });
 
+describe("isMeaningQuestion", () => {
+  it.each([
+    "What does cheers mean?",
+    "what does cheers mean",
+    "What do you mean by cheers",
+    "What's the meaning of cheers?",
+    "What is cheers",
+    "How do you say saudade in English?",
+    "How do you use cheers?",
+    "Can you explain cheers?",
+    "I don't know what cheers means",
+    "I don't understand cheers",
+    "Yes, what does cheers mean?",
+  ])("is a meaning question: %s", (text) => {
+    expect(isMeaningQuestion(text)).toBe(true);
+  });
+
+  it.each([
+    "What do you do on weekends?",
+    "What is your favorite food?",
+    "What is the best part of your day?",
+    "I don't understand you",
+    "What is a very long question about many different things that goes on and on forever?",
+    "Yes, on Sunday.",
+    "",
+  ])("is not a meaning question: %s", (text) => {
+    expect(isMeaningQuestion(text)).toBe(false);
+  });
+});
+
+describe("meaning questions in the turn service", () => {
+  const definition = "Cheers means thanks, or good luck, when people raise their glasses. For example, you can say cheers after someone buys you a coffee. Do you say cheers in Portuguese too?";
+
+  it("keeps a three-sentence definition for a meaning question", async () => {
+    const result = await turnService(fakeFetch({ say: definition, move: "FOLLOW", pathId: null })).reply(turnInput({ transcript: "What does cheers mean?" }));
+    expect(result).toEqual({ say: definition, move: "FOLLOW", pathId: null, outcome: "decided" });
+  });
+
+  it("keeps a reply that names the word the person asked about", async () => {
+    const say = "Google means to search for something on the internet. For example, you can google a recipe. Did you ever google something today?";
+    expect(await turnService(fakeFetch({ say, move: "FOLLOW", pathId: null })).reply(turnInput({ transcript: "What does google mean?" })))
+      .toEqual({ say, move: "FOLLOW", pathId: null, outcome: "decided" });
+  });
+
+  it("still refuses a provider name the person did not ask about", async () => {
+    const result = await turnService(fakeFetch({ say: "Google means to search. Did you ever google it?", move: "FOLLOW", pathId: null })).reply(turnInput({ transcript: "What does cheers mean?" }));
+    expect(result).toMatchObject({ say: "Sorry, I missed that word. Can you say it one more time?", outcome: "invalid" });
+  });
+
+  it.each([
+    ["an invalid reply", fakeFetch("not json {"), "invalid"],
+    ["HTTP 500", failingFetch(500), "error"],
+    ["a timeout", hangingFetch, "timeout"],
+  ] as const)("asks the person to repeat the word, not a path line, on %s", async (_label, fetchImplementation, outcome) => {
+    expect(await turnService(fetchImplementation, 5).reply(turnInput({ transcript: "What does cheers mean?" })))
+      .toEqual({ say: "Sorry, I missed that word. Can you say it one more time?", move: "FOLLOW", pathId: null, outcome });
+  });
+
+  it("keeps a whole NEW_PATH explanation for a meaning question", async () => {
+    const say = "Cheers is a friendly word. People say it before a drink. Do you have a favourite drink?";
+    expect(await turnService(fakeFetch({ say, move: "NEW_PATH", pathId: "p1" })).reply(turnInput({ transcript: "What is cheers" })))
+      .toEqual({ say, move: "NEW_PATH", pathId: "p1", outcome: "decided" });
+  });
+});
+
 describe("conversation plan service", () => {
   it("returns a valid plan", async () => {
     expect(await planService(fakeFetch(validPlan)).plan({ topic: "como foi meu dia hoje" })).toEqual({
@@ -309,5 +374,12 @@ describe("POST /api/v1/thinking/conversation-plan", () => {
     expect(limited.body.error.code).toBe("CONVERSATION_PLAN_RATE_LIMITED");
     expect(Number(limited.headers["retry-after"])).toBeGreaterThanOrEqual(1);
     expect(plan).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("meaning questions as people say them under pressure", () => {
+  it("recognizes them without the auxiliary verb", () => {
+    for (const text of ["what cheers mean", "what means cheers", "What cheers means?", "what the word cheers mean"]) expect(isMeaningQuestion(text)).toBe(true);
+    expect(isMeaningQuestion("what you mean by that is great")).toBe(false);
   });
 });
