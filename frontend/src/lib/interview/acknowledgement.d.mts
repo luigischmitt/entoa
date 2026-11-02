@@ -29,6 +29,8 @@ export function createAcknowledgementPlayer(options: {
   voice?: string;
   speed?: number;
   loadBlob?: (phrase: string) => Promise<Blob>;
+  /** Static audio for a phrase (no request); when it rejects the phrase falls back to `loadBlob`. */
+  staticBlob?: (phrase: string) => Promise<Blob>;
   makeAudio?: (url: string) => HTMLAudioElement;
   createObjectUrl?: (blob: Blob) => string;
   revokeObjectUrl?: (url: string) => void;

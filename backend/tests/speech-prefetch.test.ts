@@ -2,7 +2,7 @@ import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
 import { loadSpeechConfig, type SpeechConfig } from "../src/speech/config.js";
-import { CLOSING_FALLBACK_REACTIONS, composeAcknowledgedQuestion, composeInterviewClosing, groupInterviewerSentences, INTERVIEW_CLOSINGS, INTERVIEW_ENDED_CLOSINGS, interviewerChunkTexts, isAcknowledgeableAnswer, splitInterviewerSpeech, stripLeadingAcknowledgement } from "../src/speech/interviewer-chunking.js";
+import { ACKNOWLEDGEMENT_PHRASES, CLOSING_FALLBACK_REACTIONS, composeAcknowledgedQuestion, composeInterviewClosing, groupInterviewerSentences, INTERVIEW_CLOSINGS, INTERVIEW_ENDED_CLOSINGS, interviewerChunkTexts, isAcknowledgeableAnswer, splitInterviewerSpeech, stripLeadingAcknowledgement } from "../src/speech/interviewer-chunking.js";
 import { InterviewerSpeechPrefetcher, staticSpeechTexts } from "../src/speech/interviewer-prefetcher.js";
 import { SpeechCache, speechCacheKey } from "../src/speech/speech-cache.js";
 import { createSpeechServices } from "../src/speech/speech-services.js";
@@ -231,7 +231,7 @@ describe("server chunking is identical to the client's", () => {
     expect([...CLOSING_FALLBACK_REACTIONS]).toEqual([...clientClosingReaction.CLOSING_FALLBACK_REACTIONS]);
     expect(composeInterviewClosing("So you traced it to the cache TTL.", INTERVIEW_CLOSINGS[2])).toBe(client.composeInterviewClosing("So you traced it to the cache TTL.", INTERVIEW_CLOSINGS[2]));
     expect(composeInterviewClosing()).toBe(client.composeInterviewClosing());
-    expect([...clientAck.ACKNOWLEDGEMENT_PHRASES]).toEqual(["Okay.", "Got it.", "Alright.", "Mm-hm, okay.", "Thanks."]);
+    expect([...clientAck.ACKNOWLEDGEMENT_PHRASES]).toEqual(["Okay.", "Got it.", "Alright.", "Mm-hm, okay.", "Thanks.", "I got it.", "I understand what you mean."]);
   });
 });
 
@@ -382,8 +382,25 @@ describe("static phrase prefetch", () => {
     const cache = new SpeechCache({ provider: provider as never, ttlMs: 60_000, maxPrefetchInFlight: 1, onEvent: (event: { type: string }) => events.push(event.type) });
     await new InterviewerSpeechPrefetcher({ cache, chunks: 1, voice: "am_echo", speed: 1, format: "mp3" } as never).prefetchStatic();
     expect(peak).toBe(1);
-    expect(calls).toBe(staticSpeechTexts().length);
+    expect(calls).toBe(staticSpeechTexts().length - ACKNOWLEDGEMENT_PHRASES.length);
     expect(events).not.toContain("prefetch_dropped");
+  });
+
+  it("leaves the acknowledgements to the client's static files at speed 1, and synthesizes them at other speeds", async () => {
+    const { InterviewerSpeechPrefetcher } = await import("../src/speech/interviewer-prefetcher.js");
+    const phraseTexts = ACKNOWLEDGEMENT_PHRASES.map((phrase) => normalizeTextForSpeech(phrase.trim()));
+    const synthesizedAt = async (speed: number) => {
+      const texts: string[] = [];
+      const provider = { name: "fake", health: async () => ({ status: "ready" }), async synthesize(request: SpeechSynthesisRequest) { texts.push(request.text); return { audio: Buffer.from([1]), contentType: "audio/mpeg" }; } };
+      const cache = new SpeechCache({ provider: provider as never, ttlMs: 60_000 });
+      await new InterviewerSpeechPrefetcher({ cache, chunks: 1, voice: "am_echo", speed: 1, format: "mp3" } as never).prefetchStaticFor("am_echo", speed, { concurrency: 2 });
+      return texts;
+    };
+    const atSpeedOne = await synthesizedAt(1);
+    expect(atSpeedOne.length).toBeGreaterThan(0);
+    for (const text of phraseTexts) expect(atSpeedOne).not.toContain(text);
+    const atSpeedOnePointOne = await synthesizedAt(1.1);
+    for (const text of phraseTexts) expect(atSpeedOnePointOne).toContain(text);
   });
 
   it("warms static phrases for the requested voice and speed before answering, then reuses cache hits", async () => {
