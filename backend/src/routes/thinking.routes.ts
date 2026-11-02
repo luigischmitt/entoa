@@ -8,9 +8,12 @@ import { createPolishedAnswerController } from "../controllers/polished-answer-c
 import { createSpeculativeTurnController, createSpeculativeTurnStatusController } from "../controllers/speculative-turn-controller.js";
 import { createClosingReactionController } from "../controllers/closing-reaction-controller.js";
 import { createShortReplyController } from "../controllers/short-reply-controller.js";
+import { createConversationPlanController, createConversationTurnController } from "../controllers/conversation-controller.js";
 import { createResumeDirectionHandlers } from "../controllers/resume-direction-controller.js";
 import type { InterviewerSpeechPrefetcher } from "../speech/interviewer-prefetcher.js";
-import type { JobDirectionUserLimit } from "../thinking/job-direction-user-limit.js";
+import { JobDirectionUserLimit } from "../thinking/job-direction-user-limit.js";
+import type { ConversationPlanService } from "../thinking/conversation-plan-service.js";
+import type { ConversationTurnService } from "../thinking/conversation-turn-service.js";
 import type { InterviewOrchestrationService, InterviewReportService, JobDirectionService, ResumeDirectionService, ThinkingService } from "../thinking/types.js";
 import type { ClosingReactionService } from "../thinking/closing-reaction-service.js";
 import type { ShortReplyService } from "../thinking/short-reply-service.js";
@@ -21,7 +24,7 @@ import type { RedoCheckService } from "../thinking/redo-check-service.js";
 import type { PersistedReportGenerator } from "../controllers/persisted-interview-report-controller.js";
 import { createPersistedInterviewReportController } from "../controllers/persisted-interview-report-controller.js";
 
-export function createThinkingRouter(service: ThinkingService | null, orchestrationService: InterviewOrchestrationService, reportService: InterviewReportService | null, jobDirectionService: JobDirectionService | null, resumeDirectionService: ResumeDirectionService | null, jobDirectionUserLimit: JobDirectionUserLimit, speechPrefetcher: InterviewerSpeechPrefetcher | null = null, speculativeService: SpeculativeTurnAnalysisService | null = null, speculativeEnabled = false, closingReactionService: ClosingReactionService | null = null, polishedAnswerService: PolishedAnswerService | null = null, redoCheckService: RedoCheckService | null = null, persistedReportGenerator: PersistedReportGenerator | null = null, shortReplyService: ShortReplyService | null = null) {
+export function createThinkingRouter(service: ThinkingService | null, orchestrationService: InterviewOrchestrationService, reportService: InterviewReportService | null, jobDirectionService: JobDirectionService | null, resumeDirectionService: ResumeDirectionService | null, jobDirectionUserLimit: JobDirectionUserLimit, speechPrefetcher: InterviewerSpeechPrefetcher | null = null, speculativeService: SpeculativeTurnAnalysisService | null = null, speculativeEnabled = false, closingReactionService: ClosingReactionService | null = null, polishedAnswerService: PolishedAnswerService | null = null, redoCheckService: RedoCheckService | null = null, persistedReportGenerator: PersistedReportGenerator | null = null, shortReplyService: ShortReplyService | null = null, conversationTurnService: ConversationTurnService | null = null, conversationPlanService: ConversationPlanService | null = null, conversationPlanUserLimit: JobDirectionUserLimit = new JobDirectionUserLimit()) {
   const thinkingRouter = Router();
   thinkingRouter.post("/", createThinkingController(service));
   thinkingRouter.post("/job-direction", createJobDirectionController(jobDirectionService, jobDirectionUserLimit));
@@ -31,6 +34,8 @@ export function createThinkingRouter(service: ThinkingService | null, orchestrat
   thinkingRouter.get("/speculative-turn/status", createSpeculativeTurnStatusController(speculativeService, speculativeEnabled));
   thinkingRouter.post("/closing-reaction", createClosingReactionController(closingReactionService));
   thinkingRouter.post("/short-reply", createShortReplyController(shortReplyService));
+  thinkingRouter.post("/conversation-turn", createConversationTurnController(conversationTurnService));
+  thinkingRouter.post("/conversation-plan", createConversationPlanController(conversationPlanService, conversationPlanUserLimit));
   thinkingRouter.post("/report", createInterviewReportController(reportService));
   thinkingRouter.post("/report/interview/:interviewId", createPersistedInterviewReportController(persistedReportGenerator));
   thinkingRouter.post("/report/turn", createInterviewReportTurnController(reportService));

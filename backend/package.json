@@ -14,6 +14,7 @@
     "eval:followup": "tsx evals/followup-eval.ts",
     "eval:resume-fixed": "tsx evals/resume-fixed-eval.ts",
     "eval:planned-coverage": "tsx evals/planned-coverage-eval.ts",
+    "eval:conversation": "tsx evals/conversation-sim.ts",
     "test:audio-e2e": "tsx src/transcription/audio-stream-e2e.ts"
   },
   "dependencies": {
