@@ -19,5 +19,5 @@
   --tc-branch: #3f7057; --tc-edge: rgba(0, 0, 0, 0.35);
 }
 .toucan svg { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
-/* "D": an empty mouth, a faint wedge between the mandibles. */
-.toucan-wedge { fill: rgba(96, 62, 34, 0.3); }
+/* a warm wedge between the mandibles */
+.toucan-wedge { fill: #7a4b2b; }

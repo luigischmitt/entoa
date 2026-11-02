@@ -103,7 +103,7 @@ export function ToucanAvatar({ state, speechFeed = null, candidateLevelRef, clas
         <defs>
           <radialGradient id={id("wall")} cx=".5" cy=".42" r=".75"><stop offset="0" style={{ stopColor: "var(--tc-wall-a)" }} /><stop offset="1" style={{ stopColor: "var(--tc-wall-b)" }} /></radialGradient>
           <radialGradient id={id("floor")} cx=".5" cy=".5" r=".5"><stop offset="0" style={{ stopColor: "var(--tc-floor)" }} /><stop offset="1" style={{ stopColor: "var(--tc-floor)", stopOpacity: 0 }} /></radialGradient>
-          <clipPath id={id("eye")}><circle r="7" /></clipPath>
+          <clipPath id={id("eye")}><circle r="9.8" /></clipPath>
           <clipPath id={id("up")}><path d="M211,52 C248,29 332,33 372,88 C330,80 272,86 219,92 C207,86 203,66 211,52Z" /></clipPath>
         </defs>
         <rect x="-400" y="-300" width="1200" height="900" fill={`url(#${id("wall")})`} />
@@ -112,32 +112,41 @@ export function ToucanAvatar({ state, speechFeed = null, candidateLevelRef, clas
           <path d="M30 268 C96 250 170 248 266 238" fill="none" stroke="var(--tc-branch)" strokeWidth="9" strokeLinecap="round" />
           <path d="M232 241 C246 228 252 218 250 206" fill="none" stroke="var(--tc-branch)" strokeWidth="5" strokeLinecap="round" />
           <g fill="none" stroke="var(--tc-feet)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M152,228 L152,240 M152,240 C150,247 144,250 139,248 M152,240 C155,247 161,250 166,247 M152,240 L152,251" />
-            <path d="M180,224 L180,238 M180,238 C178,246 172,249 167,247 M180,238 C183,246 189,249 194,246 M180,238 L180,250" />
+            <path data-tc="footL" d="M152,228 L152,240 M152,240 C150,247 144,250 139,248 M152,240 C155,247 161,250 166,247 M152,240 L152,251" />
+            <path data-tc="footR" d="M180,224 L180,238 M180,238 C178,246 172,249 167,247 M180,238 C183,246 189,249 194,246 M180,238 L180,250" />
           </g>
           <g data-tc="tail">
             <path d="M106,200 C106,236 103,262 99,284 Q112,294 126,284 C136,264 146,246 154,222Z" fill="var(--tc-body)" />
+            <g data-tc="tailtip">
             <path d="M100,272 Q113,280 125,272 L126,279 Q113,288 99,280Z" fill="var(--tc-wingline)" opacity=".92" />
+            </g>
           </g>
           <g data-tc="body">
             <path d="M118,112 C100,150 98,190 108,214 L152,234 L180,228 C206,214 226,186 226,152 C226,134 222,118 208.6,103.7Z" fill="var(--tc-body)" />
+            <g data-tc="wing">
             <path d="M104,170 C106,150 128,142 146,152 C160,162 166,184 164,198 C162,222 150,238 138,250 C120,228 106,200 104,170Z" fill="var(--tc-wing)" />
             <path d="M112,188 C128,184 148,194 154,216 C150,232 144,242 138,250 C124,232 114,210 112,188Z" fill="var(--tc-wing2)" />
             <path d="M114,188 C120,210 128,232 138,250 L134,250 C124,232 116,212 111,192Z" fill="var(--tc-wingline)" />
+            </g>
           </g>
           <path data-tc="skin" d={REST_SKIN_PATH} fill="var(--tc-body)" />
           <g data-tc="head">
+            <path data-tc="tuft0" d="M148,52 C141,47 136,46 131,48 C133,52 137,57 144,60Z" fill="var(--tc-body)" strokeLinejoin="round" stroke="var(--tc-body)" strokeWidth="2.5" />
+            <path data-tc="tuft1" d="M154,46 C149,38 143,35 137,36 C138,42 143,49 149,53Z" fill="var(--tc-body)" strokeLinejoin="round" stroke="var(--tc-body)" strokeWidth="2.5" />
+            <path data-tc="tuft2" d="M162,42 C159,34 154,30 148,30 C148,36 151,42 156,46Z" fill="var(--tc-body)" strokeLinejoin="round" stroke="var(--tc-body)" strokeWidth="2.5" />
             <circle cx="178" cy="78" r="40" fill="var(--tc-body)" />
             <path d="M186,40.5 C198,43 207,48 210,55 C214,66 221,82 222,96 C219,103 206,106 190,106 C176,100 174,70 186,40.5Z" fill="var(--tc-body)" />
             <path data-tc="bib" d={REST_BIB_PATH} fill="var(--tc-bib)" />
-            <g transform="translate(190 66)">
-              <circle r="11.5" fill="var(--tc-ring)" stroke="var(--tc-ringedge)" strokeWidth="1.5" />
+            <g transform="translate(186 70)">
+              <circle r="14.5" fill="var(--tc-ring)" stroke="var(--tc-ringedge)" strokeWidth="1.5" />
               <g clipPath={`url(#${id("eye")})`}>
-                <circle r="7" fill="var(--tc-iris)" />
-                <g data-tc="pup"><circle r="3.6" fill="#050706" /><circle cx="-1.6" cy="-1.8" r="1.4" fill="#fff" /></g>
-                <g data-tc="lid"><rect x="-9" y="-24" width="18" height="24" fill="var(--tc-ring)" /><line x1="-9" y1="0" x2="9" y2="0" stroke="var(--tc-ringedge)" strokeWidth="1.6" /></g>
+                <circle r="9.8" fill="var(--tc-iris)" />
+                <g data-tc="pup"><circle r="6" fill="#050706" /></g>
+                <g data-tc="glint"><circle cx="-3" cy="-3.4" r="2.5" fill="#fff" /><circle cx="3" cy="3" r="1.1" fill="#fff" opacity=".75" /></g>
+                <g data-tc="lid"><path d="M-13,-30 H13 V-1.5 Q0,3 -13,-1.5 Z" fill="var(--tc-ring)" /><path d="M-13,-1.5 Q0,3 13,-1.5" fill="none" stroke="var(--tc-ringedge)" strokeWidth="1.8" strokeLinecap="round" /></g>
+                <g data-tc="lowlid"><path d="M-13,30 H13 V4 Q0,0 -13,4 Z" fill="var(--tc-ring)" /></g>
               </g>
-              <path data-tc="lash" d="M-5,1 Q0,5 5,1" fill="none" stroke="var(--tc-ringedge)" strokeWidth="1.8" strokeLinecap="round" opacity="0" />
+              <path data-tc="lash" d="M-7,1.5 Q0,6.5 7,1.5" fill="none" stroke="var(--tc-ringedge)" strokeWidth="2" strokeLinecap="round" opacity="0" />
             </g>
             <g data-tc="beak">
               <path data-tc="wedge" d="" className="toucan-wedge" />
