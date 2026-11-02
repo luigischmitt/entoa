@@ -42,6 +42,18 @@ test("summary joins the technical summary and English overview without repeating
   assert.equal(reportSummaryText(undefined), "");
 });
 
+test("summary does not repeat the English verdict when the technical summary already judges it", () => {
+  const english = "Seu inglês é compreensível, com erros recorrentes de plural.";
+  assert.equal(reportSummaryText({
+    technicalContent: { summary: "Você explicou o cache com clareza. Seu inglês é compreensível, mas erros de plural aparecem." },
+    overview: { english },
+  }), "Você explicou o cache com clareza. Seu inglês é compreensível, mas erros de plural aparecem.");
+  assert.equal(reportSummaryText({
+    technicalContent: { summary: "Você explicou o cache com clareza." },
+    overview: { english: "Seu inglês é compreensível, com erros recorrentes de plural." },
+  }), "Você explicou o cache com clareza. Seu inglês é compreensível, com erros recorrentes de plural.");
+});
+
 test("job coverage reports shown, partial and missing competencies", () => {
   const coverage = buildJobCoverage(
     [" Node.js ", "node.js", "Comunicação", "Kubernetes", "AWS"],

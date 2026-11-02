@@ -150,6 +150,22 @@ describe("final interview report service", () => {
     expect(report.priorities[1]).toEqual(secondPriority);
   });
 
+  it("keeps an English priority only when its sequence and excerpt match a validated pattern", async () => {
+    const englishPriority = (sequenceNumber: number, evidence: string) => ({ area: "ENGLISH_COMMUNICATION", sequenceNumber, evidence, focus: "Use o sujeito só uma vez antes do verbo." });
+    const content = { ...providerReport, priorities: [englishPriority(4, "We monitor errors and latency"), englishPriority(4, "monitor errors and latency in production"), englishPriority(2, "add timeouts and bounded retries")] };
+    const report = await makeService(async () => providerResponse(JSON.stringify(content))).generate(input);
+    expect(report.priorities.map((item) => [item.sequenceNumber, item.evidence])).toEqual([[4, "We monitor errors and latency"]]);
+  });
+
+  it("drops a consolidated English priority whose excerpt does not overlap the validated pattern", async () => {
+    const turnAnalyses = [{ sequenceNumber: 4, technicalStrengths: [], technicalGaps: [], englishPatterns: [validReport.englishCommunication.patterns[0]!] }];
+    const englishPriority = (evidence: string) => ({ area: "ENGLISH_COMMUNICATION", sequenceNumber: 4, evidence, focus: "Use o sujeito só uma vez antes do verbo." });
+    const priorities = [englishPriority("We monitor errors and latency"), englishPriority("monitor errors and latency in production")];
+    const report = await makeService(async () => providerResponse(JSON.stringify({ summary: "Resumo técnico completo e objetivo.", clarity: "MOSTLY_CLEAR", priorities }))).consolidate({ ...input, turnAnalyses });
+    expect(report.englishCommunication.patterns).toHaveLength(1);
+    expect(report.priorities.map((item) => [item.sequenceNumber, item.evidence])).toEqual([[4, "We monitor errors and latency"]]);
+  });
+
   it("sends only the approved direction snapshot and accepts only exact vacancy competency labels", async () => {
     const linkedStrength = { sequenceNumber: 2, evidence: "bounded retries", explanation: "Você conecta retries limitados à resiliência do serviço.", vacancyCompetency: "resilience" };
     let sent: Record<string, unknown> | undefined;
