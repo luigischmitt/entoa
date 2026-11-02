@@ -60,6 +60,11 @@ performed by the authenticated frontend client. The speech service accepts:
 | `INTERVIEWER_VOICE` | `af_bella+af_heart` (with `openrouter`: `OPENROUTER_SPEECH_VOICE`, then `am_echo`) | Voice passed to the provider. Blends containing `+` are rejected at startup with `openrouter`. |
 | `OPENROUTER_SPEECH_MODEL` | `hexgrad/kokoro-82m` | Speech model when `SPEECH_PROVIDER=openrouter`. Requires `OPENROUTER_API_KEY`, otherwise the backend fails at startup. |
 | `HYBRID_SPEECH_PINNED_FALLBACK_AFTER_MS` | `7000` | Integer 0-14000, used with `openrouter-azure`. An interview pinned to the OpenRouter voice keeps it, but Azure joins if no audio arrived after this delay. `0` waits for an OpenRouter failure, which arrives only at the shared deadline. |
+| `DEEPINFRA_API_KEY` | — | Required with `SPEECH_PROVIDER=deepinfra-openrouter-azure`; the backend fails at startup without it. Keep it server-side. |
+| `DEEPINFRA_SPEECH_URL` | `https://api.deepinfra.com/v1/openai/audio/speech` | DeepInfra speech endpoint, used only with `deepinfra-openrouter-azure`. |
+| `DEEPINFRA_SPEECH_MODEL` | `hexgrad/Kokoro-82M` | Model sent to DeepInfra with `deepinfra-openrouter-azure`. |
+| `DEEPINFRA_SPEECH_TIMEOUT_MS` | `6000` | Positive DeepInfra request timeout in milliseconds, used only with `deepinfra-openrouter-azure`. |
+| `DEEPINFRA_SPEECH_FALLBACK_AFTER_MS` | `1500` | Integer 0-10000. With `deepinfra-openrouter-azure`, OpenRouter Kokoro joins if DeepInfra has not answered after this delay, or immediately when DeepInfra fails. `0` disables the timed hedge (OpenRouter then starts only when DeepInfra fails). |
 | `OPENROUTER_SPEECH_HEDGE_AFTER_MS` | `2000` | Integer 0-10000. With `openrouter`, synthesis goes to DeepInfra first; if it has not answered after this delay (or fails sooner), a second request routed to Together starts and the first successful response wins. `0` disables hedging. |
 | `SPEECH_CACHE_TTL_MS` | `60000` | 0-600000. Finished audio and in-flight syntheses are shared by identical `/speech` requests (key: normalized text + voice + speed + format); `0` turns the cache and prefetch off. |
 | `SPEECH_STATIC_CACHE_TTL_MS` | `3600000` | Lifetime of the fixed phrases (acknowledgements, closing line). |
@@ -168,6 +173,19 @@ triggers the same deduped probe (at most one in flight, at most every 5 s from s
 polls) and returns `warming`, or `unavailable` for 60 s after a failed probe (non-2xx,
 token error, network). A probe cut short by the request timeout counts as still warming.
 Other modes always return `ready`. See `docs/deploy.md` for the Cloud Run service.
+
+## Interviewer voice: DeepInfra Kokoro, then OpenRouter, then Azure
+
+`SPEECH_PROVIDER=deepinfra-openrouter-azure` sends synthesis first to Kokoro on DeepInfra
+directly (`DeepInfraSpeechProvider`, voice `OPENROUTER_SPEECH_VOICE`, default `am_echo`). If DeepInfra
+fails, or has not answered after `DEEPINFRA_SPEECH_FALLBACK_AFTER_MS`, Kokoro through
+`OpenRouterSpeechProvider` joins (single voice, the same as the DeepInfra request). Azure
+(`AZURE_TTS_VOICE`) is the last resort: it joins after `HYBRID_SPEECH_HEDGE_AFTER_MS`
+(default `4000` in this mode) or after both Kokoro upstreams fail. The first non-empty audio wins and the
+other requests are aborted. Startup requires `DEEPINFRA_API_KEY`, `OPENROUTER_API_KEY`,
+`AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION`. Clients see `voiceSource: "openrouter"` for any
+Kokoro audio and `"azure"` only for Azure; `speech_synthesis_timing` logs `provider: "hybrid"` and
+the content-free `upstream` (`DeepInfra` or `Together`) of the Kokoro audio. Azure answers are never cached.
 
 ## Run Kokoro with a local backend
 

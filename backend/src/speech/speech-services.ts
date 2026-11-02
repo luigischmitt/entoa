@@ -25,7 +25,7 @@ export function createSpeechServices(provider: SpeechProvider, config: SpeechCon
     staticTtlMs: settings.staticTtlMs,
     isStaticText: (text) => staticTexts.has(text),
     // Azure is only a last-resort voice in this mode. Never let one of those responses be replayed later.
-    shouldCache: (speech) => config.provider !== "openrouter-azure" || speech.diagnostics?.voiceSource !== "azure",
+    shouldCache: (speech) => (config.provider !== "openrouter-azure" && config.provider !== "deepinfra-openrouter-azure") || speech.diagnostics?.voiceSource !== "azure",
     onEvent: options.log ?? logCacheEvent,
   });
   const warmable = provider as SpeechProvider & { warmConnection?: () => void };

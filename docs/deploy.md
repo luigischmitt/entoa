@@ -54,6 +54,7 @@ To use the self-hosted Kokoro service below as the primary interviewer voice
 (OpenRouter becomes the hedge), set `SPEECH_PROVIDER=kokoro-openrouter`,
 `KOKORO_URL=<kokoro service url>` and `KOKORO_AUTH=gcp-id-token` instead of
 `SPEECH_PROVIDER=openrouter`. `OPENROUTER_API_KEY` stays required.
+To try DeepInfra Kokoro first, with OpenRouter and then Azure behind it, set `SPEECH_PROVIDER=deepinfra-openrouter-azure` and `DEEPINFRA_API_KEY` (see `backend/README.md`).
 
 ### Interviewer voice: Azure (free tier)
 

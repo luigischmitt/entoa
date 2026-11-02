@@ -1,7 +1,7 @@
 import type { AudioFormat } from "./types.js";
 
 export type SpeechConfig = {
-  provider: "fake" | "kokoro" | "openrouter" | "kokoro-openrouter" | "azure-openrouter" | "openrouter-azure";
+  provider: "fake" | "kokoro" | "openrouter" | "kokoro-openrouter" | "azure-openrouter" | "openrouter-azure" | "deepinfra-openrouter-azure";
   kokoroBaseUrl: string;
   kokoroAuth?: "none" | "gcp-id-token";
   kokoroTimeoutMs: number;
@@ -12,6 +12,8 @@ export type SpeechConfig = {
   /** Hybrid voice and hedge configuration. */
   hybrid?: { hedgeAfterMs: number; pinnedFallbackAfterMs: number; openRouterVoice: string };
   azure?: { key: string; region: string; voice: string; timeoutMs: number; cooldownMs: number };
+  /** Kokoro served directly by DeepInfra, first choice in 'deepinfra-openrouter-azure'. fallbackAfterMs: OpenRouter joins after this delay. */
+  deepInfra?: { apiKey: string; url: string; model: string; timeoutMs: number; fallbackAfterMs: number };
   /** Server-side cache of finished audio, joined with in-flight syntheses and prefetched from next-turn decisions. Absent = off. */
   cache?: { ttlMs: number; staticTtlMs: number; prefetch: boolean; prefetchChunks: number };
 };
@@ -72,11 +74,13 @@ function loadCacheConfig(environment: NodeJS.ProcessEnv): NonNullable<SpeechConf
 
 export function loadSpeechConfig(environment = process.env): SpeechConfig {
   const provider = environment.SPEECH_PROVIDER ?? "fake";
-  if (provider !== "fake" && provider !== "kokoro" && provider !== "openrouter" && provider !== "kokoro-openrouter" && provider !== "azure-openrouter" && provider !== "openrouter-azure") {
-    throw new Error("SPEECH_PROVIDER must be 'fake', 'kokoro', 'openrouter', 'kokoro-openrouter', 'azure-openrouter' or 'openrouter-azure'.");
+  if (provider !== "fake" && provider !== "kokoro" && provider !== "openrouter" && provider !== "kokoro-openrouter" && provider !== "azure-openrouter" && provider !== "openrouter-azure" && provider !== "deepinfra-openrouter-azure") {
+    throw new Error("SPEECH_PROVIDER must be 'fake', 'kokoro', 'openrouter', 'kokoro-openrouter', 'azure-openrouter', 'openrouter-azure' or 'deepinfra-openrouter-azure'.");
   }
   const hybrid = provider === "kokoro-openrouter";
-  const azureHybrid = provider === "azure-openrouter" || provider === "openrouter-azure";
+  // The DeepInfra mode is the openrouter-azure chain with a DeepInfra Kokoro in front of OpenRouter.
+  const deepInfraHybrid = provider === "deepinfra-openrouter-azure";
+  const azureHybrid = provider === "azure-openrouter" || provider === "openrouter-azure" || deepInfraHybrid;
   const kokoroAuth = environment.KOKORO_AUTH?.trim() || "none";
   if (kokoroAuth !== "none" && kokoroAuth !== "gcp-id-token") {
     throw new Error("KOKORO_AUTH must be 'none' or 'gcp-id-token'.");
@@ -105,7 +109,8 @@ export function loadSpeechConfig(environment = process.env): SpeechConfig {
       // OpenRouter's own Together hedge runs first. Azure has a different voice, so it only joins after that race has
       // had enough time to finish (or immediately after both OpenRouter attempts fail).
       // The OpenRouter attempts share the hybrid deadline, so a stall there would leave Azure no time without this earlier limit.
-      hybridConfig = { hedgeAfterMs: parseHybridHedgeAfterMs(environment.HYBRID_SPEECH_HEDGE_AFTER_MS, provider === "openrouter-azure" ? 8_000 : 2_500), pinnedFallbackAfterMs: parseIntegerInRange("HYBRID_SPEECH_PINNED_FALLBACK_AFTER_MS", environment.HYBRID_SPEECH_PINNED_FALLBACK_AFTER_MS, 7_000, 0, 14_000), openRouterVoice };
+      const hedgeDefaultMs = deepInfraHybrid ? 4_000 : provider === "openrouter-azure" ? 8_000 : 2_500;
+      hybridConfig = { hedgeAfterMs: parseHybridHedgeAfterMs(environment.HYBRID_SPEECH_HEDGE_AFTER_MS, hedgeDefaultMs), pinnedFallbackAfterMs: parseIntegerInRange("HYBRID_SPEECH_PINNED_FALLBACK_AFTER_MS", environment.HYBRID_SPEECH_PINNED_FALLBACK_AFTER_MS, 7_000, 0, 14_000), openRouterVoice };
     } else if (interviewerVoice.includes("+")) {
       throw new Error("OPENROUTER_SPEECH_VOICE / INTERVIEWER_VOICE cannot be a voice blend with SPEECH_PROVIDER 'openrouter'; use a single voice such as 'am_michael'.");
     }
@@ -114,6 +119,19 @@ export function loadSpeechConfig(environment = process.env): SpeechConfig {
       url: environment.OPENROUTER_SPEECH_URL?.trim() || "https://openrouter.ai/api/v1/audio/speech",
       model: environment.OPENROUTER_SPEECH_MODEL?.trim() || "hexgrad/kokoro-82m",
       hedgeAfterMs: parseHedgeAfterMs(environment.OPENROUTER_SPEECH_HEDGE_AFTER_MS),
+    };
+  }
+
+  let deepInfra: SpeechConfig["deepInfra"];
+  if (deepInfraHybrid) {
+    const apiKey = environment.DEEPINFRA_API_KEY?.trim();
+    if (!apiKey) throw new Error("DEEPINFRA_API_KEY is required when SPEECH_PROVIDER is 'deepinfra-openrouter-azure'.");
+    deepInfra = {
+      apiKey,
+      url: environment.DEEPINFRA_SPEECH_URL?.trim() || "https://api.deepinfra.com/v1/openai/audio/speech",
+      model: environment.DEEPINFRA_SPEECH_MODEL?.trim() || "hexgrad/Kokoro-82M",
+      timeoutMs: parsePositiveNumber(environment.DEEPINFRA_SPEECH_TIMEOUT_MS, 6_000),
+      fallbackAfterMs: parseIntegerInRange("DEEPINFRA_SPEECH_FALLBACK_AFTER_MS", environment.DEEPINFRA_SPEECH_FALLBACK_AFTER_MS, 1_500, 0, 10_000),
     };
   }
 
@@ -137,6 +155,7 @@ export function loadSpeechConfig(environment = process.env): SpeechConfig {
     ...(openRouter ? { openRouter } : {}),
     ...(hybridConfig ? { hybrid: hybridConfig } : {}),
     ...(azure ? { azure } : {}),
+    ...(deepInfra ? { deepInfra } : {}),
     cache: loadCacheConfig(environment),
   };
 }
