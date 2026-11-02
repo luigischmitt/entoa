@@ -6,7 +6,7 @@ export type SpeechSynthesisRequest = {
   speed: number;
   format: AudioFormat;
   /** Preference for which provider answers; only the hybrid provider acts on it, others ignore it. */
-  preferredSource?: "openrouter" | "azure" | "kokoro";
+  preferredSource?: "chatterbox" | "azure";
   /** Background work that must never reach the fallback voice: only the primary is tried, and a preferred secondary is ignored. Never forwarded to providers. */
   primaryOnly?: boolean;
 };
@@ -16,9 +16,9 @@ export type HedgeOutcome = "not_needed" | "primary_won" | "hedge_won" | "both_fa
 // Content-free details a provider may report for logging.
 export type SpeechDiagnostics = {
   hedge?: HedgeOutcome;
-  voiceSource?: "kokoro" | "azure" | "openrouter";
-  /** OpenRouter upstream that produced the Kokoro audio, when applicable. */
-  upstream?: "DeepInfra" | "Together";
+  voiceSource?: "chatterbox" | "azure";
+  /** Upstream that produced the audio, when applicable. */
+  upstream?: "Chatterbox";
 };
 
 export type SynthesizedSpeech = {
@@ -31,14 +31,8 @@ export type SpeechProviderHealth = {
   status: "ready" | "unavailable";
 };
 
-export type VoiceStatus = "ready" | "warming" | "unavailable";
-
 export interface SpeechProvider {
   readonly name: string;
   synthesize(request: SpeechSynthesisRequest, signal?: AbortSignal): Promise<SynthesizedSpeech>;
   health(): Promise<SpeechProviderHealth>;
-  /** Optional fire-and-forget wake-up of a scale-to-zero backend; never throws. */
-  warmup?(): void;
-  /** Optional cached readiness of a scale-to-zero voice; may trigger a throttled background probe. */
-  voiceStatus?(): VoiceStatus;
 }

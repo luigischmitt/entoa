@@ -5,7 +5,7 @@ import { defaultThinkingModel, defaultThinkingTimeoutMs, type ThinkingConfig } f
 import { OpenRouterShortReplyService, shortReplySystemPrompt, type ShortReplyAction } from "../src/thinking/short-reply-service.js";
 import type { SpeechConfig } from "../src/speech/config.js";
 
-const speechConfig: SpeechConfig = { provider: "fake", kokoroBaseUrl: "http://localhost:8888", kokoroTimeoutMs: 1000, interviewerVoice: "af_bella", defaultSpeed: 1, format: "mp3" };
+const speechConfig: SpeechConfig = { provider: "fake", interviewerVoice: "en-US-AndrewNeural", defaultSpeed: 1, format: "mp3" };
 const config: ThinkingConfig = { openRouterApiKey: "server-test-key", model: defaultThinkingModel, timeoutMs: defaultThinkingTimeoutMs, orchestrationTimeoutMs: 6000, bridgeTimeoutMs: 400, diagnosticsEnabled: true };
 const input = { currentQuestion: "How did you improve system performance?", transcript: "What does bottleneck mean?", nextQuestionAvailable: true };
 const fakeFetch = (reply: unknown, capture?: (init: RequestInit) => void): typeof fetch => async (_url, init) => { if (init) capture?.(init); return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(reply) } }], usage: { prompt_tokens: 12, completion_tokens: 8, cost: 0.00001 } })); };

@@ -7,7 +7,7 @@ import type { SpeechConfig } from "../src/speech/config.js";
 import { createTestKey, fakeJwksFetch, signToken, testSupabaseUrl } from "./auth-helper.js";
 import { createAccessTokenVerifier } from "../src/auth/access-token-verifier.js";
 
-const speechConfig: SpeechConfig = { provider: "fake", kokoroBaseUrl: "http://localhost:8880", kokoroTimeoutMs: 15_000, interviewerVoice: "af_bella+af_heart", defaultSpeed: 1, format: "mp3" };
+const speechConfig: SpeechConfig = { provider: "fake", interviewerVoice: "en-US-AndrewNeural", defaultSpeed: 1, format: "mp3" };
 
 function appWithLog() {
   const lines: string[] = [];

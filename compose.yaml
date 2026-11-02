@@ -1,16 +1,4 @@
 services:
-  kokoro:
-    image: ghcr.io/remsky/kokoro-fastapi-cpu:v0.6.0
-    ports:
-      - "8880:8880"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8880/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 45s
-
   backend:
     build:
       context: ./backend
@@ -20,9 +8,7 @@ services:
     ports:
       - "3001:3001"
     environment:
-      SPEECH_PROVIDER: kokoro
-      KOKORO_BASE_URL: http://kokoro:8880
-      INTERVIEWER_VOICE: af_bella+af_heart
+      SPEECH_PROVIDER: fake
       ALLOWED_ORIGIN: http://localhost:3000
       TRANSCRIPTION_PROVIDER: ${TRANSCRIPTION_PROVIDER:-whisper-incremental}
       TRANSCRIPTION_TIMEOUT_MS: ${TRANSCRIPTION_TIMEOUT_MS:-55000}
@@ -34,9 +20,6 @@ services:
     volumes:
       - ./backend:/app
       - backend_node_modules:/app/node_modules
-    depends_on:
-      kokoro:
-        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3001/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\""]
       interval: 10s

@@ -355,11 +355,11 @@ export async function fetchSpeechAudio(
     if (controller.signal.aborted) throw new Error("Speech generation timed out while reading the audio body.");
     return audio;
   } catch (error) {
-    if (controller.signal.aborted) throw new Error("Speech generation timed out. Check the local backend and Kokoro service.");
+    if (controller.signal.aborted) throw new Error("Speech generation timed out. Check the local backend.");
     if (error instanceof Error && (error.message.startsWith("Speech generation failed with HTTP") || error.message.startsWith("Speech endpoint") || error.message.startsWith("Generated audio"))) {
       throw error;
     }
-    throw new Error("Speech generation failed. Check the local backend and Kokoro service.");
+    throw new Error("Speech generation failed. Check the local backend.");
   } finally {
     clearTimeout(timeout);
   }

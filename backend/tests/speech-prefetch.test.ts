@@ -16,7 +16,7 @@ import * as clientAck from "../../frontend/src/lib/interview/acknowledgement.mjs
 
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
-const base: SpeechSynthesisRequest = { text: "Tell me about yourself.", voice: "am_michael", speed: 1, format: "mp3" };
+const base: SpeechSynthesisRequest = { text: "Tell me about yourself.", voice: "en-US-BrianNeural", speed: 1, format: "mp3" };
 
 class ControlledProvider implements SpeechProvider {
   readonly name = "controlled";
@@ -45,7 +45,7 @@ describe("speech cache", () => {
     const key = speechCacheKey(base);
     expect(speechCacheKey({ ...base })).toBe(key);
     expect(speechCacheKey({ ...base, text: "Tell me about yourself" })).not.toBe(key);
-    expect(speechCacheKey({ ...base, voice: "af_heart" })).not.toBe(key);
+    expect(speechCacheKey({ ...base, voice: "en-US-AvaNeural" })).not.toBe(key);
     expect(speechCacheKey({ ...base, speed: 1.1 })).not.toBe(key);
     expect(key).not.toContain("yourself");
   });
@@ -120,7 +120,7 @@ describe("speech cache", () => {
       },
     };
     const config: SpeechConfig = {
-      provider: "openrouter-azure", kokoroBaseUrl: "http://x", kokoroTimeoutMs: 1_000, interviewerVoice: "en-US-AndrewNeural", defaultSpeed: 1, format: "mp3",
+      provider: "chatterbox-azure", interviewerVoice: "en-US-AndrewNeural", defaultSpeed: 1, format: "mp3",
       cache: { ttlMs: 60_000, staticTtlMs: 600_000, prefetch: false, prefetchChunks: 1 },
     };
     const cache = createSpeechServices(provider, config, { prefetchStaticOnStart: false }).cache!;
@@ -241,7 +241,7 @@ describe("interviewer prefetcher", () => {
   const setup = (chunks = 1) => {
     const provider = new ControlledProvider(true);
     const cache = new SpeechCache({ provider, ttlMs: 60_000 });
-    return { provider, cache, prefetcher: new InterviewerSpeechPrefetcher({ cache, voice: "am_michael", speed: 1, format: "mp3", chunks }) };
+    return { provider, cache, prefetcher: new InterviewerSpeechPrefetcher({ cache, voice: "en-US-BrianNeural", speed: 1, format: "mp3", chunks }) };
   };
 
   it("synthesizes the first chunk of the spoken utterance, with the leading acknowledgement dropped and speech normalization applied", async () => {
@@ -250,9 +250,9 @@ describe("interviewer prefetcher", () => {
     await tick();
     const spoken = composeAcknowledgedQuestion(stripLeadingAcknowledgement(followUp.acknowledgement), followUp.followUpQuestion);
     const first = interviewerChunkTexts(spoken)[0]!;
-    expect(provider.calls).toEqual([{ text: normalizeTextForSpeech(first), voice: "am_michael", speed: 1, format: "mp3", primaryOnly: true }]);
+    expect(provider.calls).toEqual([{ text: normalizeTextForSpeech(first), voice: "en-US-BrianNeural", speed: 1, format: "mp3", primaryOnly: true }]);
     // The client's later request for that chunk (trimmed, normalized by the controller) is a cache hit.
-    expect((await cache.synthesize({ text: normalizeTextForSpeech(first.trim()), voice: "am_michael", speed: 1, format: "mp3" })).source).toBe("hit");
+    expect((await cache.synthesize({ text: normalizeTextForSpeech(first.trim()), voice: "en-US-BrianNeural", speed: 1, format: "mp3" })).source).toBe("hit");
   });
 
   it("keeps the bridge's own acknowledgement when the answer is too short for the instant one", () => {
@@ -280,7 +280,7 @@ describe("interviewer prefetcher", () => {
 });
 
 describe("POST /next-turn then POST /speech", () => {
-  const speechConfig: SpeechConfig = { provider: "fake", kokoroBaseUrl: "http://x", kokoroTimeoutMs: 1000, interviewerVoice: "am_michael", defaultSpeed: 1, format: "mp3", cache: { ttlMs: 60_000, staticTtlMs: 60_000, prefetch: true, prefetchChunks: 1 } };
+  const speechConfig: SpeechConfig = { provider: "fake", interviewerVoice: "en-US-BrianNeural", defaultSpeed: 1, format: "mp3", cache: { ttlMs: 60_000, staticTtlMs: 60_000, prefetch: true, prefetchChunks: 1 } };
   const body = { currentQuestion: "How do you make an API reliable?", transcript: "I add bounded retries with jitter on the gateway calls.", nextFixedQuestion: "How do you monitor production?", followUpUsed: false, roleContext: { targetRole: "Backend Engineer" } };
 
   it("starts synthesis when the decision is made and answers the client's request from it", async () => {
@@ -312,15 +312,15 @@ describe("POST /next-turn then POST /speech", () => {
 });
 
 describe("speech cache configuration", () => {
-  const env = { SPEECH_PROVIDER: "openrouter", OPENROUTER_API_KEY: "k" };
+  const env = { SPEECH_PROVIDER: "chatterbox-azure", DEEPINFRA_API_KEY: "k", AZURE_SPEECH_KEY: "k", AZURE_SPEECH_REGION: "brazilsouth" };
   it("defaults to a 60 s cache with prefetch of the first chunk", () => {
     expect(loadSpeechConfig(env).cache).toEqual({ ttlMs: 60_000, staticTtlMs: 3_600_000, prefetch: true, prefetchChunks: 1 });
     expect(loadSpeechConfig({ ...env, SPEECH_PREFETCH: "0", SPEECH_CACHE_TTL_MS: "0", SPEECH_PREFETCH_CHUNKS: "3" }).cache).toEqual({ ttlMs: 0, staticTtlMs: 3_600_000, prefetch: false, prefetchChunks: 3 });
     expect(() => loadSpeechConfig({ ...env, SPEECH_PREFETCH_CHUNKS: "9" })).toThrow(/SPEECH_PREFETCH_CHUNKS/);
   });
-  it("takes the openrouter voice from OPENROUTER_SPEECH_VOICE first", () => {
-    expect(loadSpeechConfig({ ...env, OPENROUTER_SPEECH_VOICE: "am_michael", INTERVIEWER_VOICE: "af_bella" }).interviewerVoice).toBe("am_michael");
-    expect(() => loadSpeechConfig({ ...env, OPENROUTER_SPEECH_VOICE: "af_bella+af_heart" })).toThrow(/blend/);
+  it("takes the interviewer voice from AZURE_TTS_VOICE and defaults to Andrew", () => {
+    expect(loadSpeechConfig({ ...env, AZURE_TTS_VOICE: "en-US-BrianNeural" }).interviewerVoice).toBe("en-US-BrianNeural");
+    expect(loadSpeechConfig(env).interviewerVoice).toBe("en-US-AndrewNeural");
   });
 });
 
@@ -328,44 +328,46 @@ describe("selectable voices", () => {
   it("accepts only the whitelist and falls back to the default for anything else", async () => {
     const { resolveVoice, selectableVoices, selectableVoiceList } = await import("../src/speech/voices.js");
     expect(selectableVoices).toHaveLength(8);
-    expect(selectableVoiceList.find((voice) => voice.id === "en-GB-RyanNeural")).toEqual({ id: "en-GB-RyanNeural", kokoroVoice: "bm_george", gender: "male", accent: "UK" });
-    expect(selectableVoiceList.find((voice) => voice.id === "en-US-JennyNeural")).toEqual({ id: "en-US-JennyNeural", kokoroVoice: "af_sarah", gender: "female", accent: "US" });
+    expect(selectableVoiceList.find((voice) => voice.id === "en-GB-RyanNeural")).toEqual({ id: "en-GB-RyanNeural", chatterboxVoiceId: "u3o3sghrrgld77jxi368", gender: "male", accent: "UK" });
+    expect(selectableVoiceList.find((voice) => voice.id === "en-US-JennyNeural")).toEqual({ id: "en-US-JennyNeural", chatterboxVoiceId: "hjaqgzxdrdyd2jkwsdsi", gender: "female", accent: "US" });
     expect(selectableVoices[0]).toBe("en-US-AndrewNeural");
     expect(selectableVoices).toEqual(clientVoices.INTERVIEWER_VOICES);
-    expect(selectableVoiceList).toEqual(clientVoices.INTERVIEWER_VOICE_OPTIONS);
+    // The frontend mirror still has an extra voice field; only the shared fields are compared until it is updated.
+    const shared = (voices: readonly { id: string; gender: string; accent: string }[]) => voices.map(({ id, gender, accent }) => ({ id, gender, accent }));
+    expect(shared(selectableVoiceList)).toEqual(shared(clientVoices.INTERVIEWER_VOICE_OPTIONS));
     expect(resolveVoice("en-US-GuyNeural", "en-US-AndrewNeural")).toBe("en-US-GuyNeural");
     expect(resolveVoice("am_michael", "en-US-AndrewNeural")).toBe("en-US-AndrewNeural");
     for (const bad of ["af_bella+af_heart", "AM_ECHO", "../etc", "", undefined, null, 5, {}]) expect(resolveVoice(bad, "en-US-AndrewNeural")).toBe("en-US-AndrewNeural");
   });
 
   it("includes the voice in the cache key", () => {
-    expect(speechCacheKey({ ...base, voice: "am_echo" })).not.toBe(speechCacheKey({ ...base, voice: "am_michael" }));
+    expect(speechCacheKey({ ...base, voice: "en-US-AndrewNeural" })).not.toBe(speechCacheKey({ ...base, voice: "en-US-BrianNeural" }));
   });
 
   it("uses the voice sent with /speech, ignoring anything outside the whitelist", async () => {
     const provider = new ControlledProvider(true);
-    const config: SpeechConfig = { provider: "fake", kokoroBaseUrl: "http://x", kokoroTimeoutMs: 1000, interviewerVoice: "am_echo", defaultSpeed: 1, format: "mp3" };
+    const config: SpeechConfig = { provider: "fake", interviewerVoice: "en-US-AndrewNeural", defaultSpeed: 1, format: "mp3" };
     const app = createApp({ speechConfig: config, speechProvider: provider, accessTokenVerifier: null, thinkingService: null, reportService: null, jobDirectionService: null });
-    await request(app).post("/api/v1/speech").send({ text: "One.", voice: "bf_emma" });
+    await request(app).post("/api/v1/speech").send({ text: "One.", voice: "en-GB-SoniaNeural" });
     await request(app).post("/api/v1/speech").send({ text: "Two.", voice: "af_bella+af_heart" });
     await request(app).post("/api/v1/speech").send({ text: "Three." });
-    expect(provider.calls.map((call) => call.voice)).toEqual(["bf_emma", "am_echo", "am_echo"]);
+    expect(provider.calls.map((call) => call.voice)).toEqual(["en-GB-SoniaNeural", "en-US-AndrewNeural", "en-US-AndrewNeural"]);
   });
 
   it("pre-synthesizes with the voice of the next-turn request, and the same voice then hits", async () => {
     vi.spyOn(console, "info").mockImplementation(() => undefined);
     const provider = new ControlledProvider(true);
-    const config: SpeechConfig = { provider: "fake", kokoroBaseUrl: "http://x", kokoroTimeoutMs: 1000, interviewerVoice: "am_echo", defaultSpeed: 1, format: "mp3", cache: { ttlMs: 60_000, staticTtlMs: 60_000, prefetch: true, prefetchChunks: 1 } };
+    const config: SpeechConfig = { provider: "fake", interviewerVoice: "en-US-AndrewNeural", defaultSpeed: 1, format: "mp3", cache: { ttlMs: 60_000, staticTtlMs: 60_000, prefetch: true, prefetchChunks: 1 } };
     const orchestrationService = { decide: async () => ({ decision: "NEXT" as const, followUpQuestion: null, nextQuestion: "How do you monitor a service in production?", acknowledgement: null }) };
     const app = createApp({ speechConfig: config, speechProvider: provider, orchestrationService, accessTokenVerifier: null, thinkingService: null, reportService: null, jobDirectionService: null });
     const next = { currentQuestion: "Q?", transcript: "I add bounded retries with jitter on the gateway.", nextFixedQuestion: "x?", followUpUsed: false, roleContext: { targetRole: "Backend Engineer" } };
-    await request(app).post("/api/v1/thinking/next-turn").send({ ...next, voice: "am_michael" });
+    await request(app).post("/api/v1/thinking/next-turn").send({ ...next, voice: "en-US-BrianNeural" });
     await request(app).post("/api/v1/thinking/next-turn").send({ ...next, voice: "not-a-voice" });
     await tick();
-    expect(provider.calls.map((call) => call.voice)).toEqual(["am_michael", "am_echo"]);
-    await request(app).post("/api/v1/speech").send({ text: "How do you monitor a service in production?", voice: "am_michael" });
-    await request(app).post("/api/v1/speech").send({ text: "How do you monitor a service in production?", voice: "bf_emma" });
-    expect(provider.calls.map((call) => call.voice)).toEqual(["am_michael", "am_echo", "bf_emma"]);
+    expect(provider.calls.map((call) => call.voice)).toEqual(["en-US-BrianNeural", "en-US-AndrewNeural"]);
+    await request(app).post("/api/v1/speech").send({ text: "How do you monitor a service in production?", voice: "en-US-BrianNeural" });
+    await request(app).post("/api/v1/speech").send({ text: "How do you monitor a service in production?", voice: "en-GB-SoniaNeural" });
+    expect(provider.calls.map((call) => call.voice)).toEqual(["en-US-BrianNeural", "en-US-AndrewNeural", "en-GB-SoniaNeural"]);
   });
 });
 
@@ -380,7 +382,7 @@ describe("static phrase prefetch", () => {
       async synthesize() { calls += 1; active += 1; peak = Math.max(peak, active); await new Promise((resolve) => setTimeout(resolve, 5)); active -= 1; return { audio: Buffer.from([1]), contentType: "audio/mpeg" }; },
     };
     const cache = new SpeechCache({ provider: provider as never, ttlMs: 60_000, maxPrefetchInFlight: 1, onEvent: (event: { type: string }) => events.push(event.type) });
-    await new InterviewerSpeechPrefetcher({ cache, chunks: 1, voice: "am_echo", speed: 1, format: "mp3" } as never).prefetchStatic();
+    await new InterviewerSpeechPrefetcher({ cache, chunks: 1, voice: "en-US-AndrewNeural", speed: 1, format: "mp3" } as never).prefetchStatic();
     expect(peak).toBe(1);
     expect(calls).toBe(staticSpeechTexts().length - ACKNOWLEDGEMENT_PHRASES.length);
     expect(events).not.toContain("prefetch_dropped");
@@ -393,7 +395,7 @@ describe("static phrase prefetch", () => {
       const texts: string[] = [];
       const provider = { name: "fake", health: async () => ({ status: "ready" }), async synthesize(request: SpeechSynthesisRequest) { texts.push(request.text); return { audio: Buffer.from([1]), contentType: "audio/mpeg" }; } };
       const cache = new SpeechCache({ provider: provider as never, ttlMs: 60_000 });
-      await new InterviewerSpeechPrefetcher({ cache, chunks: 1, voice: "am_echo", speed: 1, format: "mp3" } as never).prefetchStaticFor("am_echo", speed, { concurrency: 2 });
+      await new InterviewerSpeechPrefetcher({ cache, chunks: 1, voice: "en-US-AndrewNeural", speed: 1, format: "mp3" } as never).prefetchStaticFor("en-US-AndrewNeural", speed, { concurrency: 2 });
       return texts;
     };
     const atSpeedOne = await synthesizedAt(1);
@@ -410,15 +412,15 @@ describe("static phrase prefetch", () => {
     const gate = new Promise<void>((resolve) => { release = resolve; });
     const calls: SpeechSynthesisRequest[] = [];
     const provider: SpeechProvider = {
-      name: "openrouter",
+      name: "chatterbox",
       health: async () => ({ status: "ready" }),
       async synthesize(request) { calls.push(request); await gate; return { audio: Buffer.from("a"), contentType: "audio/mpeg" }; },
     };
-    const config: SpeechConfig = { provider: "openrouter", kokoroBaseUrl: "http://x", kokoroTimeoutMs: 1_000, interviewerVoice: "am_echo", defaultSpeed: 1, format: "mp3", cache: { ttlMs: 60_000, staticTtlMs: 60_000, prefetch: true, prefetchChunks: 1 } };
+    const config: SpeechConfig = { provider: "chatterbox-azure", interviewerVoice: "en-US-AndrewNeural", defaultSpeed: 1, format: "mp3", cache: { ttlMs: 60_000, staticTtlMs: 60_000, prefetch: true, prefetchChunks: 1 } };
     try {
       const app = createApp({ speechConfig: config, speechProvider: provider, accessTokenVerifier: null, thinkingService: null, reportService: null, jobDirectionService: null });
       let answered = false;
-      const pending = request(app).post("/api/v1/speech/warmup").send({ voice: "bf_emma", speed: 1.2 }).then((response) => { answered = true; return response; });
+      const pending = request(app).post("/api/v1/speech/warmup").send({ voice: "en-GB-SoniaNeural", speed: 1.2 }).then((response) => { answered = true; return response; });
       for (let attempt = 0; attempt < 10 && calls.length === 0; attempt += 1) await tick();
       expect(calls).toHaveLength(3);
       expect(answered).toBe(false);
@@ -427,10 +429,10 @@ describe("static phrase prefetch", () => {
       const acknowledgements = new Set(ACKNOWLEDGEMENT_PHRASES.map((phrase) => normalizeTextForSpeech(phrase.trim())));
       const warmedCount = staticSpeechTexts().filter((text) => !acknowledgements.has(text)).length;
       expect(calls).toHaveLength(warmedCount);
-      expect(calls.every((call) => call.voice === "bf_emma" && call.speed === 1.2)).toBe(true);
+      expect(calls.every((call) => call.voice === "en-GB-SoniaNeural" && call.speed === 1.2)).toBe(true);
 
       expect((await request(app).post("/api/v1/speech/warmup").send({ voice: "not-a-voice", speed: 5 })).status).toBe(202);
-      expect(calls.slice(warmedCount).every((call) => call.voice === "am_echo" && call.speed === 1)).toBe(true);
+      expect(calls.slice(warmedCount).every((call) => call.voice === "en-US-AndrewNeural" && call.speed === 1)).toBe(true);
       const afterDefault = calls.length;
       expect((await request(app).post("/api/v1/speech/warmup").send({ voice: "not-a-voice", speed: 5 })).status).toBe(202);
       expect(calls).toHaveLength(afterDefault);
@@ -446,15 +448,15 @@ describe("voice source preference", () => {
     const key = speechCacheKey(base);
     expect(speechCacheKey({ ...base, preferredSource: undefined })).toBe(key);
     expect(speechCacheKey({ ...base, preferredSource: "azure" })).not.toBe(key);
-    expect(speechCacheKey({ ...base, preferredSource: "azure" })).not.toBe(speechCacheKey({ ...base, preferredSource: "openrouter" }));
+    expect(speechCacheKey({ ...base, preferredSource: "azure" })).not.toBe(speechCacheKey({ ...base, preferredSource: "chatterbox" }));
     const provider = new ControlledProvider(true);
     const cache = new SpeechCache({ provider, ttlMs: 60_000 });
     await cache.synthesize({ ...base, preferredSource: "azure" });
     expect(provider.calls[0]!.preferredSource).toBe("azure");
   });
 
-  const speechConfig: SpeechConfig = { provider: "fake", kokoroBaseUrl: "http://x", kokoroTimeoutMs: 1000, interviewerVoice: "en-US-AndrewNeural", defaultSpeed: 1, format: "mp3" };
-  function recordingProvider(voiceSource?: "azure" | "openrouter" | "kokoro") {
+  const speechConfig: SpeechConfig = { provider: "fake", interviewerVoice: "en-US-AndrewNeural", defaultSpeed: 1, format: "mp3" };
+  function recordingProvider(voiceSource?: "azure" | "chatterbox") {
     const calls: SpeechSynthesisRequest[] = [];
     const provider: SpeechProvider = {
       name: "hybrid",
@@ -481,11 +483,11 @@ describe("voice source preference", () => {
   });
 
   it("sets X-Voice-Source from the diagnostics and omits it when the provider reports none", async () => {
-    const withSource = recordingProvider("openrouter");
+    const withSource = recordingProvider("chatterbox");
     const app = createApp({ speechConfig, speechProvider: withSource.provider, accessTokenVerifier: null, thinkingService: null, reportService: null, jobDirectionService: null });
     const response = await request(app).post("/api/v1/speech").send({ text: "Hello." });
     expect(response.status).toBe(200);
-    expect(response.headers["x-voice-source"]).toBe("openrouter");
+    expect(response.headers["x-voice-source"]).toBe("chatterbox");
 
     const bare = recordingProvider();
     const appBare = createApp({ speechConfig, speechProvider: bare.provider, accessTokenVerifier: null, thinkingService: null, reportService: null, jobDirectionService: null });

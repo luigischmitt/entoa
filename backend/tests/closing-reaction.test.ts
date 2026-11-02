@@ -5,7 +5,7 @@ import { defaultThinkingModel, defaultThinkingTimeoutMs, type ThinkingConfig } f
 import { closingReactionSystemPrompt, OpenRouterClosingReactionService } from "../src/thinking/closing-reaction-service.js";
 import type { SpeechConfig } from "../src/speech/config.js";
 
-const speechConfig: SpeechConfig = { provider: "fake", kokoroBaseUrl: "http://localhost:8888", kokoroTimeoutMs: 1000, interviewerVoice: "af_bella", defaultSpeed: 1, format: "mp3" };
+const speechConfig: SpeechConfig = { provider: "fake", interviewerVoice: "en-US-AndrewNeural", defaultSpeed: 1, format: "mp3" };
 const config: ThinkingConfig = { openRouterApiKey: "server-test-key", model: defaultThinkingModel, timeoutMs: defaultThinkingTimeoutMs, orchestrationTimeoutMs: 6000, bridgeTimeoutMs: 400, diagnosticsEnabled: true };
 const transcript = "We traced the slow responses to the cache TTL, so I shortened it and the latency dropped by half.";
 const input = { currentQuestion: "Tell me about a performance problem you solved.", transcript };

@@ -12,7 +12,7 @@ import {
 import type { SpeechCache } from "./speech-cache.js";
 import { normalizeTextForSpeech } from "./text-normalization.js";
 import type { AudioFormat } from "./types.js";
-import { resolveKokoroVoice, resolveVoice } from "./voices.js";
+import { resolveVoice } from "./voices.js";
 
 /** Texts that never change (acknowledgements, the closing line, the closing fallback reactions): cached longer and synthesized ahead of the interview. */
 export function staticSpeechTexts(): string[] {
@@ -75,7 +75,7 @@ export class InterviewerSpeechPrefetcher {
 
   prefetchText(text: string, voice?: unknown, requestedSpeed?: unknown): void {
     const { cache, speed, format } = this.options;
-    const resolvedVoice = this.options.voice.includes("Neural") ? resolveVoice(voice, this.options.voice) : resolveKokoroVoice(voice, this.options.voice);
+    const resolvedVoice = resolveVoice(voice, this.options.voice);
     const resolvedSpeed = typeof requestedSpeed === "number" && Number.isFinite(requestedSpeed) && requestedSpeed >= 0.25 && requestedSpeed <= 4 ? requestedSpeed : speed;
     cache.prefetch({ text: normalizeTextForSpeech(text.trim()), voice: resolvedVoice, speed: resolvedSpeed, format, primaryOnly: true });
   }
@@ -83,7 +83,7 @@ export class InterviewerSpeechPrefetcher {
   /** Synthesizes the fixed phrases for a selectable voice and speed, joining cache work already in flight. */
   async prefetchStaticFor(voice?: unknown, requestedSpeed?: unknown, options: { concurrency: number; deadlineMs?: number } = { concurrency: 1 }): Promise<void> {
     const { cache, speed, format } = this.options;
-    const resolvedVoice = this.options.voice.includes("Neural") ? resolveVoice(voice, this.options.voice) : resolveKokoroVoice(voice, this.options.voice);
+    const resolvedVoice = resolveVoice(voice, this.options.voice);
     const resolvedSpeed = typeof requestedSpeed === "number" && Number.isFinite(requestedSpeed) && requestedSpeed >= 0.25 && requestedSpeed <= 4 ? requestedSpeed : speed;
     // The client plays the acknowledgements from static files at any speed, so they are not synthesized here.
     const skipped = new Set(ACKNOWLEDGEMENT_PHRASES.map((phrase) => normalizeTextForSpeech(phrase.trim())));

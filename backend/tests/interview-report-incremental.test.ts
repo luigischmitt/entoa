@@ -9,8 +9,8 @@ import type { InterviewReportConsolidationInput, InterviewTurnAnalysis } from ".
 import type { SpeechConfig } from "../src/speech/config.js";
 
 const speechConfig: SpeechConfig = {
-  provider: "fake", kokoroBaseUrl: "http://localhost:8888", kokoroTimeoutMs: 1000,
-  interviewerVoice: "af_bella+af_heart", defaultSpeed: 1, format: "mp3",
+  provider: "fake",
+  interviewerVoice: "en-US-AndrewNeural", defaultSpeed: 1, format: "mp3",
 };
 const roleContext = { targetRole: "Backend Engineer", seniority: "mid-level", focus: "technical-depth" };
 const jobDirection = { targetRole: "Backend Engineer", suggestedSeniority: "mid-level" as const, mainInterviewEmphasis: "Reliability in production.", priorityCompetencies: ["resilience", "observability"], productTeamContext: "A small platform team supporting customer-facing services." };
