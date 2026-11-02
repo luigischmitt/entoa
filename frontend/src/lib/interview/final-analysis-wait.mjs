@@ -6,7 +6,7 @@
 export const FINAL_ANALYSIS_WAIT_MS = 1_800;
 /**
  * Total cap (from submit) for the follow-up decision AND its first audio chunk; past it the fixed question is used.
- * Kokoro's first chunk takes 1.2-2 s (p50) and the follow-up synthesis starts only when the analysis lands, often ~1.8 s after submit.
+ * The voice's first chunk takes 1.2-2 s (p50) and the follow-up synthesis starts only when the analysis lands, often ~1.8 s after submit.
  */
 export const FOLLOW_UP_TOTAL_WAIT_MS = 4_500;
 

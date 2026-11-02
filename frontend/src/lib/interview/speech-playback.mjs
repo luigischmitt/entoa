@@ -13,7 +13,7 @@ export function composeContextualOpening(config, firstQuestion) {
   // Resume practice has no target job: no role, seniority or focus is spoken.
   if (isResumePractice(config)) return `Hi, I'm Tuk, and I'll be your interviewer today. We have about ${minutes} minutes for a practice interview based on your resume. ${firstQuestion.trim()}`;
   const { phrase, personal } = describeRoleForSpeech(config.role, seniorityLabels[config.seniority?.trim()]);
-  // Keep the brand stylized as TUC in the UI, but use title case in speech so Kokoro says it as a name ("Tuk"), not as initials.
+  // Keep the brand stylized as TUC in the UI, but use title case in speech so the voice says it as a name ("Tuk"), not as initials.
   return `Hi, I'm Tuk, and I'll be your interviewer today. We have about ${minutes} minutes ${personal ? "for your " : "for "}${phrase}${focusClause(config.focus)}. ${firstQuestion.trim()}`;
 }
 
@@ -84,7 +84,7 @@ export function resolveInterviewerCaption({ audioEnabled, isSpeaking, playbackFa
 const speechFlights = new Map();
 // Finished blobs of prepared (pre-synthesized) utterances, reusable by an identical request for a short time.
 const retainedSpeechBlobs = new Map();
-const VOICE_SOURCES = ["openrouter", "azure", "kokoro"];
+const VOICE_SOURCES = ["chatterbox", "azure"];
 // The provider that answered the session's first line stays for the whole session; every later request asks for it so the voice stays the same.
 let interviewVoiceSource = null;
 
@@ -158,7 +158,8 @@ export function resetSpeechFlights() {
 }
 
 function speechRequestFor(options, text) {
-  const body = options.requestBody ?? { text, ...(typeof options.voice === "string" && options.voice ? { voice: options.voice } : {}), ...(typeof options.speed === "number" && options.speed !== 1 ? { speed: options.speed } : {}) };
+  // Every network line is synthesized at 1x: the speed is applied on playback, so the request (and its cache key) never depends on it.
+  const body = options.requestBody ?? { text, ...(typeof options.voice === "string" && options.voice ? { voice: options.voice } : {}) };
   const request = {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -243,8 +244,79 @@ export function fetchSpeechBlob(text, options) {
   return lease.promise.finally(() => lease.release(false));
 }
 
+// The rate every interviewer line plays at (the room's speed, times the turn's). It is read when a chunk starts and pushed
+// to the audio playing now, so a change applies at once without restarting or re-requesting the line.
+let interviewerPlaybackRate = 1;
+const playingRateListeners = new Set();
+
+/** Sets the playback rate of the interviewer's lines; a line that is playing follows at once. Invalid rates mean 1x. */
+export function setInterviewerPlaybackRate(rate) {
+  const previous = interviewerPlaybackRate;
+  const next = Number.isFinite(rate) && rate > 0 ? rate : 1;
+  if (next === previous) return;
+  interviewerPlaybackRate = next;
+  for (const listener of [...playingRateListeners]) listener(previous, next);
+}
+
+export function getInterviewerPlaybackRate() {
+  return interviewerPlaybackRate;
+}
+
+/** Applies the current rate to an audio surface (pitch is kept on HTMLAudio; Web Audio shifts it, see web-audio-playback.mjs). */
+export function applyPlaybackRate(audio) {
+  try {
+    audio.preservesPitch = true;
+    audio.webkitPreservesPitch = true;
+  } catch { /* Not every surface has the flag. */ }
+  audio.playbackRate = interviewerPlaybackRate;
+}
+
+/** Keeps `audio` at the live rate until the returned function is called; `onChange` runs after each rate change. */
+export function followPlaybackRate(audio, onChange = () => {}) {
+  const listener = (previous, next) => {
+    audio.playbackRate = next;
+    onChange(previous, next);
+  };
+  playingRateListeners.add(listener);
+  return () => { playingRateListeners.delete(listener); };
+}
+
+const nowMs = () => globalThis.performance?.now?.() ?? Date.now();
+
 /**
- * Advances captions against the playback progress of one audio track (estimated by word count). Units are
+ * A safety deadline for audio that plays at the live rate. `budgetMs` is the time the audio may take at 1x; the wall-clock
+ * deadline is that budget divided by the rate, and a rate change rescales what is left of it (`rescale`).
+ */
+export function createRateDeadline({ budgetMs, onExpire, schedule = (callback, delay) => globalThis.setTimeout(callback, delay), unschedule = (id) => globalThis.clearTimeout(id), now = nowMs }) {
+  let allowedMs = budgetMs;
+  let rate = interviewerPlaybackRate;
+  let since = now();
+  let timer = null;
+  let expired = false;
+  const arm = () => {
+    since = now();
+    timer = schedule(() => { expired = true; onExpire(); }, allowedMs / rate);
+  };
+  const cancel = () => {
+    if (timer !== null) unschedule(timer);
+    timer = null;
+  };
+  arm();
+  return {
+    cancel,
+    rescale(previous, next) {
+      if (expired || timer === null) return;
+      cancel();
+      allowedMs -= (now() - since) * rate;
+      rate = next;
+      arm();
+    },
+  };
+}
+
+/**
+ * Advances captions against the playback progress of one audio track (estimated by word count). currentTime and duration
+ * are both media time, so the ratio holds at any playback rate. Units are
  * `{ caption, text }`: `text` is what is spoken (its words weigh the progress), `caption` is what is shown, so a
  * sentence split into two audio parts keeps showing the whole sentence.
  */
@@ -266,7 +338,7 @@ function createCaptionUpdater(units, getAudio, isCancelled, onSegment) {
 }
 
 // Longest wait for the interviewer audio (the first chunk, or a later one) before giving up on voice for the utterance.
-// The backend budget is 15 s (own Kokoro, then the OpenRouter hedge); this leaves time for the network and body transfer.
+// The backend budget is 15 s; this leaves time for the network and body transfer.
 export const FIRST_AUDIO_TIMEOUT_MS = 20_000;
 export const speechUnavailableMessage = "Não conseguimos reproduzir a voz do entrevistador. Leia a pergunta e responda normalmente.";
 // The browser (iOS) refused to start audio without a tap: a tap on "Ouvir" unlocks it and replays the utterance.
@@ -334,6 +406,8 @@ export function synthesizeInterviewerQuestion(text, options) {
   let timedOut = false;
   let timeoutId = null;
   let removeAudioListeners = null;
+  let playbackDeadline = null;
+  let stopFollowing = null;
   let resolveTimeout;
   let resolveCancellation;
   const diagnose = createChunkDiagnostics(options, 0, 1, () => audio);
@@ -354,6 +428,10 @@ export function synthesizeInterviewerQuestion(text, options) {
   const cleanup = () => {
     removeAudioListeners?.();
     removeAudioListeners = null;
+    stopFollowing?.();
+    stopFollowing = null;
+    playbackDeadline?.cancel();
+    playbackDeadline = null;
     if (audio) {
       audio.pause();
       audio.removeAttribute?.("src");
@@ -389,6 +467,7 @@ export function synthesizeInterviewerQuestion(text, options) {
       timeoutId = null;
       objectUrl = createObjectUrl(blob);
       audio = makeAudio(objectUrl);
+      applyPlaybackRate(audio);
 
       const playbackEnded = new Promise((resolve, reject) => {
         const onEnded = () => { diagnose("playback_ended"); resolve("ended"); };
@@ -412,7 +491,12 @@ export function synthesizeInterviewerQuestion(text, options) {
         };
       });
 
-      scheduleTimeout(playbackTimeoutMs, "A reprodução do áudio demorou demais. Você pode continuar sem ele.");
+      // The playback budget is media time at 1x: a rate change rescales what is left of the deadline.
+      playbackDeadline = createRateDeadline({
+        budgetMs: playbackTimeoutMs, schedule, unschedule, now: options.now,
+        onExpire: () => { diagnose("playback_timeout"); resolveTimeout({ status: "unavailable", message: "A reprodução do áudio demorou demais. Você pode continuar sem ele." }); },
+      });
+      stopFollowing = followPlaybackRate(audio, (previous, next) => playbackDeadline?.rescale(previous, next));
       diagnose("playback_start");
       const outcome = await Promise.race([
         Promise.resolve(audio.play()).then(() => { diagnose("playback_play_resolved"); return playbackEnded; }),
@@ -720,7 +804,8 @@ export function playInterviewerSegments(segments, options) {
     const announceFinalChunk = () => {
       if (!isLast || !playingStarted || finalChunkAnnounced || cancelled) return;
       const duration = audio.duration;
-      if (Number.isFinite(duration) && duration > 0 && duration * 1_000 - (audio.currentTime || 0) * 1_000 > handoffLeadMs) return;
+      // The lead is wall-clock time: the media left to play is heard at the live rate.
+      if (Number.isFinite(duration) && duration > 0 && (duration - (audio.currentTime || 0)) * 1_000 / getInterviewerPlaybackRate() > handoffLeadMs) return;
       finalChunkAnnounced = true;
       options.onFinalChunkStarted?.();
     };
@@ -736,9 +821,15 @@ export function playInterviewerSegments(segments, options) {
       if (isLast) options.onFinalChunkPlaybackStarted?.();
       announceFinalChunk();
     };
-    const timer = schedule(() => { diagnose("playback_timeout"); finish(reject, Object.assign(new Error("playback timeout"), { isPlaybackTimeout: true })); }, playbackTimeoutMs);
+    let stopFollowing = () => {};
+    // The playback budget is media time at 1x: a rate change rescales what is left of the deadline.
+    const deadline = createRateDeadline({
+      budgetMs: playbackTimeoutMs, schedule, unschedule,
+      onExpire: () => { diagnose("playback_timeout"); finish(reject, Object.assign(new Error("playback timeout"), { isPlaybackTimeout: true })); },
+    });
     function finish(settle, value) {
-      unschedule(timer);
+      deadline.cancel();
+      stopFollowing();
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onError);
       audio.removeEventListener("playing", onPlaying);
@@ -755,6 +846,8 @@ export function playInterviewerSegments(segments, options) {
     audio.addEventListener("timeupdate", onTimeUpdate);
     audio.addEventListener("durationchange", onTimeUpdate);
     if (chunk.sentences.length && !cancelled) onSegment(chunk.sentences[0]);
+    applyPlaybackRate(audio);
+    stopFollowing = followPlaybackRate(audio, (previous, next) => deadline.rescale(previous, next));
     diagnose("playback_start");
     item.playing = true;
     Promise.resolve(audio.play()).then(
@@ -823,12 +916,12 @@ export function playInterviewerSegments(segments, options) {
  * (`retainMs`) instead of synthesizing the opening twice. Resolves to the interview's voice source once the first
  * chunk answered or after `options.timeoutMs` (default 6000); the request keeps running after a timeout. Never rejects.
  */
-export function prepareSessionVoice(text, voice, speed, options = {}) {
+export function prepareSessionVoice(text, voice, options = {}) {
   const chunks = groupInterviewerSentences(splitInterviewerSpeech(text));
   if (!chunks.length) return Promise.resolve(getInterviewVoiceSource());
   const schedule = options.setTimeout ?? ((callback, delay) => globalThis.setTimeout(callback, delay));
   const unschedule = options.clearTimeout ?? ((id) => globalThis.clearTimeout(id));
-  const lease = acquireSpeechBlob({ endpoint: options.endpoint, fetcher: options.fetcher, voice, speed, retainMs: options.retainMs ?? 30_000 }, chunks[0].text);
+  const lease = acquireSpeechBlob({ endpoint: options.endpoint, fetcher: options.fetcher, voice, retainMs: options.retainMs ?? 30_000 }, chunks[0].text);
   let timerId = null;
   const deadline = new Promise((resolve) => { timerId = schedule(resolve, options.timeoutMs ?? 6_000); });
   // Released only once answered: a timed-out request stays attached for the playback that will ask for it.
@@ -882,7 +975,7 @@ export function prewarmInterviewerSpeech(segments, options) {
 /** Best-effort wake-up of a scale-to-zero voice backend (POST <speech endpoint>/warmup); errors are ignored. */
 export function warmUpInterviewerSpeech(endpoint, fetcher, preferences) {
   try {
-    const body = preferences ? JSON.stringify({ voice: preferences.voice, speed: preferences.speed }) : undefined;
+    const body = preferences ? JSON.stringify({ voice: preferences.voice }) : undefined;
     Promise.resolve(fetcher(`${endpoint}/warmup`, { method: "POST", ...(body ? { headers: { "content-type": "application/json" }, body } : {}) })).catch(() => undefined);
   } catch {
     // Warm-up must never affect the interview.

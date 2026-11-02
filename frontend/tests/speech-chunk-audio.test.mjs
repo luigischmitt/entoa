@@ -76,7 +76,7 @@ test("on the Web Audio path the chunk reuses the track's decoded buffer (no seco
   const context = {
     state: "running", currentTime: 0, destination: {},
     addEventListener() {}, removeEventListener() {}, resume: () => Promise.resolve(),
-    createBufferSource: () => ({ connect() {}, disconnect() {}, start() {}, stop() {}, onended: null }),
+    createBufferSource: () => ({ connect() {}, disconnect() {}, start() {}, stop() {}, onended: null, playbackRate: { value: 1 } }),
     createGain: () => ({ gain: { value: 1 }, connect() {}, disconnect() {} }),
     decodeAudioData: () => { decodes += 1; return Promise.resolve(buffer); },
   };

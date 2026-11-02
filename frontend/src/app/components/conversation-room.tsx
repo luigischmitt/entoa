@@ -87,7 +87,7 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
   }, []);
   const speechFeed = useMemo(() => createSpeechFeed(), []);
   // The instant static reactions ("Oh, really?") after an answer of two words or more.
-  const [acknowledgements] = useState(() => createInterviewerAcknowledgements(speechFeed.push, config.voice, speechSpeed, CONVERSATION_REACTIONS));
+  const [acknowledgements] = useState(() => createInterviewerAcknowledgements(speechFeed.push, config.voice, CONVERSATION_REACTIONS));
   useEffect(() => { void acknowledgements.preload(); }, [acknowledgements]);
   // Already loaded when the room opens; kept for the quiet moment after the first line, as in the interview.
   const preloadReactions = useCallback(() => { void acknowledgements.preload(); }, [acknowledgements]);
@@ -95,7 +95,7 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
   useEffect(() => { leaveRef.current = onLeave; });
 
   // The session's voice is decided on the opening line before it plays (see use-session-voice); a pin never leaks from another session.
-  const { voiceReady } = useSessionVoice(config.playInterviewerAudio, plan.opening, config.voice, speechSpeed);
+  const { voiceReady } = useSessionVoice(config.playInterviewerAudio, plan.opening, config.voice);
   const { seconds, remaining, timeLimitReached } = useInterviewSession(phase, durationMinutes);
   useEffect(() => { secondsRef.current = seconds; }, [seconds]);
   const question = useMemo(() => ({ id: `tuck-${sequence}`, prompt: tuckLine, cue: "" }), [sequence, tuckLine]);
@@ -212,7 +212,7 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
     setSequence(nextSequence);
     setTuckLine(reply.say);
     record({ sequenceNumber: nextSequence, speaker: "interviewer", content: reply.say });
-    void prewarmInterviewerUtterance(reply.say, config.voice, speechSpeed);
+    void prewarmInterviewerUtterance(reply.say, config.voice);
     submittingRef.current = false;
     setPhase(isConversationEnd(reply) || body.phase === "closing" ? "closing" : "speaking");
   };

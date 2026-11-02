@@ -1,5 +1,4 @@
 import { resolveInterviewerVoice } from "./voices.mjs";
-import { resolveInterviewerSpeechSpeed } from "./interviewer-speech-speed.mjs";
 import { buildRoleContext } from "./resume-neutral.mjs";
 /** Keep the next-turn request on an explicit allowlist; raw job descriptions never enter orchestration. */
 export function serializeNextTurnRequest(input) {
@@ -16,7 +15,6 @@ export function serializeNextTurnRequest(input) {
     ...(input.config.jobDirection && input.config.interviewSource !== "resume" ? { jobDirection: input.config.jobDirection } : {}),
     // The server pre-synthesizes the next utterance as soon as it decides; it must use the voice this client will ask for.
     voice: resolveInterviewerVoice(input.config.voice),
-    speed: resolveInterviewerSpeechSpeed(input.config.speechSpeed),
     ...(hint ? { clarificationHint: hint } : {}),
     roleContext: buildRoleContext(input.config),
   });

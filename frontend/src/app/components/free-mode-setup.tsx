@@ -93,7 +93,7 @@ export function FreeModeSetup() {
       mode: "conversation",
       conversationPlan: plan,
     };
-    if (config.playInterviewerAudio) prewarmInterviewerUtterance(plan.opening, voice, speechSpeed);
+    if (config.playInterviewerAudio) prewarmInterviewerUtterance(plan.opening, voice);
     if (storeRoomHandoff(window.sessionStorage, config)) router.push("/interview");
     else { setStartError(true); setPreparing(false); }
   };
