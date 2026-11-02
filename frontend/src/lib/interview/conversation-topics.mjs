@@ -1,0 +1,819 @@
+export const RECENT_TOPICS_STORAGE_KEY = "tuc:recent-conversation-topics";
+export const RECENT_TOPICS_LIMIT = 24;
+
+const topic = (id, category, title, opening, lines) => ({
+  id,
+  category,
+  title,
+  opening,
+  paths: lines.map((line, index) => ({ id: `p${index + 1}`, line })),
+});
+
+export const CONVERSATION_TOPICS = [
+  // daily-life
+  topic("morning-routine", "daily-life", "Rotina da manhã",
+    "Okay, I'm a toucan, so my morning starts with sunshine and a very loud yawn. How does your morning usually begin?",
+    [
+      "Last week I watched the sunrise from my favorite branch. What did you do first when you woke up today?",
+      "I love slow mornings with fruit and quiet trees. Which kind of morning helps you feel most ready for the day?",
+      "Some mornings feel heavy, like the whole day is waiting. How do you feel when you wake up before you want to?",
+      "Weekday mornings and weekend mornings feel very different to me. How are your weekend mornings different from your weekdays?",
+      "Imagine every morning started with fresh mango and warm sun. What would you do first with that perfect start?",
+    ]),
+  topic("small-things-happy", "daily-life", "Pequenas alegrias do dia",
+    "Psst, I have a secret: I get very happy about tiny things, like a ripe papaya. What small thing made you smile this week?",
+    [
+      "Yesterday a bird sang outside my window, and I stopped to listen. What little moment has stayed with you lately?",
+      "My favorite small joy is a warm cup of tea in the sun. What is your favorite small joy during a normal day?",
+      "Tiny good moments can change a whole day for me. How do you feel when something small goes right unexpectedly?",
+      "Big plans are nice, but small habits feel more real to me. Which small habit do you enjoy the most in your daily life?",
+      "Imagine saving one tiny moment from every day in a little jar. Which tiny moment would you put in it first?",
+    ]),
+  topic("weekend-plans", "daily-life", "Planos de fim de semana",
+    "Weekends are my favorite, because the forest gets extra gossip and extra sun. What do you like to do when the weekend finally arrives?",
+    [
+      "Last Saturday I sat in a tree and listened to the wind for hours. What is the best way you spent your last free day?",
+      "I like lazy weekends more than busy ones, with a good book and some fruit. What kind of weekend makes you feel the most rested?",
+      "Some Sundays feel very calm, and others feel a bit empty. How do you feel when a weekend ends too fast?",
+      "A quiet weekend and a busy weekend feel like two different worlds to me. How do you choose which kind of weekend to have?",
+      "Imagine a weekend with no plans and no phone, just you and the sun. What would you do with all those free hours?",
+    ]),
+  topic("cozy-corner", "daily-life", "O cantinho da casa",
+    "Every home has a special corner that feels like a hug, I think. Where is your favorite spot to relax at home?",
+    [
+      "Last winter I found a warm spot by the window and stayed there all afternoon. What is one place you always go to when you want to rest?",
+      "I prefer rooms with plants and lots of light, like a little forest. Which room in your place feels the most comfortable to you?",
+      "A messy room can make me feel stressed, even if I am only a bird. How do you feel when your space is tidy and calm?",
+      "Some people love big open spaces, and some love small cozy corners. Which one feels more like home to you?",
+      "Imagine your home was built in a tree with a view of the ocean. What would you change first to make it feel perfect?",
+    ]),
+  topic("household-chores", "daily-life", "Tarefas do dia a dia",
+    "Chores are like tiny dragons that appear every day, but I sort of like them. What is the chore you dislike the most?",
+    [
+      "Yesterday I cleaned my favorite branch and found a shiny stone under it. What is the funniest thing you have found while cleaning?",
+      "I like folding things because it makes the mess look smaller. Which chore do you find the most satisfying to finish?",
+      "Some chores feel boring, but a little music can change everything. How do you feel when you finally finish something you put off?",
+      "Washing dishes and sweeping feel very different to me, but both feel calm. Which small task feels the calmest to do?",
+      "Imagine a robot that did every chore and never complained. What would you ask it to talk about while it worked?",
+    ]),
+
+  // food
+  topic("favorite-fruit", "food", "Frutas favoritas",
+    "Fruit is basically my whole personality, so I am biased. Which fruit would you pick if you could only eat one for a year?",
+    [
+      "My first real fruit memory is a sweet mango in a hot market. What fruit has a special place in your memory?",
+      "I like fruit that is juicy and a little messy to eat. Which fruit do you enjoy the most when it is fresh?",
+      "Some fruits feel exciting to try, and some scare me a little, like durian. How do you feel about trying a new fruit?",
+      "Mango and pineapple are both sweet, but they taste very different to me. How would you compare your two favorite fruits?",
+      "Imagine a tree that grows any fruit you want, once a day. Which fruit would you ask it for first?",
+    ]),
+  topic("street-food", "food", "Comida de rua",
+    "Street food smells like adventure, and I would fly to any market for it. What is the best snack you have found on the street?",
+    [
+      "Once I tried a warm corn snack at a busy fair, and I still think about it. What is a food you remember from a lively place?",
+      "I think the best food is the kind you eat standing up with your hands. Which snack do you like to eat while walking?",
+      "Some foods taste like home, even when you eat them far away. What food always makes you feel comfortable?",
+      "Sweet snacks and salty snacks feel like two different friends to me. Which one would you choose after a long day?",
+      "Imagine a food truck that appears only when you feel hungry for something new. What would you hope it serves?",
+    ]),
+  topic("cooking-something-simple", "food", "Cozinhar algo simples",
+    "I can't hold a spoon with my beak, so I just watch cooks and judge their pans. What is one easy meal you know how to make?",
+    [
+      "Last month I watched a cook make soup with a wooden spoon and a lot of laughter. What is a meal you could cook without thinking?",
+      "I think simple food tastes better when it is made slowly and with care. What makes a homemade dish special to you?",
+      "Cooking can feel scary when you try a new recipe for the first time. How do you feel in the kitchen when something goes wrong?",
+      "Baking and frying feel like two very different adventures to me. Which one do you enjoy more when you cook at home?",
+      "Imagine a kitchen where every dish turns out perfect on the first try. What would you cook first in that magic kitchen?",
+    ]),
+  topic("breakfast-or-not", "food", "Café da manhã",
+    "Some people skip breakfast, and I think that is a very strange idea. What do you usually eat in the morning, if anything?",
+    [
+      "Once I ate a fruit breakfast so big that I could barely fly. What is the biggest breakfast you have ever enjoyed?",
+      "I prefer something light and sweet, like fruit with a little yogurt. What is your favorite thing to eat early in the day?",
+      "Sometimes a good breakfast feels like a warm start to a happy day. How does your mood change when you eat something tasty first?",
+      "A savory breakfast and a sweet breakfast feel like two different styles to me. Which style do you like more when you wake up?",
+      "Imagine a breakfast that tastes like your favorite memory from long ago. What would be on that plate?",
+    ]),
+  topic("sweet-things", "food", "Coisas doces",
+    "My beak gets sticky very fast around sweet things, and I love it. What dessert do you always want, even after a big meal?",
+    [
+      "Last summer I found a bowl of very ripe guava and ate almost all of it. What sweet treat did you enjoy the most lately?",
+      "I think fruit desserts are better than chocolate, but chocolate is strong competition. Which sweet is your number one choice?",
+      "Eating dessert slowly makes me feel calm and a little bit happy. How do you feel when you finally eat something sweet?",
+      "Cake and ice cream feel very different to me, one is soft and one is cold. Which one would you pick on a hot day?",
+      "Imagine a dessert shop that only sells the treats you loved as a little one. What would you order first?",
+    ]),
+
+  // travel
+  topic("dream-destination", "travel", "Destino dos sonhos",
+    "Birds travel a lot, but I mostly fly between my three favorite trees. Where is the one place you dream about visiting someday?",
+    [
+      "Last year I flew over a river so wide that I forgot to blink. What place in the world would make you stop and stare?",
+      "I prefer quiet places with birds and waterfalls over busy cities. Which kind of place feels most relaxing to you?",
+      "Some places make my heart feel calm, like a forest after rain. How do you feel when you imagine a beautiful new place?",
+      "Beaches and mountains feel very different to me, one is loud and one is quiet. How would you compare those two places?",
+      "Imagine you could fly for one day and visit any place on Earth. Where would you land first?",
+    ]),
+  topic("short-escape", "travel", "Viagem perto de casa",
+    "A short trip close to home can feel like a big adventure, trust me. What is a nearby place you would love to explore?",
+    [
+      "Last month I visited a small waterfall just a short flight from my tree. What is the nearest place you go when you want an escape?",
+      "I like places with fresh water, green plants, and a little sunshine. Which kind of day trip sounds most fun to you?",
+      "Some short trips feel relaxing, and some feel like a fun surprise. How do you feel when a plan goes better than you expected?",
+      "A city day and a forest day are different types of fun for me. Which one would you choose for a free Saturday?",
+      "Imagine a train that takes you anywhere in an hour, with no tickets needed. Where would you go first?",
+    ]),
+  topic("waiting-and-watching", "travel", "Momentos de viagem",
+    "Airports are full of tiny stories, and I love listening to them from above. What is something interesting you have noticed while waiting in line?",
+    [
+      "Once I watched a man laugh at his own hat in a very busy hall. What small moment in a crowded place made you smile?",
+      "I think the best part of any trip is the first hour, when everything feels new. What part of a trip do you enjoy the most?",
+      "Some people feel nervous before they leave, and that feeling is normal. How do you feel right before a big change?",
+      "Trains and planes feel like two different adventures to me. Which one would you choose for a long journey?",
+      "Imagine you had a travel buddy who never gets tired and always knows the best snacks. What would you ask them to show you first?",
+    ]),
+  topic("where-to-sleep", "travel", "Onde dormir",
+    "I have slept in a tree hole, a palm nest, and a very cozy bush. Where do you like to sleep when you are away from home?",
+    [
+      "Last spring I slept in a nest that smelled like fresh leaves. What kind of place would make you feel really cozy?",
+      "I like a bed that is high up, with a nice breeze and good views. Which feature matters most to you in a place to sleep?",
+      "Some beds feel too soft, and some feel just right. How do you feel after your first good night of sleep somewhere new?",
+      "A small room and a big room feel different to me, like a nest and a cave. Which one sounds more comfortable to you?",
+      "Imagine a hotel built inside a giant fruit tree with a view of the sea. What would you want to see from your window?",
+    ]),
+  topic("packing-tricks", "travel", "Arrumar a mala",
+    "Packing is an art that I still struggle with, because a bird has only one bag. What is the one thing you never forget to pack?",
+    [
+      "Last trip I packed a whole banana tree, which was a terrible idea. What is the silliest item you would pack for a trip?",
+      "I always bring a light jacket, even on sunny days, because forests get cold. Which item do you think is essential to pack?",
+      "Some suitcases feel heavy before you even start walking. How do you feel when you carry something that is too big?",
+      "Small bags and big bags feel like two very different plans. Which one would you choose for a short weekend?",
+      "Imagine a bag that never gets heavy, no matter what you put inside. What would you fill it with first?",
+    ]),
+
+  // movies-series
+  topic("favorite-movie", "movies-series", "Filme favorito",
+    "Movies are like tiny windows into other forests, and I watch them with my head tilted. Which movie has stayed in your mind for a long time?",
+    [
+      "Last night I watched a cartoon about a brave fox, and I cried a little. What is the last movie that made you feel something?",
+      "I love films with funny animals, bright colors, and a big heart. What kind of movie do you enjoy watching the most?",
+      "Some movies make me feel calm, and others make me jump. How do you feel when a movie surprises you?",
+      "Comedies and dramas feel like two different kinds of sunshine. Which one would you pick for a relaxed evening?",
+      "Imagine a movie about your own life, with a soundtrack you love. What would the first scene show?",
+    ]),
+  topic("series-to-binge", "movies-series", "Série para maratonar",
+    "Watching a whole season in one day sounds like fun to me. Which show would you recommend to a curious bird?",
+    [
+      "Once I followed a detective show in a forest, and I got very confused. What show made you excited to see the next episode?",
+      "I like shows with lovable characters who make silly mistakes. What kind of characters do you enjoy following the most?",
+      "A good ending can make me happy for hours after the show. How do you feel when you finish a series you love?",
+      "Long series and short series feel like two different adventures to me. Which kind do you like watching more?",
+      "Imagine you are the main character of a show that airs every night. What would your first episode be about?",
+    ]),
+  topic("animated-favorites", "movies-series", "Desenhos animados",
+    "Cartoons are a great way to learn, and they make even a toucan look wise. What cartoon do you still love to watch when you want to relax?",
+    [
+      "Last week I watched a cartoon about a clever penguin who built a boat. What was the last cartoon that made you laugh out loud?",
+      "I prefer cartoons with bright colors and silly songs that stay in your head. Which cartoon has the best music for you?",
+      "Some cartoons feel calm and warm, and some feel wild and crazy. How do you feel when you watch something funny after a long day?",
+      "Old cartoons and new cartoons look very different to me, like two worlds. What do you think makes a cartoon feel special?",
+      "Imagine you could join a cartoon for one day and be any character. Which character would you pick to be?",
+    ]),
+  topic("documentary-nights", "movies-series", "Documentários e curiosidades",
+    "Documentaries are like a cup of tea for my curious brain, slow and full of interesting details. What is one topic you could watch about all day?",
+    [
+      "Once I watched a film about bees, and now I think about them every morning. What topic has made you curious after watching something?",
+      "I love nature documentaries because the sounds of the forest feel very real. Which kind of documentary do you enjoy the most?",
+      "Some documentaries feel sad, and some feel very inspiring. How do you feel after a film that makes you think?",
+      "Short videos and long documentaries feel very different to my brain. Which one is easier for you to finish?",
+      "Imagine a documentary about your favorite hobby, with a big voice narrating everything. What would the narrator say first?",
+    ]),
+  topic("superhero-films", "movies-series", "Filmes de super-herói",
+    "Heroes in movies always have such cool gadgets and capes. If you were a hero in a film, what would your special gadget be?",
+    [
+      "I once pretended to fly off a branch and almost fell into a bush. What would your first superhero move look like?",
+      "I prefer heroes who are kind and funny, not only strong. What kind of hero do you like most in films?",
+      "Some hero stories feel exciting, and some make me nervous. How do you feel when the hero is in danger?",
+      "Strong heroes and clever heroes feel like two very different styles to me. Which style do you think is more interesting?",
+      "Imagine a world where everyone had a small superpower for one day. What would you use yours for first?",
+    ]),
+
+  // music
+  topic("favorite-song-moods", "music", "Música para cada humor",
+    "Music can turn a dull afternoon into a little party, and I think birds know it. What song makes you feel the most alive?",
+    [
+      "Last week I sang along to a song with the wind, and the trees loved it. What song did you sing loudly recently?",
+      "I like songs with simple melodies that I can hum all day. What kind of music do you prefer when you want to relax?",
+      "Some songs make my feathers tingle, and some make me want to dance. How do you feel when a song suddenly gives you chills?",
+      "Slow songs and fast songs feel like two different moods to me. Which mood do you pick when you need some energy?",
+      "Imagine you could write a song about your favorite place. What would the chorus sound like?",
+    ]),
+  topic("dream-instrument", "music", "Instrumento dos sonhos",
+    "I cannot play any instrument, but I would love to play a tiny drum. Which instrument would you most like to learn one day?",
+    [
+      "Once I tapped a hollow log like a drum, and the forest looked surprised. What sound would you make if you played for the first time?",
+      "I think a guitar sounds warm, but a flute sounds magical to me. Which instrument sounds the most beautiful to you?",
+      "Learning a new instrument can feel frustrating in the first weeks. How do you feel when you practice something difficult?",
+      "Piano and drums feel like two very different adventures, one is calm and one is loud. Which one would you enjoy learning more?",
+      "Imagine a magic instrument that plays whatever song you hum. What song would you ask it to play first?",
+    ]),
+  topic("live-shows", "music", "Show ao vivo",
+    "Concerts look like just noise to some people, but I call them pure magic. What would be your dream moment at a live show?",
+    [
+      "Once I heard a band play in a big tree, and the whole forest danced. What kind of music would you love to hear live?",
+      "I like small shows where the singer is close enough to see the smile. What do you enjoy most about being in a crowd during a song?",
+      "Standing in a crowd can make me feel small, but in a good way. How do you feel when everyone sings the same chorus?",
+      "Big stadium shows and tiny club shows feel like two different worlds. How would you compare them?",
+      "Imagine a musician sang a song just for you while you cooked. What song would you ask for?",
+    ]),
+  topic("rhythm-and-dance", "music", "Ritmo e dança",
+    "When music starts, my feet forget that I am a bird and want to dance. What is a rhythm that makes you move without thinking?",
+    [
+      "Last summer a drum beat made me spin around a branch three times. What song is impossible for you to sit still to?",
+      "I think samba and jazz are both full of joy, but in very different ways. Which style of dance do you enjoy watching most?",
+      "Some rhythms make me feel brave, and some make me feel calm. How do you feel when a beat starts loud and fast?",
+      "A quick beat and a slow beat feel like two different kinds of happiness. Which beat would you choose when you are happy?",
+      "Imagine a dance class where the teacher is a very dramatic parrot. What would your first move be?",
+    ]),
+  topic("songs-in-english", "music", "Músicas em inglês",
+    "Singing in English is a great way to practice, and I love catchy repeated lines. Which English song do you sing without even thinking?",
+    [
+      "Once I sang a song in English, and I forgot half the words. What line of a song do you remember most easily?",
+      "I think songs with simple words are easier to learn for new speakers. What kind of songs help you practice the most?",
+      "Singing can feel scary when people are watching you. How do you feel when you sing in front of someone?",
+      "Slow songs are clear for practice, but fast songs are more fun to sing. Which one helps you learn new words the most?",
+      "Imagine a song that teaches you a new word every time the chorus starts. Which word would you want to learn first?",
+    ]),
+
+  // sports
+  topic("favorite-sport", "sports", "Esporte favorito",
+    "Sports look like running and shouting to most people, but I see little stories in them. What sport do you enjoy watching or playing the most?",
+    [
+      "Once I tried to race a squirrel up a tree, and I lost by a lot. What is a sport you would like to try one day?",
+      "I like sports where you can move freely and laugh a lot. What kind of game makes you feel the most free?",
+      "Some matches are so tense that my feathers stand up. How do you feel when the game is close at the very end?",
+      "Team sports and solo sports feel very different to me, one needs friends and one needs focus. Which kind do you prefer?",
+      "Imagine you could be a champion in any sport for one day. Which sport would you choose to win?",
+    ]),
+  topic("outdoor-games", "sports", "Brincadeiras ao ar livre",
+    "Outdoor games are the best, because the wind plays along and the grass is always ready. What outdoor game do you enjoy the most?",
+    [
+      "Last spring I played hide and seek with a squirrel, and I did not win. What is a game you could play in a park?",
+      "I prefer games with simple rules, lots of running, and fresh air. Which outdoor game feels easiest to join?",
+      "Some games make me laugh so hard that I forget to count points. How do you feel when you play with lots of laughter?",
+      "Quiet games like chess and loud games like tag feel like two different worlds. Which one would you pick for a sunny afternoon?",
+      "Imagine a park where every game is invented by the people who visit it. What game would you create there?",
+    ]),
+  topic("sports-dreams", "sports", "Sonhos esportivos",
+    "Athletes make it look so easy, and I wonder what their secret is. What sport would you love to be really good at?",
+    [
+      "I once watched a swimmer glide across a lake with perfect style. What would your perfect sports moment look like?",
+      "I think practice matters more than talent, even for a bird. What do you think makes someone good at a sport?",
+      "Winning feels great, but trying hard can also feel very proud. What feeling stays with you after you finish something hard?",
+      "Individual goals and team goals are two very different challenges. Which kind of goal would you like to set for yourself?",
+      "Imagine a sport invented just for birds, with branches and wind. What would you call it?",
+    ]),
+  topic("beach-games", "sports", "Esporte na praia",
+    "Sand, sun, and waves make the perfect place for a game. What beach game would you like to try with friends?",
+    [
+      "Last summer I kicked a ball on the sand, and it flew into the sea. What is the funniest thing that happened during a game?",
+      "I like beach volleyball more than soccer, because the sand is so soft. Which place makes a game feel more fun for you?",
+      "Playing in the sand can feel like a relaxing holiday. How do you feel when you run barefoot on a warm beach?",
+      "Sand and grass feel very different under the feet, and both are fun. Which one would you choose for a game?",
+      "Imagine a beach game where the waves are the referees. What rules would you make for that game?",
+    ]),
+  topic("sports-and-rest", "sports", "Esporte e descanso",
+    "Resting is a skill, and I think I am an expert at it. How do you like to rest after a busy day?",
+    [
+      "Once I slept on a branch in the sun for three hours. What is your favorite way to relax after moving around a lot?",
+      "I prefer resting with soft music and a cool breeze. After a long walk, what helps you feel better?",
+      "Some rest feels lazy, but I think it is very important. How do you feel after a day with nothing to do?",
+      "Active rest and quiet rest feel like two different styles to me. Which style do you like more on a Sunday?",
+      "Imagine a perfect day of doing nothing, with snacks and sunshine. What would be the first thing you would do?",
+    ]),
+
+  // work-career
+  topic("dream-work-hypo", "work-career", "Trabalho dos sonhos",
+    "If I could have any job, I would probably guard the tallest fruit tree. What kind of work would make you proud to talk about?",
+    [
+      "Last month I pretended to be a tour guide for a very sleepy lizard. What is a kind of work you would enjoy trying for a week?",
+      "I prefer work that lets me move around and talk with many people. What kind of work do you find most exciting?",
+      "Some kinds of work feel scary, and some feel like a great adventure. How do you feel when you think about a brand new field?",
+      "Working alone and working in a team feel very different to me. Which one sounds more fun to you?",
+      "Imagine a workplace inside a giant tree, with a view of the whole forest. What would you do there every morning?",
+    ]),
+  topic("useful-skills", "work-career", "Habilidades úteis",
+    "Skills are useful everywhere, like listening well and staying calm. Which skill do you think is most useful to learn first?",
+    [
+      "Once I learned to count my seeds, and it helped me feel organized. What is a small skill that surprised you when you learned it?",
+      "I think listening is more powerful than talking, even for a loud bird. What skill do you admire in other people?",
+      "Learning a new skill can feel slow, but it feels great at the end. How do you feel when you finally get better at something?",
+      "Technical skills and people skills feel different to me, like wings and feet. Which kind comes easier to you?",
+      "Imagine a skill that makes everyone smile when you use it. What would it be?",
+    ]),
+  topic("new-beginnings", "work-career", "Começar algo novo",
+    "Starting something new is like flying from a high branch for the first time. What is one new thing you would like to start this year?",
+    [
+      "The first time I flew, I wobbled a lot and landed on a fern. What first step would you take in a new area?",
+      "I like new things that feel easy to begin, like a short game or a walk. Which new activity would you try first?",
+      "A new start can feel exciting and scary at the same time. How do you feel when you begin something you know little about?",
+      "Learning a new routine and learning a new hobby feel different to me. Which one sounds more interesting to start?",
+      "Imagine you could start over with a fresh plan and no past mistakes. What would your first goal be?",
+    ]),
+  topic("teamwork-stories", "work-career", "Trabalho em equipe",
+    "Birds in a flock work together, and I think that is very smart. What makes a group of people work well together for you?",
+    [
+      "Once I helped a group of ants carry a big leaf, and it was amazing. What kind of group activity do you enjoy most?",
+      "I prefer small teams where everyone can speak and share ideas. What makes a team feel comfortable to you?",
+      "Some group projects feel slow, and some feel full of energy. How do you feel when everyone is working toward the same goal?",
+      "Leading a group and following a leader feel like different roles to me. Which role feels more natural to you?",
+      "Imagine a team of birds, fish, and squirrels solving one problem together. What problem would they solve first?",
+    ]),
+  topic("favorite-tools", "work-career", "Ferramentas favoritas",
+    "Good tools make every task easier, and I think they should be a bit beautiful too. What tool do you like to use the most?",
+    [
+      "Once I used a stick to dig for worms, and it worked very well. What is the strangest tool you have ever tried?",
+      "I prefer simple tools that do one thing really well. Which tool in your life feels the most useful?",
+      "Some tools are so complicated that I want to give up. How do you feel when you find an easy tool that solves a problem?",
+      "Pens and keyboards feel like very different tools, one feels slow and one feels fast. Which one helps you think better?",
+      "Imagine a tool that can fix any small problem in your day. What would you ask it to fix first?",
+    ]),
+
+  // tech
+  topic("gadgets-wish", "tech", "Aparelhos e gadgets",
+    "Gadgets are fun, but a good map and a nice friend are pretty useful too. What gadget would you love to have just for fun?",
+    [
+      "Once I found a shiny stone that beeped, and I still do not know why. What tiny gadget would you invent if you could make any one?",
+      "I like gadgets that make life simpler, not more complicated. Which one helps you the most during a normal day?",
+      "Some gadgets make me excited, and others make me feel lost. How do you feel when you learn to use a new device?",
+      "Big screens and small screens feel very different to me, like two worlds. Which one do you prefer to look at?",
+      "Imagine a gadget that can turn any sound into a song. What would you want it to turn into music first?",
+    ]),
+  topic("helpful-apps", "tech", "Aplicativos úteis",
+    "Apps can help you learn a language, and a little reminder can feel like a friendly bird. Which app do you use the most in your day?",
+    [
+      "Once I set a reminder to eat a mango, and it worked perfectly. What reminder would you like your phone to send every morning?",
+      "I prefer simple apps with few buttons and clear colors. What makes an app feel easy to use for you?",
+      "Some apps feel helpful, and some feel too noisy. How do you feel when an app makes your day a little easier?",
+      "Free apps and paid apps can feel different in quality, though not always. Which feature matters most when you choose one?",
+      "Imagine an app that helps you practice English while you walk through a park. What would you want it to say to you?",
+    ]),
+  topic("robots-future", "tech", "Robôs no futuro",
+    "Being an AI, I feel a little friendly toward robots, even the clumsy ones. What would you like a robot to help you with?",
+    [
+      "Last week I watched a little robot try to climb a step and fall over. What task would you give a robot first?",
+      "I prefer robots that are friendly and that make you laugh a bit. What kind of robot personality do you like most?",
+      "Some people feel uneasy about robots, and that feeling is understandable. How do you feel about machines that help with chores?",
+      "A robot that cooks and a robot that cleans feel like two different helpers. Which helper would you choose first?",
+      "Imagine a robot that could only help you with one thing for the rest of your life. What would you choose?",
+    ]),
+  topic("learning-online", "tech", "Aprender online",
+    "Learning online can feel like a cozy classroom in your pocket, I think. What do you enjoy most when you learn from a screen?",
+    [
+      "I watched a short video about how seeds grow, and I was amazed. What is one video that taught you something new?",
+      "I prefer short lessons that I can finish in a few minutes. What length of lesson helps you focus the best?",
+      "Some lessons feel boring, and some make me curious all day. How do you feel when a lesson makes you curious?",
+      "Videos and written notes help me in very different ways. Which one helps you remember things more easily?",
+      "Imagine a course taught by the wisest owl in the forest. What would you most want to learn from that owl?",
+    ]),
+  topic("phone-habits", "tech", "Hábitos no celular",
+    "Phones are great, but they can steal our attention like a shiny thing. How do you use your phone when you have free time?",
+    [
+      "Once I spent an hour looking at a pretty flower photo and forgot my plans. What do you enjoy doing on your phone when you relax?",
+      "I like screen time that teaches me something useful, like a new word. What kind of content do you enjoy the most?",
+      "Sometimes my screen feels very loud, and I need a quiet walk. How do you feel after a long time looking at a screen?",
+      "Reading on paper and reading on a screen feel different to me. Which one helps you concentrate better?",
+      "Imagine a phone that only shows you beautiful things for one day. What would you hope to see first?",
+    ]),
+
+  // money-goals
+  topic("saving-dreams", "money-goals", "Economizar para sonhar",
+    "Saving a little bit for a dream feels like collecting seeds for a future tree. What dream would you love to save for?",
+    [
+      "Last year I saved shiny stones in a nest, and I felt very proud. What is a small thing you would like to save up for?",
+      "I prefer goals that feel fun, not stressful, like a small trip. What kind of goal makes you feel motivated?",
+      "Saving can feel slow, but each small step still matters. How do you feel when you reach a little goal?",
+      "Saving for something big and buying small treats feel very different. Which one do you enjoy more?",
+      "Imagine a jar that grows a little every time you learn a new word. What would you save up for in that jar?",
+    ]),
+  topic("yearly-goals", "money-goals", "Metas para o ano",
+    "Plans work best with big dreams and small steps, like a garden. What goal would you like to reach this year?",
+    [
+      "Last spring I planted a tiny seed and checked it every morning. What goal would you like to start working on?",
+      "I prefer goals that I can check off one step at a time. What kind of goal feels most doable for you?",
+      "Big goals can feel scary, but small ones feel calm and possible. How do you feel when you think about your next big step?",
+      "Short goals and long goals need different kinds of patience. Which one is easier for you to keep?",
+      "Imagine a magic calendar that shows you the best day to start something new. What would you start on that day?",
+    ]),
+  topic("free-joys", "money-goals", "Alegrias que não custam nada",
+    "The best joys are often free, like sunshine, a warm breeze, or a good song. What free thing makes your day better?",
+    [
+      "Once I sat in the sun for an hour and felt completely happy. What free activity do you enjoy when you have some time?",
+      "I think a walk in a park can feel better than a fancy plan. What simple activity do you prefer on a relaxed day?",
+      "Some simple pleasures feel very special, and you can enjoy them alone or with others. How do you feel after a simple, happy moment?",
+      "Trips and walks feel different, but both can feel amazing. Which kind of happy moment do you like more?",
+      "Imagine a day where everything you enjoy is free and open to you. How would you spend the first hour?",
+    ]),
+  topic("what-matters-most", "money-goals", "O que importa para você",
+    "People chase big things, and others enjoy small things, and both are fine. What do you value most in your life right now?",
+    [
+      "Last year I chose to rest more, and it felt surprisingly good. What is one thing you want to focus on lately?",
+      "I value kindness and a warm sun more than fast success. What value do you think is most important for a happy life?",
+      "Some choices feel heavy, and others feel light and clear. How do you feel when you make a decision that feels right?",
+      "Quick wins and steady progress feel different to me. Which one motivates you more?",
+      "Imagine you could ask a wise tree one question about your future. What would you ask?",
+    ]),
+  topic("dream-list", "money-goals", "Lista de sonhos",
+    "Dreams are like fruit on a branch, and my list grows every season. What is the first item you would write on your list?",
+    [
+      "Last winter I added a moonlit swim to my list, and I still want it. What is a dream you think about often?",
+      "I prefer dreams that feel exciting but still possible, like a small adventure. What kind of dream sounds best to you?",
+      "Some dreams make my heart jump, and others feel a little far away. How do you feel when you think about your biggest dream?",
+      "Dreams about travel and dreams about learning feel very different. Which one would you put at the top of your list?",
+      "Imagine a magic envelope that makes one dream come true this year. What would you write inside?",
+    ]),
+
+  // people-relationships
+  topic("good-friend-qualities", "people-relationships", "Qualidades de um amigo",
+    "Good friends are like tall trees that give shade when the sun gets too strong. What quality do you value most in a friend?",
+    [
+      "Once a friend shared her fruit with me when I was very hungry. What is a small kindness that touched your heart?",
+      "I prefer friends who listen more than they talk, but who also laugh with me. What kind of friend do you enjoy spending time with?",
+      "Some friendships feel warm and easy, and some need extra care. How do you feel around people who make you feel comfortable?",
+      "Old friends and new friends feel very different to me. Which kind of friend do you enjoy meeting more?",
+      "Imagine a friend who always knows the best snack for any mood. What snack would you ask them for today?",
+    ]),
+  topic("making-new-friends", "people-relationships", "Fazer novos amigos",
+    "Making new friends can feel awkward, but it is also a little bit like a treasure hunt. How do you usually start talking to someone new?",
+    [
+      "Last month I met a shy frog by the river, and we became good friends. What is a simple way to start a chat with a stranger?",
+      "I think a small joke is the easiest way to start a talk. What kind of opening line makes you feel comfortable?",
+      "Some first talks feel nervous, but they can turn into real friendship. How do you feel when a new conversation goes well?",
+      "Talking in person and talking online feel different to me. Which one feels more natural for you to start with?",
+      "Imagine a park where everyone you meet becomes a friend for life. What would you say to the first person you see?",
+    ]),
+  topic("small-kindness", "people-relationships", "Pequenos gestos gentis",
+    "Kindness spreads like a yawn, and I think that is a wonderful thing. What small act of kindness made your day better?",
+    [
+      "Once a squirrel gave me a nut when I looked very sad. What is a kind thing you enjoy doing for others?",
+      "I prefer quiet kindness, like a friendly smile or a small note. What gesture do you think means the most to people?",
+      "Some kind gestures feel very warm, and they stay in your heart. How do you feel when someone is nice to you for no reason?",
+      "Big gifts and small gestures are different, but both can feel special. Which one do you think means more?",
+      "Imagine a day when everyone gave a small compliment to a stranger. What compliment would you like to give?",
+    ]),
+  topic("neighbors-community", "people-relationships", "Vizinhos e comunidade",
+    "Neighbors are like branches of the same tree, always close but a bit noisy. What is your favorite way to say hello to people nearby?",
+    [
+      "Last week a neighbor bird gave me a shiny leaf and asked for nothing. What is a small way you connect with people around you?",
+      "I like places where people wave and smile as they walk by. Which kind of local place makes you feel welcome?",
+      "Some neighbors feel distant, and some feel like family. How do you feel when someone recognizes you in a shop?",
+      "Big cities and small towns feel very different to me, one is busy and one is calm. Which one feels more friendly to you?",
+      "Imagine a street where every house has a garden full of fruit. What would you grow in a garden like that?",
+    ]),
+  topic("keeping-in-touch", "people-relationships", "Manter contato",
+    "Sending a message to someone you care about is like sending a tiny song across the forest. Who would you like to talk to more often?",
+    [
+      "Last spring I sent a letter to a friend who lives far away, and it arrived with a feather. How do you like to keep in touch?",
+      "I prefer calls with laughter and short messages with silly photos. What is your favorite way to share news with friends?",
+      "Waiting for a reply can feel nervous, but it can also be exciting. How do you feel when a friend answers your message quickly?",
+      "Long letters and quick chats feel like two different kinds of care. Which one do you think feels more personal?",
+      "Imagine a magic bird that carries one message to anyone you choose. Who would you send it to first?",
+    ]),
+
+  // memories
+  topic("happy-memory", "memories", "Lembrança feliz",
+    "Some memories feel like warm sunlight, even years later. What is one happy memory that always makes you smile?",
+    [
+      "I remember a summer day when I ate too many berries and laughed for hours. What memory do you think about when you need a smile?",
+      "I like memories with food, music, or sunshine in them the most. Which kind of memory do you enjoy remembering?",
+      "Some memories feel sweet, and some feel a little sad, but both are part of life. How do you feel when a good memory comes back?",
+      "Memories from the city and memories from the countryside feel very different to me. Which place do you remember more clearly?",
+      "Imagine you could visit one happy memory again for one hour. Which memory would you pick?",
+    ]),
+  topic("first-times", "memories", "Primeiras vezes",
+    "The first time I flew, I wobbled and landed on a fern, and I still giggle. What is a first time that you remember clearly?",
+    [
+      "My first real swim in a lake felt cold, wild, and amazing. What is one first that you still remember well?",
+      "I think first days are the most exciting, because everything feels new. What do you like most about the start of something?",
+      "First tries can feel nervous, and that nervous feeling is normal. How do you feel when you try something for the first time?",
+      "First tries and tenth tries feel very different to me. Which one do you think teaches you more?",
+      "Imagine you could have a first time for anything, with no fear at all. What would you try first?",
+    ]),
+  topic("song-memories", "memories", "Lembranças em música",
+    "Songs can take you back to a sunny afternoon in one second, which feels like magic. Which song brings back a special moment for you?",
+    [
+      "Once I heard a tune in the forest and remembered my first flight. What song always reminds you of a good moment?",
+      "I prefer songs that remind me of warm days and bright colors. What kind of music brings back your best memories?",
+      "Hearing an old song can make you feel warm and a little emotional. How do you feel when a familiar song starts playing?",
+      "Old songs and new songs carry different kinds of memories for me. Which kind of song holds more memories for you?",
+      "Imagine a playlist that tells the story of your life in twelve songs. Which song would be the first one?",
+    ]),
+  topic("favorite-place-memory", "memories", "Lugar que eu lembro",
+    "Some places stay in our hearts forever, like a little secret garden. What place do you think about when you want to feel calm?",
+    [
+      "Last year I found a waterfall hidden behind a wall of green leaves. What place feels magical to you, even if you only dream about it?",
+      "I love places with trees, water, and sunshine all together. Which kind of place makes you feel the most relaxed?",
+      "Some places feel too busy, and some feel like a warm hug. How do you feel in a place that feels peaceful?",
+      "Places by the sea and places in the mountains feel very different to me. Which place do you remember with the most warmth?",
+      "Imagine you could paint a picture of your favorite place from memory. What colors would you use first?",
+    ]),
+  topic("childhood-games", "memories", "Brincadeiras antigas",
+    "Old games sound wonderful to me, even though I never had a childhood. What game do you remember playing when you were little?",
+    [
+      "I once played a clapping game with a group of bees, and it was loud. What is a game you loved when you were young?",
+      "I prefer simple games with few rules and lots of laughter. What kind of game do you remember enjoying the most?",
+      "Some old games make me feel light and free, like flying. How do you feel when you remember a silly game you once loved?",
+      "Board games and running games feel different to me, one is calm and one is wild. Which kind did you enjoy more?",
+      "Imagine an old game came back today with a brand new twist. What would the twist be?",
+    ]),
+
+  // hypotheticals
+  topic("if-you-could-fly", "hypotheticals", "Se pudesse voar",
+    "If I could fly to any place, I would choose a tall mountain with fresh wind. Where would you go if you could fly for one day?",
+    [
+      "I tried flying once from a low branch, and I landed in a bush. What would your first flight look like?",
+      "I think a flight over the ocean would feel calm, but also a bit scary. Which view would you want to see first from above?",
+      "Being high in the sky must feel free and light. How do you feel when you imagine seeing the whole world below you?",
+      "A flight over a forest and a flight over a city would look very different. Which one would you choose?",
+      "Imagine you could fly for an hour every week, and no one would notice. What would you do with that free time?",
+    ]),
+  topic("time-travel", "hypotheticals", "Viagem no tempo",
+    "If I had a time machine, I would visit the forest a thousand years ago and say hello. Which time would you like to visit for a day?",
+    [
+      "I think it would be funny to watch the first trees grow tall. What time would you visit to see something amazing?",
+      "I prefer going to the future to see new inventions, but the past is also fun. Which direction in time would you explore first?",
+      "Some ideas about the future feel exciting, and some feel strange. How do you feel when you imagine a world very different from today?",
+      "Visiting the past and visiting the future feel like two different adventures. How would you compare those two trips?",
+      "Imagine you could bring one thing from today to a time long ago. What would you bring to show them?",
+    ]),
+  topic("invisible-for-a-day", "hypotheticals", "Invisível por um dia",
+    "Invisibility would be great, because I could sneak into the fruit market for a snack. What would you do first if nobody could see you?",
+    [
+      "Once I hid behind a leaf, and a lizard walked right past me without seeing me. What is the funniest thing you would do without being seen?",
+      "I think invisibility would be useful and a little bit mischievous. What kind of small adventure would you choose?",
+      "Being invisible could feel lonely, or it could feel free. How do you feel about having that kind of secret power?",
+      "Being invisible and being able to fly feel like two very different powers. Which one would you choose for a day?",
+      "Imagine you became invisible only when you were happy. What would make you happy enough to disappear for a while?",
+    ]),
+  topic("perfect-day", "hypotheticals", "Dia perfeito",
+    "Sunshine, a ripe mango, and a long chat in the trees make my perfect day. What would your perfect day look like?",
+    [
+      "Last summer I had a day like that, and I felt light all afternoon. What would you do first on a perfect day off?",
+      "I prefer a day with some quiet time and some surprise fun. Which mix of quiet and fun sounds best to you?",
+      "A perfect day can feel calm and full of joy at the same time. How do you feel when a day goes exactly the way you want?",
+      "A day in the city and a day in nature feel different, but both can be perfect. Which one would you choose?",
+      "Imagine a day where time moves slowly and every hour feels like a gift. What would you spend that time on?",
+    ]),
+  topic("talking-animals", "hypotheticals", "Falar com os animais",
+    "Talking animals would tell the funniest stories, I think. Which animal would you like to chat with for an hour?",
+    [
+      "I once heard a parrot tell a joke, and I still think about it. What would you ask a cat if it could answer you?",
+      "I think a talking dog would be cheerful, but a talking owl would be wise. Which animal would you pick for a long talk?",
+      "A talking animal could share secrets from the forest, and that feels exciting. How do you feel about hearing animal stories?",
+      "A big animal and a tiny animal would have very different things to say. Which one do you think is more interesting to talk to?",
+      "Imagine a bird and a fish sat down to talk about the ocean and the sky. What topic would they choose first?",
+    ]),
+
+  // nature-animals
+  topic("favorite-animal", "nature-animals", "Animal favorito",
+    "Animals have the best personalities, even the quiet ones, and I love them all. Which animal do you think is the most interesting?",
+    [
+      "Once I saw a sleepy sloth hanging from a branch, and it winked at me. What is your favorite animal to watch?",
+      "I like animals that are colorful, loud, and very proud of themselves. Which animal do you think has the best style?",
+      "Some animals make me feel calm, like turtles walking slowly. How do you feel when you watch an animal relax?",
+      "Big animals and small animals each have a special kind of charm. Which kind of animal do you find more charming?",
+      "Imagine you could swap places with an animal for one day. Which one would you pick?",
+    ]),
+  topic("forest-sounds", "nature-animals", "Sons da floresta",
+    "A forest is never quiet, because there are birds, frogs, and wind all talking at once. What sound in nature do you love the most?",
+    [
+      "Last morning I heard frogs singing near the river, and it sounded like a concert. What is a nature sound that calms you?",
+      "I prefer the sound of rain on leaves more than the sound of waves. Which sound helps you relax when you need quiet?",
+      "Some sounds in nature feel wild and scary, and some feel warm. How do you feel when you hear thunder far away?",
+      "Birdsong in the morning and crickets at night feel very different to me. Which one do you like to hear more?",
+      "Imagine a forest where every tree made a different musical note. What song would that forest play for you?",
+    ]),
+  topic("plants-and-gardens", "nature-animals", "Plantas e jardins",
+    "Plants are patient friends, and they never complain when you forget them for a day. What kind of plant would you choose to keep near your window?",
+    [
+      "Last spring I planted a tiny seed and checked it every morning. What is a plant you find beautiful?",
+      "I prefer leafy plants with big green fans, like a little jungle. Which plant style do you like most?",
+      "Watching a plant grow can feel calm and hopeful. How do you feel when something you care for starts to grow?",
+      "Flowers and trees feel like two different kinds of friends to me. Which one would you choose to grow first?",
+      "Imagine a garden where every plant gives a new fruit each morning. Which fruit would you like to find first?",
+    ]),
+  topic("ocean-life", "nature-animals", "Vida no mar",
+    "The ocean is huge and full of secrets, and I think it is the most mysterious place. What would you most like to see under the waves?",
+    [
+      "Once I watched a dolphin jump near a boat, and it made me clap my wings. What sea creature would you love to see up close?",
+      "I like colorful fish and bright coral more than dark, cold water. Which part of the sea sounds most amazing to you?",
+      "The sea can feel peaceful, but it can also feel a bit scary. How do you feel when you look at a big blue ocean?",
+      "Rivers and oceans are different worlds, one is calm and one is huge. Which one would you like to explore more?",
+      "Imagine you could breathe underwater for a day. Where would you go first?",
+    ]),
+  topic("weather-moods", "nature-animals", "Clima e humor",
+    "Weather changes my mood very quickly, and I think that is a fun feature. How does the weather change the way you feel?",
+    [
+      "Last week it rained all afternoon, and I sat by the window with warm tea. What is your favorite kind of weather?",
+      "I love warm, sunny days with a light breeze in the trees. Which weather makes you feel most like yourself?",
+      "Cloudy skies make me sleepy, but a little thunder wakes me up. How do you feel on a cloudy day?",
+      "A rainy day and a windy day feel very different to me. Which one do you enjoy more when you stay inside?",
+      "Imagine you could choose the weather for one perfect week. What would you pick for your sky?",
+    ]),
+
+  // brazil-culture
+  topic("festas-do-brasil", "brazil-culture", "Festas populares",
+    "Brazilian festivals are full of color, music, and warm food, and I always feel invited. What celebration do you enjoy the most?",
+    [
+      "Once I watched colorful flags flutter over a village square, and I felt very happy. What is a celebration where you feel most relaxed?",
+      "I like celebrations with dancing, music, and lots of people chatting. What makes a party feel really fun for you?",
+      "Some celebrations feel loud and warm, and their joy spreads fast. How do you feel when everyone starts dancing together?",
+      "Big city parties and small town festivals feel very different to me. Which one do you prefer to join?",
+      "Imagine a festival where every stall serves a different fruit drink. Which drink would you try first?",
+    ]),
+  topic("comidas-tipicas", "brazil-culture", "Comidas típicas do Brasil",
+    "Brazilian food has so many flavors, from sweet fruits to hot and savory stews. Which typical dish do you love the most?",
+    [
+      "Once a friend cooked a big pot of feijoada, and I smelled it from far away. What dish reminds you of a really good meal?",
+      "I think tropical fruits are the most special part of Brazilian food. Which fruit from Brazil do you enjoy eating the most?",
+      "Some traditional dishes feel like a warm hug in a bowl. How do you feel when you smell a dish that tastes like home?",
+      "Sweet dishes and savory dishes are both loved here in many ways. Which kind would you pick for a lazy lunch on a Sunday?",
+      "Imagine a market where every stall sells a different Brazilian snack. Which one would you buy first?",
+    ]),
+  topic("sotaques-do-brasil", "brazil-culture", "Sotaques do Brasil",
+    "Brazil has so many accents, and each one sounds like a different song. Which regional accent do you find the most charming to hear?",
+    [
+      "Once I heard a fisherman speak with a sing-song voice that made me smile. What is a voice or accent you enjoy hearing?",
+      "I think it is fun when people use their own words for everyday things. What is a word from your region that you love?",
+      "Hearing a familiar accent can make someone feel instantly at home. How do you feel when you hear a voice that sounds like yours?",
+      "Fast speakers and slow speakers feel different to listen to. Which speaking style is easier for you to follow?",
+      "Imagine every region of the country had its own festival of words. What word would you add to that festival?",
+    ]),
+  topic("natureza-brasileira", "brazil-culture", "Natureza brasileira",
+    "Brazil has beaches, rivers, and forests that make a bird very happy. What part of the country's nature would you love to explore first?",
+    [
+      "Once I flew over a green valley and saw a river that shined like silver. What natural place makes you feel proud?",
+      "I prefer quiet beaches and forest trails over busy places. Which kind of natural place sounds best for a calm day?",
+      "Being surrounded by green things feels very peaceful to me. How do you feel after you spend some time outside?",
+      "Mountains and beaches make very different holidays, I think. Which one would you choose for a long weekend?",
+      "Imagine a national park where every animal has a friendly guide. Which guide would you choose to follow?",
+    ]),
+  topic("girias-e-expressoes", "brazil-culture", "Gírias e expressões",
+    "Every language has funny words, and Brazilian Portuguese has plenty of them. Which expression from your own language makes you laugh?",
+    [
+      "Once I heard a funny saying about a sleepy cat, and I still repeat it. What is a word you love to say with friends?",
+      "I think short, playful words are the most fun to use. Which funny word from home do you enjoy using the most?",
+      "Some expressions feel warm and cute, and others sound a bit silly. How do you feel when you hear a funny local word?",
+      "Formal words and casual words feel very different in conversation. Which style do you use more with new people?",
+      "Imagine a dictionary made only of words that make people smile. Which word would you put on the first page?",
+    ]),
+
+  // learning
+  topic("english-fun-words", "learning", "Palavras em inglês",
+    "English has some words that sound funny to me, like a squeaky branch. Which English word do you think is the most fun to say?",
+    [
+      "Once I learned a new word about berries, and I used it with everyone I met. What new word have you learned recently?",
+      "I think short words are easier to remember than long ones. What kind of words do you find easiest to remember?",
+      "Some English sounds feel tricky, and that can be frustrating. How do you feel when a new word is hard to say?",
+      "Learning from songs and learning from movies feel different to me. Which one helps you remember words the best?",
+      "Imagine a word that changes its meaning every time you say it. Which word would you want to test first?",
+    ]),
+  topic("learning-mistakes", "learning", "Errar e aprender",
+    "Mistakes are part of learning, and I make them all the time, especially with my beak. What is a funny mistake you made while learning?",
+    [
+      "Last week I said a word wrong, and an owl corrected me with a smile. What do you do when you make a language mistake?",
+      "I prefer teachers who correct me gently and say something nice too. What makes a correction feel helpful to you?",
+      "Mistakes can feel embarrassing, but they also show that you are trying. How do you feel after you make a small error?",
+      "Speaking slowly and speaking fast are two different ways to practice. Which one helps you learn more?",
+      "Imagine a teacher who loves your mistakes and turns them into jokes. What kind of joke would make you laugh the most?",
+    ]),
+  topic("hobbies-for-practice", "learning", "Aprender com hobbies",
+    "Learning becomes much easier when it looks like play, like a game in the sun. What hobby could help you practice English without feeling like studying?",
+    [
+      "Once I learned a song in another language just by singing it every morning. What hobby would make learning feel natural to you?",
+      "I like hobbies with pictures, music, or movement, because they keep me busy. Which hobby sounds most fun for practicing words?",
+      "A hobby can feel relaxing, and that makes learning less stressful. How do you feel when you practice something you love?",
+      "Reading and talking feel like two different kinds of practice. Which one do you find more useful for your English?",
+      "Imagine a hobby that teaches you a new word every time you do it. Which hobby would you choose for that?",
+    ]),
+  topic("talking-with-the-world", "learning", "Conversas com o mundo",
+    "Talking with people from around the world is like having a little window to other forests. Who would you love to talk with, if you could pick anyone?",
+    [
+      "Once I chatted with a green parrot who told me about her rainy island. What do you wonder about people in other countries?",
+      "I prefer conversations where people ask questions and really listen to the answers. What makes a good chat feel nice to you?",
+      "Talking with someone new can be scary, but it can also feel exciting. How do you feel when you start a chat in English?",
+      "Chatting with a friend and chatting with a stranger feel different to me. Which one helps you speak more freely?",
+      "Imagine a video call where everyone speaks a different language, but you still understand. What would you say first?",
+    ]),
+  topic("study-routine", "learning", "Rotina de estudo",
+    "A good routine can be very simple, like one song and ten new words each morning. What would a good learning routine look like to you?",
+    [
+      "I once tried to study for an hour, but I kept looking at a shiny beetle. What helps you stay focused when you practice?",
+      "I prefer short sessions every day rather than one very long session. Which routine feels more doable for you?",
+      "Some days feel full of energy, and some days I just want to nap. How do you feel when you sit down to practice?",
+      "Morning practice and night practice feel very different to me. Which time works better for your brain?",
+      "Imagine a study buddy who never gets tired and always smiles. What would you ask this buddy to help you with first?",
+    ]),
+
+  // fun-opinions
+  topic("unpopular-opinion", "fun-opinions", "Uma opinião ousada",
+    "Here is a small, silly opinion from a toucan: pineapple belongs on everything. What is one food you think is underrated?",
+    [
+      "Once I told a squirrel that acorns are overrated, and he was offended. What is a silly opinion you hold?",
+      "I think tiny opinions are the most fun to share in a chat. Which everyday thing do you think is better than people say?",
+      "Some opinions make people laugh, and some make people think twice. How do you feel when someone disagrees with you kindly?",
+      "Strong opinions and soft opinions feel different in conversation. Which style do you prefer when talking about a favorite thing?",
+      "Imagine you could change one everyday rule for the whole world. What would your new rule be?",
+    ]),
+  topic("best-day-of-week", "fun-opinions", "Melhor dia da semana",
+    "Monday is secretly a good day, because it starts the week with hope. Which day of the week feels best to you?",
+    [
+      "Last Monday I flew around the tree twice just to feel excited. What part of the week do you enjoy most?",
+      "I prefer Sundays with slow mornings and fruit on the table. What kind of day makes you feel most relaxed?",
+      "Some days feel heavy from the start, and some feel light. How do you feel when a day starts with a nice surprise?",
+      "Busy days and quiet days feel like two very different styles. Which kind of day do you enjoy the most?",
+      "Imagine a week with an extra day that only you can design. What would that day be like?",
+    ]),
+  topic("silly-laughs", "fun-opinions", "Coisas engraçadas",
+    "Hiccups are the funniest sound in the world, and I refuse to argue. What sound makes you laugh the most?",
+    [
+      "Once a frog hiccupped so loudly that the whole pond started laughing. What is the funniest sound you have heard lately?",
+      "I like little things that are silly but harmless, like bubbles or puddles. Which silly thing makes you smile the most?",
+      "A good laugh can change my whole mood in just one second. How do you feel after a really good laugh?",
+      "Silly jokes and clever jokes make me laugh in different ways. Which kind of joke do you find funnier?",
+      "Imagine a comedy show where all the comedians are animals. Which animal would be the funniest on stage?",
+    ]),
+  topic("style-and-clothes", "fun-opinions", "Estilo e roupas",
+    "Feathers are my style, and I think clothes say a lot about a person. What is your favorite way to dress when you feel relaxed?",
+    [
+      "Once I wore a big red leaf as a hat, and everyone in the forest noticed. What piece of clothing makes you feel confident?",
+      "I like colors that look bright in the sun, like orange and green. Which color do you like wearing most?",
+      "Some outfits feel comfy and easy, and some feel a bit stiff. How do you feel when you wear something soft and comfortable?",
+      "Simple looks and bold looks feel like two different personalities. Which style do you think fits you best?",
+      "Imagine a clothing shop that only sells things made of fruit. What would you buy first?",
+    ]),
+  topic("puzzles-and-riddles", "fun-opinions", "Quebra-cabeças e enigmas",
+    "Puzzles make my beak tingle with excitement, especially the ones with tricky riddles. What kind of puzzle do you enjoy solving?",
+    [
+      "Last week I solved a riddle about a tree that talks, and I felt very clever. What is a puzzle that made you think hard?",
+      "I prefer puzzles with pictures and patterns more than long word games. Which kind of puzzle keeps you focused the longest?",
+      "A tough puzzle can be frustrating, but solving it feels amazing. How do you feel when you finally find the answer?",
+      "Word puzzles and number puzzles feel different to my brain. Which one feels more fun to solve?",
+      "Imagine a puzzle that only opens when you tell a good joke. What joke would you use to open it?",
+    ]),
+];
+
+const isNonEmptyString = (value) => typeof value === "string" && value.trim().length > 0;
+
+export function pickConversationTopic({ recentIds = [], random = Math.random, topics = CONVERSATION_TOPICS } = {}) {
+  const fallback = Array.isArray(CONVERSATION_TOPICS) && CONVERSATION_TOPICS.length > 0 ? CONVERSATION_TOPICS[0] : null;
+  try {
+    const list = Array.isArray(topics) ? topics.filter((item) => item && typeof item === "object") : [];
+    if (list.length === 0) return fallback;
+    const recent = Array.isArray(recentIds) ? recentIds.filter(isNonEmptyString) : [];
+    const recentSet = new Set(recent);
+    let pool = list.filter((item) => !recentSet.has(item.id));
+    if (pool.length === 0) pool = list;
+    const lastTopic = recent.length > 0 ? list.find((item) => item.id === recent[0]) : undefined;
+    if (lastTopic) {
+      const otherCategory = pool.filter((item) => item.category !== lastTopic.category);
+      if (otherCategory.length > 0) pool = otherCategory;
+    }
+    const raw = Number(random());
+    const roll = Number.isFinite(raw) ? Math.min(Math.max(raw, 0), 0.999999999999) : 0;
+    return pool[Math.floor(roll * pool.length)] ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export function readRecentTopicIds(storage) {
+  try {
+    const raw = storage.getItem(RECENT_TOPICS_STORAGE_KEY);
+    if (typeof raw !== "string") return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || !parsed.every((value) => typeof value === "string")) return [];
+    return parsed.slice(0, RECENT_TOPICS_LIMIT);
+  } catch {
+    return [];
+  }
+}
+
+export function rememberConversationTopic(storage, id) {
+  try {
+    if (!isNonEmptyString(id)) return readRecentTopicIds(storage);
+    const next = [id, ...readRecentTopicIds(storage).filter((value) => value !== id)].slice(0, RECENT_TOPICS_LIMIT);
+    storage.setItem(RECENT_TOPICS_STORAGE_KEY, JSON.stringify(next));
+    return next;
+  } catch {
+    return [];
+  }
+}
+
+export function topicToConversationPlan(topic) {
+  return {
+    title: topic.title,
+    opening: topic.opening,
+    paths: topic.paths.map((path) => ({ id: path.id, line: path.line })),
+  };
+}
