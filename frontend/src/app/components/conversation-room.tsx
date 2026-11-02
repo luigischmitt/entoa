@@ -28,11 +28,14 @@ import { CallDock, CandidateTile, InterviewerTile, Toast, useCandidateCamera, us
 import { SessionPreparing } from "./session-preparing";
 import { useSessionVoice } from "../hooks/use-session-voice";
 import { InterviewReport } from "./interview-report";
+import { EndCallDialog } from "./end-call-dialog";
 import "./interview-room.css";
 
 type ConversationTurn = { sequenceNumber: number; speaker: "interviewer" | "candidate"; content: string | null };
 type AssessmentEntry = ConversationAssessmentEntry;
 const noProgressRecords: ProgressRecord[] = [];
+// The opening line waits this long after the voice is ready, so the conversation does not start right after the click.
+const CONVERSATION_OPENING_DELAY_MS = 2_500;
 
 function formatClock(seconds: number) {
   const safeSeconds = Math.max(0, seconds);
@@ -67,6 +70,7 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
   const secondsRef = useRef(0);
   const [autoCaptureKey, setAutoCaptureKey] = useState<string | null>(null);
   const [answerError, setAnswerError] = useState<string | null>(null);
+  const [endOpen, setEndOpen] = useState(false);
   const [voiceTranscription, setVoiceTranscription] = useState<VoiceTranscriptionState>({ status: "idle" });
   const [voiceCaptureState, setVoiceCaptureState] = useState<VoiceCaptureState>("idle");
   // Kept like the interview room does: the report of a conversation reads these.
@@ -95,7 +99,7 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
   useEffect(() => { leaveRef.current = onLeave; });
 
   // The session's voice is decided on the opening line before it plays (see use-session-voice); a pin never leaks from another session.
-  const { voiceReady } = useSessionVoice(config.playInterviewerAudio, plan.opening, config.voice);
+  const { voiceReady, waitForOpeningDelay } = useSessionVoice(config.playInterviewerAudio, plan.opening, config.voice, { fixedOpeningDelayMs: CONVERSATION_OPENING_DELAY_MS });
   const { seconds, remaining, timeLimitReached } = useInterviewSession(phase, durationMinutes);
   useEffect(() => { secondsRef.current = seconds; }, [seconds]);
   const question = useMemo(() => ({ id: `tuck-${sequence}`, prompt: tuckLine, cue: "" }), [sequence, tuckLine]);
@@ -174,7 +178,11 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
     setAutoCaptureKey(String(sequenceRef.current));
     setPhase("answering");
   }, [durationMinutes, endConversation, setPhase, voiceReady]);
-  const waitForReaction = useCallback(() => acknowledgements.beforeQuestion(), [acknowledgements]);
+  // The opening's breathing room counts from voiceReady, as in the interview; later lines wait only for the reaction.
+  const waitForReaction = useCallback(async () => {
+    if (phaseRef.current === "introducing") await waitForOpeningDelay();
+    await acknowledgements.beforeQuestion();
+  }, [acknowledgements, waitForOpeningDelay]);
   const isTuckTurn = phase === "introducing" || phase === "speaking" || phase === "closing";
   const speechSegments = useMemo(() => splitInterviewerSpeech(tuckLine), [tuckLine]);
   const { activeSegment, speechMessage, retrySpeech } = useSpeechPlayback(speechSegments, onTuckSpoken, isTuckTurn && config.playInterviewerAudio && voiceReady, undefined, preloadReactions, speechSpeed, speechFeed.push, waitForReaction, config.voice);
@@ -306,7 +314,7 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
         skipDisabled
         hideSkip
         onSkip={() => undefined}
-        onEnd={endConversation}
+        onEnd={() => setEndOpen(true)}
         endLabel="Encerrar conversa"
         speechSpeed={config.playInterviewerAudio ? speechSpeed : null}
         onSpeechSpeed={changeSpeechSpeed}
@@ -385,6 +393,14 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
           />
         </section>
 
+        <EndCallDialog
+          open={endOpen}
+          canFinish={phase !== "closing"}
+          copy={{ title: t("Encerrar a conversa?"), finish: t("Encerrar e ver relatório"), finishingHint: t("A conversa já está sendo encerrada."), leave: t("Sair sem concluir"), keepGoing: t("Continuar na conversa") }}
+          onClose={() => setEndOpen(false)}
+          onFinish={() => { setEndOpen(false); endConversation(); }}
+          onLeave={() => { setEndOpen(false); leaveConversation(); }}
+        />
         <MicrophoneCapture
           key={sequence}
           disabled={idle}

@@ -3,6 +3,8 @@ export type ToucanState = "idle" | "speaking" | "listening" | "thinking";
 export type SpeechFeedChunk = {
   chunkIndex: number;
   chunkCount?: number;
+  /** "reaction" for the short static clips after an answer; they never clear the utterance's chunks. */
+  kind?: "utterance" | "reaction";
   endsWithQuestion?: boolean;
   /** The received audio, decoded here with a shared offline context unless `decodeAudio` is given. */
   blob?: Blob;
