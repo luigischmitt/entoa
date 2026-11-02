@@ -115,7 +115,15 @@ export function resetSpeechFlights(): void;
 /** Starts a new interview: the next line that comes back decides the voice source again. */
 export function resetInterviewVoiceSource(): void;
 export function getInterviewVoiceSource(): "openrouter" | "azure" | "kokoro" | null;
-/** Azure only covers the line it answered: clears an Azure pin, keeps OpenRouter and Kokoro pins. */
-export function releaseAzureVoiceSource(): void;
+/**
+ * Decides the session's voice before its opening plays: synthesizes only the first chunk of `text` (playback reuses that
+ * blob). Resolves to the voice source once it answered or after `options.timeoutMs` (default 6000). Never rejects.
+ */
+export function prepareSessionVoice(
+  text: string,
+  voice: string | undefined,
+  speed: number,
+  options: { endpoint: string; fetcher?: typeof fetch; timeoutMs?: number; retainMs?: number },
+): Promise<"openrouter" | "azure" | "kokoro" | null>;
 
 export function warmUpInterviewerSpeech(endpoint: string, fetcher: (input: string, init?: RequestInit) => Promise<unknown>, preferences?: { voice?: string; speed?: number }): void;

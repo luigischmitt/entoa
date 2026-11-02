@@ -6,7 +6,7 @@ import { reportAudioDiagnostic } from "@/lib/interview/audio-diagnostics";
 import { installAudioUnlockOnFirstGesture, setAudioUnlockObserver, unlockSharedAudio } from "@/lib/interview/audio-unlock.mjs";
 import { createAcknowledgementPlayer } from "@/lib/interview/acknowledgement.mjs";
 import { loadStaticReaction } from "@/lib/interview/static-reactions.mjs";
-import { getInterviewVoiceSource, playInterviewerSegments, prewarmInterviewerSpeech, splitInterviewerSpeech, warmUpInterviewerSpeech, type SpeechPlayback, type SpeechPlaybackOptions } from "@/lib/interview/speech-playback.mjs";
+import { getInterviewVoiceSource, playInterviewerSegments, prepareSessionVoice, prewarmInterviewerSpeech, splitInterviewerSpeech, warmUpInterviewerSpeech, type SpeechPlayback, type SpeechPlaybackOptions } from "@/lib/interview/speech-playback.mjs";
 import { readStoredInterviewerVoice } from "@/lib/interview/voice-picker.mjs";
 import { readStoredInterviewerSpeechSpeed } from "@/lib/interview/interviewer-speech-speed.mjs";
 
@@ -41,6 +41,11 @@ export function useVoiceReadiness(enabled: boolean, attempt = 0): VoiceReadiness
     });
   }, [enabled, attempt]);
   return state;
+}
+
+/** Decides the session's voice on the opening's first chunk (never rejects); the opening playback reuses that audio. */
+export function prepareInterviewSessionVoice(utterance: string, voice: string | undefined, speed = 1) {
+  return prepareSessionVoice(utterance, voice, speed, { endpoint: speechEndpoint, fetcher: authorizedFetch, retainMs: 30_000 });
 }
 
 /** Starts synthesizing the next interviewer utterance early; the later playback of the same utterance reuses it. */

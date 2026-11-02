@@ -25,6 +25,8 @@ import { useInterviewSession } from "../hooks/use-interview-session";
 import { useMicEngine } from "../hooks/use-mic-engine";
 import { createInterviewerAcknowledgements, prewarmInterviewerUtterance, useSpeechPlayback, useSpeechWarmup } from "../hooks/use-speech-playback";
 import { CallDock, CandidateTile, InterviewerTile, Toast, useCandidateCamera, useMicLevelMeter } from "./call-stage";
+import { SessionPreparing } from "./session-preparing";
+import { useSessionVoice } from "../hooks/use-session-voice";
 import { InterviewReport } from "./interview-report";
 import "./interview-room.css";
 
@@ -93,6 +95,8 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
   const leaveRef = useRef(onLeave);
   useEffect(() => { leaveRef.current = onLeave; });
 
+  // The session's voice is decided on the opening line before it plays (see use-session-voice); a pin never leaks from another session.
+  const { voiceReady } = useSessionVoice(config.playInterviewerAudio, plan.opening, config.voice, speechSpeed);
   const { seconds, remaining, timeLimitReached } = useInterviewSession(phase, durationMinutes);
   useEffect(() => { secondsRef.current = seconds; }, [seconds]);
   const question = useMemo(() => ({ id: `tuck-${sequence}`, prompt: tuckLine, cue: "" }), [sequence, tuckLine]);
@@ -161,6 +165,8 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
 
   // Tuck finished a line: a closing line ends the conversation, otherwise the microphone opens for the answer.
   const onTuckSpoken = useCallback(() => {
+    // Playback is held until the voice is decided; the hook reports "ready" then too, which must not open the microphone.
+    if (!voiceReady) return;
     const current = phaseRef.current;
     // Also fired when the speech is off or cut short: only a line Tuck was saying moves the conversation on.
     if (current !== "introducing" && current !== "speaking" && current !== "closing") return;
@@ -168,11 +174,11 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
     setVoiceCaptureState("idle");
     setAutoCaptureKey(String(sequenceRef.current));
     setPhase("answering");
-  }, [durationMinutes, endConversation, setPhase]);
+  }, [durationMinutes, endConversation, setPhase, voiceReady]);
   const waitForReaction = useCallback(() => acknowledgements.beforeQuestion(), [acknowledgements]);
   const isTuckTurn = phase === "introducing" || phase === "speaking" || phase === "closing";
   const speechSegments = useMemo(() => splitInterviewerSpeech(tuckLine), [tuckLine]);
-  const { activeSegment, speechMessage, retrySpeech } = useSpeechPlayback(speechSegments, onTuckSpoken, isTuckTurn && config.playInterviewerAudio, undefined, preloadReactions, speechSpeed, speechFeed.push, waitForReaction, config.voice);
+  const { activeSegment, speechMessage, retrySpeech } = useSpeechPlayback(speechSegments, onTuckSpoken, isTuckTurn && config.playInterviewerAudio && voiceReady, undefined, preloadReactions, speechSpeed, speechFeed.push, waitForReaction, config.voice);
 
   // Silence while the microphone listens (no speech yet, nothing transcribing): Tuck nudges after silenceWaitMs. Any speech
   // detected, or a transcription starting, changes these inputs and cancels the timer.
@@ -347,6 +353,7 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
 
   return (
     <main id="main-content" className="rm-root mx-auto min-h-dvh w-full max-w-7xl px-4 py-5 sm:px-8 sm:py-8">
+      <SessionPreparing ready={voiceReady} label={t("Preparando a conversa…")} />
       <div className="mt-call" data-over={timeLimitReached ? "true" : undefined}>
         <header className="mt-top">
           <div className="mt-top-title">

@@ -77,7 +77,7 @@ export class InterviewerSpeechPrefetcher {
     const { cache, speed, format } = this.options;
     const resolvedVoice = this.options.voice.includes("Neural") ? resolveVoice(voice, this.options.voice) : resolveKokoroVoice(voice, this.options.voice);
     const resolvedSpeed = typeof requestedSpeed === "number" && Number.isFinite(requestedSpeed) && requestedSpeed >= 0.25 && requestedSpeed <= 4 ? requestedSpeed : speed;
-    cache.prefetch({ text: normalizeTextForSpeech(text.trim()), voice: resolvedVoice, speed: resolvedSpeed, format });
+    cache.prefetch({ text: normalizeTextForSpeech(text.trim()), voice: resolvedVoice, speed: resolvedSpeed, format, primaryOnly: true });
   }
 
   /** Synthesizes the fixed phrases for a selectable voice and speed, joining cache work already in flight. */
@@ -93,7 +93,8 @@ export class InterviewerSpeechPrefetcher {
       for (;;) {
         const text = texts[next++];
         if (!text) return;
-        try { await cache.synthesize({ text, voice: resolvedVoice, speed: resolvedSpeed, format }); } catch { /* A missing phrase is synthesized on demand later. */ }
+        // Background work: never spends the fallback voice's characters (the cache key ignores this flag).
+        try { await cache.synthesize({ text, voice: resolvedVoice, speed: resolvedSpeed, format, primaryOnly: true }); } catch { /* A missing phrase is synthesized on demand later. */ }
       }
     };
     const complete = Promise.all(Array.from({ length: Math.min(Math.max(1, options.concurrency), texts.length) }, work)).then(() => undefined);

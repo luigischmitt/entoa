@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { clearRetainedSpeechBlobs, fetchSpeechBlob, getInterviewVoiceSource, releaseAzureVoiceSource, resetInterviewVoiceSource, resetSpeechFlights } from "../src/lib/interview/speech-playback.mjs";
+import { clearRetainedSpeechBlobs, fetchSpeechBlob, getInterviewVoiceSource, playInterviewerSegments, prepareSessionVoice, resetInterviewVoiceSource, resetSpeechFlights } from "../src/lib/interview/speech-playback.mjs";
 
 const endpoint = "https://api.test/api/v1/speech";
 
@@ -90,25 +90,87 @@ test("an explicit requestBody is sent unchanged, without the interview voice sou
   reset();
 });
 
-test("releaseAzureVoiceSource clears an Azure pin, so the next request has no voiceSource", async () => {
+// Audio element that plays for one microtask and then ends, so playInterviewerSegments completes.
+function endingAudio() {
+  const listeners = {};
+  return {
+    paused: true, ended: false, currentTime: 0, duration: 1, preload: "none",
+    addEventListener(type, listener) { listeners[type] = listener; },
+    removeEventListener(type) { delete listeners[type]; },
+    removeAttribute() {}, load() {},
+    pause() { this.paused = true; },
+    play() {
+      this.paused = false;
+      queueMicrotask(() => listeners.playing?.());
+      queueMicrotask(() => listeners.ended?.());
+      return Promise.resolve();
+    },
+  };
+}
+
+function playbackOptions(fetcher) {
+  return {
+    endpoint, fetcher, voice: "voice-a", speed: 1,
+    makeAudio: () => endingAudio(),
+    createObjectUrl: () => "blob:opening",
+    revokeObjectUrl: () => {},
+    setTimeout: (callback, delay) => globalThis.setTimeout(callback, delay),
+    clearTimeout: (id) => globalThis.clearTimeout(id),
+  };
+}
+
+test("prepareSessionVoice pins the voice of the header, and the next chunk request carries it", async () => {
   reset();
   const { bodies, fetcher } = recordingFetcher(["azure", null]);
-  await fetchSpeechBlob("Azure line.", { endpoint, fetcher });
+  const source = await prepareSessionVoice("Opening line. Second sentence here.", "voice-a", 1, { endpoint, fetcher, timeoutMs: 1000 });
+  assert.equal(source, "azure");
   assert.equal(getInterviewVoiceSource(), "azure");
-  releaseAzureVoiceSource();
-  assert.equal(getInterviewVoiceSource(), null);
-  await fetchSpeechBlob("Next line.", { endpoint, fetcher });
-  assert.equal(bodies[1].voiceSource, undefined);
+  assert.equal(bodies[0].voiceSource, undefined, "the opening itself is requested before any pin");
+  await fetchSpeechBlob("Next chunk.", { endpoint, fetcher });
+  assert.equal(bodies[1].voiceSource, "azure");
   reset();
 });
 
-test("releaseAzureVoiceSource keeps an openrouter pin", async () => {
+test("prepareSessionVoice resolves without throwing when the first chunk is too slow, and playback can still join it", async () => {
   reset();
-  const { bodies, fetcher } = recordingFetcher(["openrouter", null]);
-  await fetchSpeechBlob("OpenRouter line.", { endpoint, fetcher });
-  releaseAzureVoiceSource();
-  assert.equal(getInterviewVoiceSource(), "openrouter");
-  await fetchSpeechBlob("Next line.", { endpoint, fetcher });
-  assert.equal(bodies[1].voiceSource, "openrouter");
+  let calls = 0;
+  const fetcher = () => { calls += 1; return new Promise(() => {}); };
+  const source = await prepareSessionVoice("Slow opening.", "voice-a", 1, { endpoint, fetcher, timeoutMs: 5 });
+  assert.equal(source, null);
+  assert.equal(getInterviewVoiceSource(), null);
+  void fetchSpeechBlob("Slow opening.", { endpoint, fetcher, voice: "voice-a" });
+  assert.equal(calls, 1, "the request in flight is joined, not sent again");
   reset();
+});
+
+test("the opening blob prepared for the session is reused by playback: one request for it", async () => {
+  reset();
+  const { bodies, fetcher } = recordingFetcher(["azure"]);
+  await prepareSessionVoice("Opening line.", "voice-a", 1, { endpoint, fetcher });
+  const { promise } = playInterviewerSegments(["Opening line."], playbackOptions(fetcher));
+  assert.equal((await promise).status, "completed");
+  assert.equal(bodies.length, 1, "playback did not synthesize the opening again");
+  reset();
+});
+
+test("an Azure pin stays after a line ends, so the next line keeps Azure", async () => {
+  reset();
+  const { bodies, fetcher } = recordingFetcher(["azure", null]);
+  await playInterviewerSegments(["First line."], playbackOptions(fetcher)).promise;
+  assert.equal(getInterviewVoiceSource(), "azure");
+  await playInterviewerSegments(["Second line."], playbackOptions(fetcher)).promise;
+  assert.equal(getInterviewVoiceSource(), "azure");
+  assert.equal(bodies[1].voiceSource, "azure");
+  reset();
+});
+
+test("a blob retained before the session started still sets the voice pin", async () => {
+  reset();
+  const { bodies, fetcher } = recordingFetcher(["azure", "azure"]);
+  await fetchSpeechBlob("Hello there.", { endpoint, fetcher, retainMs: 30_000 });
+  resetInterviewVoiceSource();
+  assert.equal(getInterviewVoiceSource(), null);
+  await fetchSpeechBlob("Hello there.", { endpoint, fetcher, retainMs: 30_000 });
+  assert.equal(getInterviewVoiceSource(), "azure");
+  assert.equal(bodies.length, 1);
 });
