@@ -1,15 +1,15 @@
 const isText = (value) => typeof value === "string" && value.trim().length > 0;
 
 const familyDefinitions = {
-  th: { label: "Som de th (think, this)", tip: "Encoste a ponta da língua entre os dentes e solte o ar com leveza." },
-  initialR: { label: "R inicial (right, run)", tip: "Comece com a língua mais recuada, sem vibrar como o R do português." },
-  ed: { label: "Final -ed (worked, used)", tip: "O final muda de som: pratique o verbo no ritmo da frase." },
-  shortLongI: { label: "i curto x i longo (ship/sheep)", tip: "Alongue o /iː/ de sheep; em ship, deixe a vogal mais curta e relaxada." },
-  openVowels: { label: "Vogais abertas (cat, cut)", tip: "Abra a boca para a vogal de cat e relaxe mais a vogal de cut." },
-  schwa: { label: "Vogal neutra (about)", tip: "Na sílaba sem destaque, relaxe a vogal para um som curto e neutro." },
-  h: { label: "H aspirado (hello)", tip: "Solte um sopro leve antes da vogal, sem raspar a garganta." },
-  final: { label: "Consoantes (t, d, s…)", tip: "Pronuncie a consoante com clareza e sem acrescentar vogal no fim (big, não “bigui”)." },
-  intonation: { label: "Entonação plana", tip: "Destaque as palavras principais e varie a melodia da frase." },
+  th: { label: "Som de th (think, this)" },
+  initialR: { label: "R inicial (right, run)" },
+  ed: { label: "Final -ed (worked, used)" },
+  shortLongI: { label: "i curto x i longo (ship/sheep)" },
+  openVowels: { label: "Vogais abertas (cat, cut)" },
+  schwa: { label: "Vogal neutra (about)" },
+  h: { label: "H aspirado (hello)" },
+  final: { label: "Consoantes (t, d, s…)" },
+  intonation: { label: "Entonação plana" },
 };
 
 function familyFor(problem) {

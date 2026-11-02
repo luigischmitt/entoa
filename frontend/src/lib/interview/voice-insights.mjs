@@ -132,9 +132,9 @@ function phrasesFor(records, metric) {
 
 function accuracyTips(records) {
   const families = buildPronunciationInsights(records).families.slice(0, 3);
-  if (!families.length) return ["Ainda não há palavras destacadas para orientar o treino de precisão."];
   const examples = [...new Set(families.flatMap((family) => family.examples))].slice(0, 3);
-  return [...families.slice(0, examples.length ? 2 : 3).map((family) => family.tip), ...(examples.length ? [{ key: "Palavras suas para praticar: {words}.", values: { words: examples.map((word) => `“${word}”`).join(", ") } }] : [])];
+  if (!examples.length) return ["Ainda não há palavras destacadas para orientar o treino de precisão."];
+  return [{ key: "Palavras suas para praticar: {words}.", values: { words: examples.map((word) => `“${word}”`).join(", ") } }];
 }
 
 function accuracyPersonalizedTips(records) {
@@ -296,21 +296,6 @@ function nonEmptyText(value) {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed || null;
-}
-
-function pronunciationSoundTips(problemWords) {
-  const tips = [];
-  const seen = new Set();
-  for (const word of problemWords) {
-    const phoneme = typeof word.worstPhoneme === "string" && word.worstPhoneme.trim() ? word.worstPhoneme : null;
-    const text = word.word.trim();
-    const key = text.toLocaleLowerCase("en-US");
-    if (!phoneme || seen.has(key)) continue;
-    seen.add(key);
-    tips.push({ word: text, phoneme });
-    if (tips.length === 3) break;
-  }
-  return tips;
 }
 
 /** Keeps a corrected practice sentence natural, complete and ready to be spoken. */
@@ -478,7 +463,7 @@ export function buildVoiceTrainingPhrases(input) {
         referenceText, saidText, source: "english", sourceKind: "english_correction", interviewId: record.id, candidateSequenceNumber: pattern.sequenceNumber + 1, phraseIndex: null, time: timeOf(record), date: dateOf(record), beforeAccuracy: null, attentionWords: [],
         patternType: trainingPatternTypes.includes(pattern?.type) ? pattern.type : null,
         explanation: nonEmptyText(pattern?.why) ?? nonEmptyText(pattern?.suggestion),
-        soundTips: [], issue: null,
+        issue: null,
       });
     }
     for (const answer of record?.feedback?.azureSummary?.answers ?? []) {
@@ -511,7 +496,6 @@ export function buildVoiceTrainingPhrases(input) {
           patternType: null,
           explanation: null,
           issue: nonEmptyText(phrase?.issue),
-          soundTips: pronunciationSoundTips(problemWords),
         });
       }
     }

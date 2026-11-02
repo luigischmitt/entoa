@@ -25,15 +25,3 @@ export function summarizeDelivery(delivery) {
   if (delivery.fillerCount > 4) hints.push("Vale observar se as hesitações se repetem.");
   return { wordsPerMinute: Number.isFinite(delivery.wordsPerMinute) ? Math.round(delivery.wordsPerMinute) : null, pauseCount: pauses, longestPauseMs: delivery.longestPauseMs ?? 0, fillerCount: delivery.fillerCount ?? 0, hint: hints[0] ?? null };
 }
-
-export function phonemeHint(phoneme) {
-  const value = String(phoneme ?? "").toLowerCase();
-  if (/θ|ð|th/.test(value)) return "Som de th: língua levemente entre os dentes.";
-  if (/ɹ|r|h/.test(value)) return "Observe o som inicial de r ou h em inglês.";
-  if (/ɪ|iː|i:/.test(value)) return "Diferencie o i curto do i longo em inglês.";
-  if (/ə|schwa/.test(value)) return "A vogal reduzida costuma soar como um “â” bem curto.";
-  if (/ed|t$|d$/.test(value)) return "Pronuncie a terminação final com clareza.";
-  if (/æ|ʌ|ɒ|ɑ/.test(value)) return "Ajuste a vogal curta sem acrescentar uma vogal no final.";
-  if (/final|consonant/.test(value)) return "Mantenha a consoante final audível.";
-  return null;
-}

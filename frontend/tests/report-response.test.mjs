@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { findingsForAnswer, phonemeHint, summarizeDelivery } from "../src/lib/interview/report-response.mjs";
+import { findingsForAnswer, summarizeDelivery } from "../src/lib/interview/report-response.mjs";
 
 const item = { sequenceNumber: 2, evidence: "a", explanation: "Funciona." };
 const report = { turns: [], technicalContent: { strengths: [item], gaps: [] }, englishCommunication: { patterns: [] } };
@@ -25,9 +25,4 @@ test("per answer keeps a technical point only on the gap side when it conflicts"
 test("delivery stays descriptive and only adds a hint outside comfortable ranges", () => {
   assert.equal(summarizeDelivery({ wordsPerMinute: 128, pauseCount: 2, longestPauseMs: 900, fillerCount: 2 }).hint, null);
   assert.match(summarizeDelivery({ wordsPerMinute: 180, pauseCount: 4, longestPauseMs: 1200, fillerCount: 5 }).hint, /acelerado/u);
-});
-
-test("maps common Portuguese-speaker sounds", () => {
-  assert.match(phonemeHint("θ"), /th/u);
-  assert.equal(phonemeHint("unknown"), null);
 });

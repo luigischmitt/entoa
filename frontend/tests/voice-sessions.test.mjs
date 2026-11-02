@@ -253,10 +253,8 @@ test("buildVoiceTrainingPhrases adds session fields for english and pronunciatio
   assert.equal(english.patternType, "GRAMMAR");
   assert.equal(english.explanation, "Past tense of lead is led.");
   assert.equal(english.issue, null);
-  assert.deepEqual(english.soundTips, []);
   assert.equal(pronunciation.wordCount, 7);
   assert.equal(pronunciation.patternType, null);
   assert.equal(pronunciation.explanation, null);
   assert.equal(pronunciation.issue, "pronunciation");
-  assert.deepEqual(pronunciation.soundTips, [{ word: "latency", phoneme: "t" }]);
 });

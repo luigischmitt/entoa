@@ -4,4 +4,3 @@ export function displayTechnicalFindings<T extends { explanation?: unknown; evid
 export function displayInterviewerTakeaway(takeaway: { remember?: unknown; concern?: unknown } | undefined, otherNegativeFindings?: Array<{ explanation?: unknown }>): { remember: string | null; concern: string | null };
 export function hasIncompleteAnalysisCoverage(report: unknown): boolean;
 export function analysisCoverageNotice(coverage: unknown, ordinalForSequence?: (sequenceNumber: number) => number | null): string | null;
-export function phonemeTip(phoneme?: string | null, word?: string): string;

@@ -11,5 +11,5 @@ export type PronunciationPhrase = {
   interviewId?: string;
   completedAt?: string | null;
 };
-export type PronunciationFamily = { id: string; label: string; tip: string; count: number; examples: string[] };
+export type PronunciationFamily = { id: string; label: string; count: number; examples: string[] };
 export function buildPronunciationInsights(records: ProgressRecord[]): { families: PronunciationFamily[]; phrases: PronunciationPhrase[] };

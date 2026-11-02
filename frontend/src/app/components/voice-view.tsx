@@ -13,7 +13,6 @@ import { fetchSpeechBlob, playInterviewerSegments, prewarmInterviewerSpeech, spl
 import { readStoredInterviewerVoice } from "@/lib/interview/voice-picker.mjs";
 import { buildVoiceInsights, buildVoiceLesson, buildVoicePracticePlan, buildVoiceTrainingPhrases, encodeWav16Mono, migrateLegacyPracticeAttempts, normalizePracticeSpokenText, readPracticeAttempts, savePracticeAttempt, type VoiceMetricKey, type VoicePracticeAttempt, type VoiceTip, type VoiceTrainingPhrase } from "@/lib/interview/voice-insights.mjs";
 import { buildVoiceSession, focusedSessionSize, quickSessionSize, summarizeVoiceSession, voiceSessionCatalog, type VoiceSessionKind } from "@/lib/interview/voice-sessions.mjs";
-import { phonemeTip } from "@/lib/interview/report-presentation.mjs";
 import { loadVoicePracticeAttempts, saveVoicePracticeAttempt, type VoicePracticeAssessment, type VoicePracticeSource } from "@/lib/interview/voice-practice-persistence";
 import type { ProgressRecord } from "@/lib/interview/progress-insights.mjs";
 import { useLocale } from "@/lib/locale";
@@ -40,12 +39,9 @@ type VoiceSessionState = {
   doneIds: string[];
 };
 
-/** What a phrase needs explaining: the reason for a correction, or how to make a hard sound. */
-function phraseNotes(phrase: VoiceTrainingPhrase, t: (key: string, values?: Record<string, string | number>) => string): string[] {
-  if (phrase.source === "english") return phrase.explanation ? [phrase.explanation] : [];
-  const tips = phrase.soundTips.slice(0, 2).map((tip) => `“${tip.word}”: ${phonemeTip(tip.phoneme, tip.word)}`);
-  if (tips.length === 0 && phrase.attentionWords.length > 0) return [t("Fale devagar as palavras em destaque, sílaba por sílaba.")];
-  return tips;
+/** What a phrase needs explaining: the reason for a correction. Pronunciation cards show only their highlighted words. */
+function phraseNotes(phrase: VoiceTrainingPhrase): string[] {
+  return phrase.source === "english" && phrase.explanation ? [phrase.explanation] : [];
 }
 
 function HighlightedText({ text, words }: { text: string; words: string[] }) {
@@ -156,7 +152,7 @@ export function VoiceView({ onStart }: { onStart?: () => void } = {}) {
   const catalog = useMemo(() => voiceSessionCatalog(trainingPhrases, attempts), [trainingPhrases, attempts]);
   const quickPreview = useMemo(() => buildVoiceSession(trainingPhrases, attempts, { kind: "quick" }), [trainingPhrases, attempts]);
   const currentPhrase = session && !session.done ? session.phrases[session.index] ?? null : null;
-  const currentNotes = currentPhrase ? phraseNotes(currentPhrase, t) : [];
+  const currentNotes = currentPhrase ? phraseNotes(currentPhrase) : [];
   const currentAttempted = Boolean(session && currentPhrase && (attempts[currentPhrase.id]?.length ?? 0) > (session.attemptsAtStart[currentPhrase.id]?.length ?? 0));
   const sessionSummary = session?.done ? summarizeVoiceSession(session.phrases, session.attemptsAtStart, attempts) : null;
   const sessionBusy = activeCapture !== null || startingCapture !== null || assessing !== null;

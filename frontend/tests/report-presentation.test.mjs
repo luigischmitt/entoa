@@ -1,19 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { analysisCoverageNotice, diffReportWords, displayInterviewerTakeaway, displayTechnicalFindings, isCompleteSentence, phonemeTip } from "../src/lib/interview/report-presentation.mjs";
+import { analysisCoverageNotice, diffReportWords, displayInterviewerTakeaway, displayTechnicalFindings, isCompleteSentence } from "../src/lib/interview/report-presentation.mjs";
 
 test("word diff marks only changed words and preserves shared words", () => {
   assert.deepEqual(diffReportWords("I made a test.", "We ran a test."), {
     original: [{ text: "I", changed: true }, { text: " ", changed: false }, { text: "made", changed: true }, { text: " ", changed: false }, { text: "a", changed: false }, { text: " ", changed: false }, { text: "test", changed: false }, { text: ".", changed: false }],
     revised: [{ text: "We", changed: true }, { text: " ", changed: false }, { text: "ran", changed: true }, { text: " ", changed: false }, { text: "a", changed: false }, { text: " ", changed: false }, { text: "test", changed: false }, { text: ".", changed: false }],
   });
-});
-
-test("phoneme tips cover Azure symbols and use a safe fallback", () => {
-  assert.match(phonemeTip("θ"), /língua entre os dentes/u);
-  assert.match(phonemeTip("iy"), /i mais longo/u);
-  assert.match(phonemeTip(undefined, "worked"), /-ed/u);
-  assert.equal(phonemeTip("unknown"), "pronuncie cada sílaba com clareza");
 });
 
 test("incomplete explanations and contradictory positive points stay out of the report", () => {
