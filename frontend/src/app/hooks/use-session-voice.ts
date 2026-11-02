@@ -15,10 +15,10 @@ const SHORT_OPENING_DELAY_MS = 600;
  * first chunk answered (or the preparation timed out); with audio off it is true at once. `waitForOpeningDelay()` resolves
  * once the opening's breathing room has passed, counted from `voiceReady`.
  */
-export function useSessionVoice(audioEnabled: boolean, openingText: string, voice: string | undefined, speed: number) {
+export function useSessionVoice(audioEnabled: boolean, openingText: string, voice: string | undefined) {
   const [voiceReady, setVoiceReady] = useState(!audioEnabled);
-  // The opening's settings are the ones of mount: a later speed change must not prepare (or reset the pin) again.
-  const openingRef = useRef({ openingText, voice, speed });
+  // The opening's settings are the ones of mount: a later change must not prepare (or reset the pin) again.
+  const openingRef = useRef({ openingText, voice });
   const readyAtRef = useRef<number | null>(audioEnabled ? null : 0);
   const delayMsRef = useRef(OPENING_DELAY_MS);
 
@@ -27,8 +27,8 @@ export function useSessionVoice(audioEnabled: boolean, openingText: string, voic
     if (!audioEnabled) return;
     let cancelled = false;
     const startedAt = performance.now();
-    const { openingText: text, voice: voiceId, speed: speechSpeed } = openingRef.current;
-    void prepareInterviewSessionVoice(text, voiceId, speechSpeed).then(() => {
+    const { openingText: text, voice: voiceId } = openingRef.current;
+    void prepareInterviewSessionVoice(text, voiceId).then(() => {
       if (cancelled) return;
       const now = performance.now();
       delayMsRef.current = now - startedAt > LONG_PREPARATION_MS ? SHORT_OPENING_DELAY_MS : OPENING_DELAY_MS;

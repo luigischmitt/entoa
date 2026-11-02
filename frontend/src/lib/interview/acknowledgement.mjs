@@ -4,7 +4,7 @@
 
 import { acquireInterviewerAudio, releaseInterviewerAudio } from "./audio-unlock.mjs";
 import { errorNameOf } from "./client-environment.mjs";
-import { fetchSpeechBlob } from "./speech-playback.mjs";
+import { applyPlaybackRate, createRateDeadline, fetchSpeechBlob, followPlaybackRate } from "./speech-playback.mjs";
 
 export const ACKNOWLEDGEMENT_PHRASES = ["Okay.", "Got it.", "Alright.", "Mm-hm, okay.", "Thanks.", "I got it.", "I understand what you mean."];
 
@@ -78,18 +78,17 @@ export function createAcknowledgementPlayer(options) {
   const schedule = options.setTimeout ?? ((callback, delay) => globalThis.setTimeout(callback, delay));
   const unschedule = options.clearTimeout ?? ((id) => globalThis.clearTimeout(id));
   const maxPlayMs = options.maxPlayMs ?? 5_000;
-  const loadBlob = options.loadBlob ?? ((phrase) => fetchSpeechBlob(phrase, { endpoint: options.endpoint, fetcher: options.fetcher, timeoutMs: 20_000, voice: options.voice, speed: options.speed }));
-  // A static file (free, no request, recorded at 1x) when the phrase has one; otherwise it is synthesized like any other phrase.
-  // Only the static blobs are played at the session's speed (playbackRate); a synthesized one already has the speed in its audio.
-  const staticBlobs = new WeakSet();
+  const loadBlob = options.loadBlob ?? ((phrase) => fetchSpeechBlob(phrase, { endpoint: options.endpoint, fetcher: options.fetcher, timeoutMs: 20_000, voice: options.voice }));
+  // A static file (free, no request) when the phrase has one; otherwise it is synthesized like any other phrase.
+  // Every blob is recorded or synthesized at 1x and plays at the live rate.
   const loadPhraseBlob = async (phrase) => {
     if (options.staticBlob) {
-      try { const blob = await options.staticBlob(phrase); staticBlobs.add(blob); return blob; } catch { /* Not generated for this voice: synthesize it instead. */ }
+      try { return await options.staticBlob(phrase); } catch { /* Not generated for this voice: synthesize it instead. */ }
     }
     return loadBlob(phrase);
   };
   const blobs = new Map();
-  // Azure copies of the phrases, used only while the session's voice is Azure (never mixed with the Kokoro blobs).
+  // Azure copies of the phrases, used only while the session's voice is Azure (never mixed with the Chatterbox blobs).
   const azureBlobs = new Map();
   let preloading = null;
   let lastPhrase = null;
@@ -115,7 +114,7 @@ export function createAcknowledgementPlayer(options) {
         for (const phrase of phrases) {
           try { blobs.set(phrase, await loadPhraseBlob(phrase)); } catch { /* A missing phrase is simply never picked. */ }
           if (options.azureBlob) {
-            try { const blob = await options.azureBlob(phrase); staticBlobs.add(blob); azureBlobs.set(phrase, blob); } catch { /* No Azure copy: never played in an Azure session. */ }
+            try { azureBlobs.set(phrase, await options.azureBlob(phrase)); } catch { /* No Azure copy: never played in an Azure session. */ }
           }
         }
         diagnose("ack_preloaded", { loaded: blobs.size, total: phrases.length, azureLoaded: azureBlobs.size });
@@ -132,7 +131,7 @@ export function createAcknowledgementPlayer(options) {
       if (current) return null;
       if (questionStarted) { diagnose("ack_skipped", { reason: "question_started" }); return null; }
       // The phrase is picked from every phrase with audio; the blob then comes from the session's voice source. An Azure
-      // session never plays a Kokoro file: when the phrase has no Azure copy another phrase with one is used, and when
+      // session never plays a Chatterbox file: when the phrase has no Azure copy another phrase with one is used, and when
       // none has one nothing is said (a wrong voice is worse than no reaction).
       const azureSession = options.voiceSource?.() === "azure";
       const phrase = pickAcknowledgement({ phrases, available: [...new Set([...blobs.keys(), ...azureBlobs.keys()])], recent, lastPhrase });
@@ -144,13 +143,16 @@ export function createAcknowledgementPlayer(options) {
       const blob = source.get(chosen);
       let url = null;
       let audio = null;
-      let timer = null;
+      let deadline = null;
+      let stopFollowing = () => {};
       let playing = false;
       let finish;
       const done = new Promise((resolve) => { finish = resolve; });
       const cleanup = () => {
-        if (timer !== null) unschedule(timer);
-        timer = null;
+        deadline?.cancel();
+        deadline = null;
+        stopFollowing();
+        stopFollowing = () => {};
         playing = false;
         if (audio) {
           audio.pause();
@@ -175,7 +177,7 @@ export function createAcknowledgementPlayer(options) {
         audio = makeAudio(url);
         const track = audio;
         // Set on every play: a pooled element may still carry the rate of its previous use.
-        track.playbackRate = staticBlobs.has(blob) ? (options.speed ?? 1) : 1;
+        applyPlaybackRate(track);
         track.addEventListener("ended", cleanup, { once: true });
         track.addEventListener("error", cleanup, { once: true });
         try {
@@ -189,7 +191,9 @@ export function createAcknowledgementPlayer(options) {
             isPlaying: () => Boolean(audio === track && playing && !track.paused && !track.ended),
           });
         } catch { /* The lip-sync feed must never affect playback. */ }
-        timer = schedule(cleanup, maxPlayMs);
+        // The safety budget is media time at 1x: a rate change rescales what is left of it.
+        deadline = createRateDeadline({ budgetMs: maxPlayMs, schedule, unschedule, onExpire: cleanup });
+        stopFollowing = followPlaybackRate(track, (previous, next) => deadline?.rescale(previous, next));
         playing = true;
         diagnose("ack_play", answerFinalAt === null ? {} : { answerToAckMs: Math.max(0, startedAt - answerFinalAt) });
         Promise.resolve(track.play()).then(

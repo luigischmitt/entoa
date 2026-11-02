@@ -83,7 +83,10 @@ export function createWebAudioTrack(url, deps = {}) {
   let decoding = null;
   let source = null;
   let gain = null;
-  let startedAt = 0;
+  // Media time already played before the current rate began, and the context time it began at: currentTime stays right
+  // when the rate changes mid-track.
+  let mediaAtRateStart = 0;
+  let rateStartedAt = 0;
   let tick = null;
   let paused = true;
   let ended = false;
@@ -120,11 +123,19 @@ export function createWebAudioTrack(url, deps = {}) {
       if (!buffer) return 0;
       if (ended) return buffer.duration;
       if (paused || !source) return 0;
-      return Math.min(buffer.duration, Math.max(0, (context.currentTime - startedAt) * playbackRate));
+      return Math.min(buffer.duration, Math.max(0, mediaAtRateStart + (context.currentTime - rateStartedAt) * playbackRate));
     },
-    /** Like HTMLMediaElement.playbackRate, read when the next play() starts. Web Audio resamples, so the pitch moves with it. */
+    /** Like HTMLMediaElement.playbackRate, and live: a track that is playing changes its source at once. Web Audio resamples, so the pitch moves with it. */
     get playbackRate() { return playbackRate; },
-    set playbackRate(value) { if (Number.isFinite(value) && value > 0) playbackRate = value; },
+    set playbackRate(value) {
+      if (!Number.isFinite(value) || value <= 0 || value === playbackRate) return;
+      if (source && !paused) {
+        mediaAtRateStart = track.currentTime;
+        rateStartedAt = context.currentTime;
+      }
+      playbackRate = value;
+      if (source) source.playbackRate.value = value;
+    },
     /** Resolves the decoded AudioBuffer (decoding at most once): lets the avatar reuse it instead of decoding again. */
     whenDecoded() { return decode(); },
     get preload() { return preload; },
@@ -154,7 +165,7 @@ export function createWebAudioTrack(url, deps = {}) {
       if (disposed) throw domError("AbortError", "Track was released.");
       source = context.createBufferSource();
       source.buffer = decoded;
-      if (playbackRate !== 1) source.playbackRate.value = playbackRate;
+      source.playbackRate.value = playbackRate;
       gain = context.createGain();
       gain.gain.value = 1;
       source.connect(gain);
@@ -170,7 +181,8 @@ export function createWebAudioTrack(url, deps = {}) {
       };
       paused = false;
       ended = false;
-      startedAt = context.currentTime;
+      mediaAtRateStart = 0;
+      rateStartedAt = context.currentTime;
       source.start(0);
       tick = everyTick(() => emit("timeupdate"), TRACK_TIME_UPDATE_MS);
       emit("playing");

@@ -381,7 +381,7 @@ function SpeechSpeedControl({ speed, onChange }: { speed: number; onChange: (spe
               <Plus className="size-4" aria-hidden="true" />
             </button>
           </div>
-          <p className="mt-speed-hint">{t("Vale a partir da próxima fala.")}</p>
+          <p className="mt-speed-hint">{t("Vale na hora, inclusive na fala em curso.")}</p>
         </div>
       )}
     </div>

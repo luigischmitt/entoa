@@ -43,16 +43,16 @@ test("the voice source of the first answer is kept for the rest of the interview
 
 test("a retained blob from another voice source is fetched again once the interview source is known", async () => {
   reset();
-  const { bodies, fetcher } = recordingFetcher(["openrouter", "azure", "azure"]);
+  const { bodies, fetcher } = recordingFetcher(["chatterbox", "azure", "azure"]);
   const options = { endpoint, fetcher, retainMs: 240_000 };
   await fetchSpeechBlob("Retained line.", options);
-  assert.equal(getInterviewVoiceSource(), "openrouter");
-  // A new interview starts, and its first line comes back from Azure while "Retained line." is still retained as openrouter.
+  assert.equal(getInterviewVoiceSource(), "chatterbox");
+  // A new interview starts, and its first line comes back from Azure while "Retained line." is still retained as chatterbox.
   resetInterviewVoiceSource();
   await fetchSpeechBlob("Other line.", options);
   assert.equal(getInterviewVoiceSource(), "azure");
   await fetchSpeechBlob("Retained line.", options);
-  assert.equal(bodies.length, 3, "the openrouter blob is not reused");
+  assert.equal(bodies.length, 3, "the chatterbox blob is not reused");
   assert.equal(bodies[2].voiceSource, "azure");
   assert.equal(bodies[2].text, "Retained line.");
   reset();
@@ -71,9 +71,9 @@ test("a retained blob with an unknown source is still reused", async () => {
 
 test("resetInterviewVoiceSource clears the interview voice source", async () => {
   reset();
-  const { bodies, fetcher } = recordingFetcher(["kokoro", null]);
+  const { bodies, fetcher } = recordingFetcher(["chatterbox", null]);
   await fetchSpeechBlob("A line.", { endpoint, fetcher });
-  assert.equal(getInterviewVoiceSource(), "kokoro");
+  assert.equal(getInterviewVoiceSource(), "chatterbox");
   resetInterviewVoiceSource();
   assert.equal(getInterviewVoiceSource(), null);
   await fetchSpeechBlob("Next interview line.", { endpoint, fetcher });
@@ -110,7 +110,7 @@ function endingAudio() {
 
 function playbackOptions(fetcher) {
   return {
-    endpoint, fetcher, voice: "voice-a", speed: 1,
+    endpoint, fetcher, voice: "voice-a",
     makeAudio: () => endingAudio(),
     createObjectUrl: () => "blob:opening",
     revokeObjectUrl: () => {},
@@ -122,7 +122,7 @@ function playbackOptions(fetcher) {
 test("prepareSessionVoice pins the voice of the header, and the next chunk request carries it", async () => {
   reset();
   const { bodies, fetcher } = recordingFetcher(["azure", null]);
-  const source = await prepareSessionVoice("Opening line. Second sentence here.", "voice-a", 1, { endpoint, fetcher, timeoutMs: 1000 });
+  const source = await prepareSessionVoice("Opening line. Second sentence here.", "voice-a", { endpoint, fetcher, timeoutMs: 1000 });
   assert.equal(source, "azure");
   assert.equal(getInterviewVoiceSource(), "azure");
   assert.equal(bodies[0].voiceSource, undefined, "the opening itself is requested before any pin");
@@ -135,7 +135,7 @@ test("prepareSessionVoice resolves without throwing when the first chunk is too 
   reset();
   let calls = 0;
   const fetcher = () => { calls += 1; return new Promise(() => {}); };
-  const source = await prepareSessionVoice("Slow opening.", "voice-a", 1, { endpoint, fetcher, timeoutMs: 5 });
+  const source = await prepareSessionVoice("Slow opening.", "voice-a", { endpoint, fetcher, timeoutMs: 5 });
   assert.equal(source, null);
   assert.equal(getInterviewVoiceSource(), null);
   void fetchSpeechBlob("Slow opening.", { endpoint, fetcher, voice: "voice-a" });
@@ -146,7 +146,7 @@ test("prepareSessionVoice resolves without throwing when the first chunk is too 
 test("the opening blob prepared for the session is reused by playback: one request for it", async () => {
   reset();
   const { bodies, fetcher } = recordingFetcher(["azure"]);
-  await prepareSessionVoice("Opening line.", "voice-a", 1, { endpoint, fetcher });
+  await prepareSessionVoice("Opening line.", "voice-a", { endpoint, fetcher });
   const { promise } = playInterviewerSegments(["Opening line."], playbackOptions(fetcher));
   assert.equal((await promise).status, "completed");
   assert.equal(bodies.length, 1, "playback did not synthesize the opening again");

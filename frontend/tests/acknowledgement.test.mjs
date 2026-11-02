@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import test, { beforeEach } from "node:test";
 
 import { ACKNOWLEDGEMENT_PHRASES, createAcknowledgementPlayer, isAcknowledgeableAnswer, pickAcknowledgement, stripLeadingAcknowledgement } from "../src/lib/interview/acknowledgement.mjs";
-import { clearRetainedSpeechBlobs, playInterviewerSegments, resetSpeechFlights } from "../src/lib/interview/speech-playback.mjs";
+import { clearRetainedSpeechBlobs, playInterviewerSegments, resetSpeechFlights, setInterviewerPlaybackRate } from "../src/lib/interview/speech-playback.mjs";
 import { createSpeechFeed } from "../src/components/interview/toucan/toucan-engine.mjs";
 
-beforeEach(() => { resetSpeechFlights(); clearRetainedSpeechBlobs(); });
+beforeEach(() => { resetSpeechFlights(); clearRetainedSpeechBlobs(); setInterviewerPlaybackRate(1); });
 
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
@@ -282,10 +282,10 @@ test("scheduling is skipped when audio is not loaded or the answer no longer app
   assert.equal(player.schedule() !== null, true, "a new turn schedules again");
 });
 
-test("an Azure session plays the Azure copy of the phrase, never the Kokoro one", async () => {
+test("an Azure session plays the Azure copy of the phrase, never the Chatterbox one", async () => {
   const { player, chunks } = playerHarness({
     phrases: ["Okay.", "Got it."],
-    loadBlob: async (phrase) => new Blob([`kokoro ${phrase}`]),
+    loadBlob: async (phrase) => new Blob([`chatterbox ${phrase}`]),
     azureBlob: async (phrase) => new Blob([`azure ${phrase}`]),
     voiceSource: () => "azure",
   });
@@ -325,22 +325,22 @@ test("an Azure session with no Azure copy of the phrase picks one that has a cop
   assert.ok(diagnostics.some((event) => event.kind === "ack_skipped" && event.reason === "no_matching_voice"));
 });
 
-test("a Kokoro or unknown voice source keeps playing the Kokoro blobs, never the Azure ones", async () => {
-  for (const source of ["kokoro", null, "openrouter"]) {
+test("a Chatterbox or unknown voice source keeps playing the Chatterbox blobs, never the Azure ones", async () => {
+  for (const source of ["chatterbox", null, "unknown"]) {
     const { player, chunks } = playerHarness({
       phrases: ["Okay."],
-      loadBlob: async (phrase) => new Blob([`kokoro ${phrase}`]),
+      loadBlob: async (phrase) => new Blob([`chatterbox ${phrase}`]),
       azureBlob: async (phrase) => new Blob([`azure ${phrase}`]),
       voiceSource: () => source,
     });
     await player.preload();
     const handle = player.play({ recent: [] });
-    assert.equal(await chunks[0].blob.text(), "kokoro Okay.", String(source));
+    assert.equal(await chunks[0].blob.text(), "chatterbox Okay.", String(source));
     handle.cancel();
   }
 });
 
-test("a failing Azure copy never fails the preload of the Kokoro phrases", async () => {
+test("a failing Azure copy never fails the preload of the Chatterbox phrases", async () => {
   const { player } = playerHarness({
     phrases: ["Okay.", "Got it."],
     loadBlob: async (phrase) => new Blob([phrase]),
@@ -351,17 +351,23 @@ test("a failing Azure copy never fails the preload of the Kokoro phrases", async
   assert.equal(player.loadedCount, 2);
 });
 
-test("a static reaction plays at the session speed; a synthesized one plays at 1x because its audio already has the speed", async () => {
-  const staticHarness = playerHarness({ speed: 0.95, staticBlob: async (phrase) => new Blob([`static:${phrase}`]) });
+test("static and synthesized reactions play at the live rate, and a change reaches the phrase that is playing", async () => {
+  setInterviewerPlaybackRate(0.95);
+  const staticHarness = playerHarness({ staticBlob: async (phrase) => new Blob([`static:${phrase}`]) });
   await staticHarness.player.preload();
   const handle = staticHarness.player.play({ recent: [] });
   assert.equal(staticHarness.audios[0].playbackRate, 0.95);
+  assert.equal(staticHarness.audios[0].preservesPitch, true);
+  setInterviewerPlaybackRate(1.1);
+  assert.equal(staticHarness.audios[0].playbackRate, 1.1, "the reaction playing now follows at once");
+  assert.equal(staticHarness.audios[0].plays, 1, "the reaction is not played again");
   staticHarness.audios[0].listeners.ended();
   await handle.promise;
 
-  const synthesized = playerHarness({ speed: 0.95, staticBlob: async () => { throw new Error("missing"); } });
+  const synthesized = playerHarness({ staticBlob: async () => { throw new Error("missing"); } });
   await synthesized.player.preload();
   const second = synthesized.player.play({ recent: [] });
-  assert.equal(synthesized.audios[0].playbackRate, 1);
+  assert.equal(synthesized.audios[0].playbackRate, 1.1);
   second.cancel();
+  setInterviewerPlaybackRate(1);
 });

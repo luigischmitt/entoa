@@ -73,14 +73,14 @@ test("parses clarification decisions from the backend", () => {
   assert.equal(parseTurnDecisionResponse({ ...base, nextQuestion: "Other question?", decision: "REPEAT", clarificationText: null }, options), null);
 });
 
-test("the speech request carries the speed only when it differs from the default", async () => {
+test("the speech request never carries a speed: every line is synthesized at 1x and played at the live rate", async () => {
   const { clearRetainedSpeechBlobs, prewarmInterviewerSpeech } = await import("../src/lib/interview/speech-playback.mjs");
   const bodies = [];
   const fetcher = async (_url, init) => { bodies.push(JSON.parse(init.body)); return new Response(new Blob(["audio"])); };
   clearRetainedSpeechBlobs();
-  await prewarmInterviewerSpeech(["Sure. Tell me about your last project."], { endpoint: "http://speech.test", fetcher, speed: 0.9, retainMs: 0 }).promise;
+  await prewarmInterviewerSpeech(["Sure. Tell me about your last project."], { endpoint: "http://speech.test", fetcher, retainMs: 0 }).promise;
   await prewarmInterviewerSpeech(["Thanks. How do you monitor a service?"], { endpoint: "http://speech.test", fetcher, retainMs: 0 }).promise;
   clearRetainedSpeechBlobs();
-  assert.deepEqual(bodies[0], { text: "Sure. Tell me about your last project.", speed: 0.9 });
+  assert.deepEqual(bodies[0], { text: "Sure. Tell me about your last project." });
   assert.deepEqual(bodies[1], { text: "Thanks. How do you monitor a service?" });
 });

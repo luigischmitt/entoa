@@ -10,7 +10,7 @@ beforeEach(() => { resetSpeechFlights(); clearRetainedSpeechBlobs(); resetShared
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
 class FakeSource {
-  constructor(context) { this.context = context; this.onended = null; this.started = false; this.stopped = false; this.connected = null; }
+  constructor(context) { this.context = context; this.onended = null; this.started = false; this.stopped = false; this.connected = null; this.playbackRate = { value: 1 }; }
   connect(node) { this.connected = node; }
   disconnect() {}
   start() { this.started = true; this.context.sources.push(this); }
