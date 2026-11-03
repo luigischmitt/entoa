@@ -134,6 +134,8 @@ export function createSupabaseReportPersistence({ supabaseUrl, publishableKey, f
 }
 
 const turnAnalysisConcurrency = 6;
+/** Head start of the first answer analysis: enough for the provider to begin answering, when its prompt becomes readable from the cache. */
+const cacheWarmupMs = 1_500;
 
 /** Runs `mapper` over `items` with at most `limit` in flight; results keep the input order. */
 async function mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>): Promise<R[]> {
@@ -165,13 +167,19 @@ async function analyzeTurnWithRetry(reportService: InterviewReportService, input
  * so the caller can fall back to the single-call report and the user always gets a report.
  */
 async function generatePerAnswerReport(reportService: InterviewReportService, input: InterviewReportInput): Promise<(InterviewReport & { model: string; analysisVersion: typeof reportAnalysisVersion }) | null> {
-  const analyses = await mapWithConcurrency(input.turns, turnAnalysisConcurrency, async (turn) => {
+  const analyze = async (turn: InterviewReportInput["turns"][number]) => {
     try {
       return await analyzeTurnWithRetry(reportService, { locale: input.locale, roleContext: input.roleContext, turn, ...(input.jobDirection ? { jobDirection: input.jobDirection } : {}) });
     } catch {
       return null;
     }
-  });
+  };
+  // The first answer goes alone for a moment so it writes the shared prompt cache before the others read it.
+  const [firstTurn, ...otherTurns] = input.turns;
+  const first = firstTurn ? analyze(firstTurn) : Promise.resolve(null);
+  if (firstTurn && otherTurns.length > 0) await Promise.race([first, new Promise((resolve) => setTimeout(resolve, cacheWarmupMs))]);
+  const others = mapWithConcurrency(otherTurns, turnAnalysisConcurrency - 1, analyze);
+  const analyses = firstTurn ? [await first, ...await others] : [];
   if (analyses.some((analysis) => analysis === null)) return null;
   const turnAnalyses = analyses as InterviewTurnAnalysis[];
   try {

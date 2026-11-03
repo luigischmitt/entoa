@@ -183,3 +183,27 @@ describe("consolidation summary repair", () => {
     expect(result.technicalContent.summary).toBe("");
   });
 });
+
+describe("Anthropic prompt cache", () => {
+  it("caches only the per-answer prompt, on the Anthropic provider first", async () => {
+    const turn = scripted([providerResponse(emptyTurnAnalysis), providerResponse(emptyTurnAnalysis)]);
+    const service = serviceFor(defaultInterviewReportModel, turn.fetchImplementation);
+    await service.analyzeTurn({ roleContext, turn: turns[0]! });
+    await service.analyzeTurn({ roleContext, turn: turns[1]! });
+    for (const body of turn.bodies) {
+      expect(body.messages[0].content).toEqual([{ type: "text", text: expect.stringContaining("one answer"), cache_control: { type: "ephemeral" } }]);
+      expect(body.provider).toMatchObject({ order: ["anthropic"], allow_fallbacks: true, data_collection: "deny" });
+      expect(body.provider.sort).toBeUndefined();
+    }
+
+    const consolidation = scripted(providerResponse(consolidationContent));
+    await serviceFor(defaultInterviewReportModel, consolidation.fetchImplementation).consolidate(consolidationInput);
+    expect(typeof consolidation.bodies[0]!.messages[0].content).toBe("string");
+    expect(consolidation.bodies[0]!.provider).toMatchObject({ sort: "latency" });
+
+    const other = scripted(providerResponse(emptyTurnAnalysis));
+    await serviceFor(defaultThinkingModel, other.fetchImplementation).analyzeTurn({ roleContext, turn: turns[0]! });
+    expect(typeof other.bodies[0]!.messages[0].content).toBe("string");
+    expect(other.bodies[0]!.provider.order).toBeUndefined();
+  });
+});

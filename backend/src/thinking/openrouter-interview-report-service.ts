@@ -1008,6 +1008,9 @@ export class OpenRouterInterviewReportService implements InterviewReportService 
     const providerStartedAt = Date.now();
     const reasoning = isReasoningReportModel(this.options.model);
     const schema = this.options.model.startsWith("openai/") ? strictOpenAiSchema(request.schema) as object : request.schema;
+    // The per-answer prompt depends only on the locale and repeats for every answer, so Anthropic caches it (reads cost 0.1x).
+    // Other scopes run once per report and would only pay the 1.25x cache write.
+    const cached = request.scope === "turn" && this.options.model.startsWith("anthropic/");
     let response: Response;
     try {
       response = await this.fetchImplementation("https://openrouter.ai/api/v1/chat/completions", {
@@ -1016,7 +1019,7 @@ export class OpenRouterInterviewReportService implements InterviewReportService 
         body: JSON.stringify({
           model: this.options.model,
           messages: [
-            { role: "system", content: request.system },
+            { role: "system", content: cached ? [{ type: "text", text: request.system, cache_control: { type: "ephemeral" } }] : request.system },
             { role: "user", content: JSON.stringify(request.user) },
           ],
           // Reasoning models reject temperature tuning; their reasoning tokens count against max_tokens, so the cap gets headroom.
@@ -1024,7 +1027,8 @@ export class OpenRouterInterviewReportService implements InterviewReportService 
           max_tokens: reasoning ? request.maxTokens + reasoningReportTokenAllowance : request.maxTokens,
           ...(reasoning ? { reasoning: { effort: this.options.reasoningEffort ?? defaultReportReasoningEffort } } : {}),
           usage: { include: true },
-          provider: { sort: "latency", require_parameters: true, data_collection: "deny", ...(ignoreProviders.length > 0 ? { ignore: ignoreProviders } : {}) },
+          // A cache lives on one provider, so cached calls prefer Anthropic itself and only fall back to the others.
+          provider: { ...(cached ? { order: ["anthropic"], allow_fallbacks: true } : { sort: "latency" }), require_parameters: true, data_collection: "deny", ...(ignoreProviders.length > 0 ? { ignore: ignoreProviders } : {}) },
           response_format: { type: "json_schema", json_schema: { name: request.schemaName, strict: true, schema } },
         }),
         signal,
