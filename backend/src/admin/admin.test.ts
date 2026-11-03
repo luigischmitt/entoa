@@ -10,7 +10,7 @@ describe("AdminUsageService", () => {
     const service = new AdminUsageService({ env: {}, fetchImpl: vi.fn() as unknown as typeof fetch });
     const usage = await service.getUsage();
     expect(usage.sources.map((source) => [source.id, source.status])).toEqual([
-      ["openrouter", "not_configured"], ["azure", "not_configured"], ["gcp_billing", "not_configured"], ["gcp_run", "not_configured"],
+      ["openrouter", "not_configured"], ["deepinfra", "not_configured"], ["azure", "not_configured"], ["gcp_billing", "not_configured"], ["gcp_run", "not_configured"],
     ]);
   });
 
@@ -25,6 +25,29 @@ describe("AdminUsageService", () => {
     time = new Date("2026-10-17T12:01:01.000Z");
     await service.getUsage();
     expect(fetchImpl).toHaveBeenCalledTimes(4);
+  });
+
+  it("returns DeepInfra month cost per model in dollars, plus prepaid credit", async () => {
+    const urls: string[] = [];
+    const fetchImpl = vi.fn(async (url: string | URL) => {
+      urls.push(String(url));
+      if (String(url).includes("/payment/usage")) return response({ months: [{ period: "2026.11", total_cost: 4, items: [
+        { model: { model_name: "ResembleAI/chatterbox-turbo" }, units: 23832, cost: 2 },
+        { model: { model_name: "XiaomiMiMo/MiMo-V2.5-tts" }, units: 174, cost: 0 },
+      ] }] });
+      if (String(url).includes("/payment/checklist")) return response({ stripe_balance: -5, billing_address_info: { city: "x" } });
+      return response({}, 404);
+    }) as unknown as typeof fetch;
+    const usage = await new AdminUsageService({ fetchImpl, now: () => new Date("2026-11-03T12:00:00.000Z"), env: { DEEPINFRA_API_KEY: "test" } }).getUsage();
+    const source = usage.sources.find((entry) => entry.id === "deepinfra");
+    expect(urls).toContain("https://api.deepinfra.com/payment/usage?from=2026.11");
+    expect(source).toMatchObject({ status: "ok", metrics: [
+      expect.objectContaining({ id: "month_cost", value: 0.04, unit: "USD" }),
+      expect.objectContaining({ id: "credit", value: 5 }),
+      expect.objectContaining({ id: "model_resembleai_chatterbox_turbo", label: "chatterbox-turbo", value: 0.02, note: "23.832 caracteres" }),
+    ] });
+    expect(source?.metrics).toHaveLength(3);
+    expect(JSON.stringify(source)).not.toContain("billing_address");
   });
 
   it("contains upstream failures and timeouts within the affected source", async () => {

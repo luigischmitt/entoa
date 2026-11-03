@@ -51,6 +51,7 @@ export class AdminUsageService {
     if (!refresh && this.cached && this.cached.expiresAt > time.getTime()) return this.cached.value;
     const sources = await Promise.all([
       this.withTimeout(() => this.openRouter(), "openrouter", "OpenRouter", "https://openrouter.ai/settings/credits"),
+      this.withTimeout(() => this.deepInfra(), "deepinfra", "DeepInfra", "https://deepinfra.com/dash/usage"),
       this.withTimeout(() => this.azure(), "azure", "Azure Speech", "https://portal.azure.com/#view/Microsoft_Azure_CognitiveServices/ResourceMenuBlade/~/overview"),
       this.withTimeout(() => this.gcpBilling(), "gcp_billing", "Google Cloud Billing", "https://console.cloud.google.com/billing"),
       this.withTimeout(() => this.gcpRun(), "gcp_run", "Cloud Run", "https://console.cloud.google.com/run"),
@@ -81,6 +82,37 @@ export class AdminUsageService {
         { id: "total_credits", label: "Créditos comprados", value: total, unit: "USD" },
         { id: "total_usage", label: "Uso acumulado", value: usage, unit: "USD" },
         { id: "remaining", label: "Saldo", value: total === null || usage === null ? null : total - usage, unit: "USD" },
+      ] };
+    } catch { return sourceError(id, label, consoleUrl); }
+  }
+
+  /** Month-to-date voice cost per model; DeepInfra reports usage costs in US cents. */
+  private async deepInfra(): Promise<UsageSource> {
+    const id = "deepinfra"; const label = "DeepInfra"; const consoleUrl = "https://deepinfra.com/dash/usage";
+    const key = this.env.DEEPINFRA_API_KEY?.trim();
+    if (!key) return { id, label, status: "not_configured", metrics: [], consoleUrl, setupHint: "Defina DEEPINFRA_API_KEY." };
+    try {
+      const headers = { authorization: `Bearer ${key}`, accept: "application/json" };
+      const time = this.now(); const period = `${time.getUTCFullYear()}.${String(time.getUTCMonth() + 1).padStart(2, "0")}`;
+      // The checklist also carries billing contact data: only the balance is read from it.
+      const [usage, checklist] = await Promise.all([
+        json(this.fetchImpl, `https://api.deepinfra.com/payment/usage?from=${period}`, { headers }) as Promise<{ months?: Array<{ period?: unknown; total_cost?: unknown; items?: Array<{ model?: { model_name?: unknown }; units?: unknown; cost?: unknown }> }> }>,
+        json(this.fetchImpl, "https://api.deepinfra.com/payment/checklist", { headers }).catch(() => null) as Promise<{ stripe_balance?: unknown } | null>,
+      ]);
+      const month = usage.months?.find((entry) => entry.period === period);
+      const totalCents = number(month?.total_cost) ?? 0;
+      const models = (month?.items ?? []).flatMap((item) => {
+        const name = typeof item.model?.model_name === "string" ? item.model.model_name : null; const cents = number(item.cost); const units = number(item.units);
+        if (!name || cents === null || cents <= 0) return [];
+        const modelId = name.replace(/[^a-z0-9]+/giu, "_").replace(/^_|_$/gu, "").toLowerCase();
+        return [{ id: `model_${modelId}`, label: name.split("/").pop() ?? name, value: cents / 100, unit: "USD", period: "Este mês", ...(units === null ? {} : { note: `${new Intl.NumberFormat("pt-BR").format(units)} caracteres` }) }];
+      });
+      // A negative Stripe customer balance is prepaid credit.
+      const balance = number(checklist?.stripe_balance);
+      return { id, label, status: "ok", consoleUrl, updatedAt: time.toISOString(), metrics: [
+        { id: "month_cost", label: "Custo no mês", value: totalCents / 100, unit: "USD", period: "Este mês" },
+        ...(balance === null ? [] : [{ id: "credit", label: "Crédito pré-pago", value: Math.max(0, -balance), unit: "USD" }]),
+        ...models,
       ] };
     } catch { return sourceError(id, label, consoleUrl); }
   }
