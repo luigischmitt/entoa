@@ -289,6 +289,7 @@ const englishCopy: Record<string, string> = {
   "Créditos comprados": "Purchased credits",
   "Uso acumulado": "Total usage",
   "Saldo": "Balance",
+  "Crédito pré-pago": "Prepaid credit",
   "Caracteres de voz neural": "Neural voice characters",
   "Áudio transcrito / avaliado": "Transcribed / assessed audio",
   "Custo no mês": "Cost this month",
