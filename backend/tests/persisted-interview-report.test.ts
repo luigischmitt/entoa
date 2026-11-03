@@ -163,6 +163,22 @@ describe("persisted interview reports", () => {
     expect(data.persistence.saveReady).toHaveBeenCalledOnce();
   });
 
+  it("gives the first answer analysis a head start so the others can read its prompt cache", async () => {
+    vi.useFakeTimers();
+    try {
+      const data = store();
+      data.persistence.loadTurns = vi.fn(async () => twoAnswers);
+      const started: number[] = [];
+      const analyzeTurn = vi.fn((input: { turn: { sequenceNumber: number } }) => { started.push(input.turn.sequenceNumber); return new Promise<never>(() => {}); });
+      void createPersistedInterviewReportService(serviceStub(undefined, analyzeTurn as never), data.persistence).generate(token, interviewId, { locale: "en" }, "user-a");
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(1_499);
+      expect(started).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(started).toEqual([1, 3]);
+    } finally { vi.useRealTimers(); }
+  });
+
   it("keeps concurrent users isolated in the in-process idempotency map", async () => {
     const data = store();
     const consolidate = vi.fn(async () => ({ ...report, model: "test-model", analysisVersion: "v3" }));
