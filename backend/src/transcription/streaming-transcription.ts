@@ -21,9 +21,9 @@ export type StreamingLimits = {
 export const defaultStreamingLimits: StreamingLimits = {
   maxDurationMs: 180_000,
   maxBytes: 6 * 1024 * 1024,
-  maxActiveSessions: 20,
-  maxConcurrentTranscriptions: 4,
-  maxQueuedTranscriptions: 4,
+  maxActiveSessions: 60,
+  maxConcurrentTranscriptions: 12,
+  maxQueuedTranscriptions: 12,
   finalizationTimeoutMs: 128_000,
   hedgeAfterMs: 4_000,
 };

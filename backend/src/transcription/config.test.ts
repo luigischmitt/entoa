@@ -12,10 +12,10 @@ describe("optional Azure assessment configuration", () => {
     expect(config.assessmentTimeoutMs).toBe(15_000);
     expect(config.streamMaxDurationMs).toBe(180_000);
     expect(config.streamMaxBytes).toBe(6 * 1024 * 1024);
-    expect(config.streamMaxActiveSessions).toBe(20);
+    expect(config.streamMaxActiveSessions).toBe(60);
     expect(config.openRouterTimeoutMs).toBe(55_000);
-    expect(config.streamMaxConcurrentTranscriptions).toBe(4);
-    expect(config.streamMaxQueuedTranscriptions).toBe(4);
+    expect(config.streamMaxConcurrentTranscriptions).toBe(12);
+    expect(config.streamMaxQueuedTranscriptions).toBe(12);
     expect(config.vadTrailingSilenceMs).toBe(3_500);
     expect(config.vadFinalizationGraceMs).toBe(1_500);
     expect(config.vadAmbientActivityHoldMs).toBe(8_000);
@@ -46,11 +46,11 @@ describe("optional Azure assessment configuration", () => {
     });
     expect(config).toMatchObject({ streamMaxDurationMs: 90_000, streamMaxBytes: 3_000_000, streamMaxActiveSessions: 4, streamMaxConcurrentTranscriptions: 2, streamMaxQueuedTranscriptions: 3, openRouterTimeoutMs: 45_000 });
     expect(() => loadTranscriptionConfig({ TRANSCRIPTION_STREAM_MAX_ACTIVE_SESSIONS: "1.5" })).toThrow("positive integers");
-    expect(loadTranscriptionConfig({ TRANSCRIPTION_STREAM_MAX_ACTIVE_SESSIONS: "20" }).streamMaxActiveSessions).toBe(20);
-    expect(() => loadTranscriptionConfig({ TRANSCRIPTION_STREAM_MAX_ACTIVE_SESSIONS: "21" })).toThrow("no greater than 20");
-    // At the configured 20-session ceiling, PCM buffers plus one WAV copy per finalizing session stay bounded near 240 MiB.
-    expect(20 * 6 * 1024 * 1024 * 2).toBe(240 * 1024 * 1024);
-    expect(() => loadTranscriptionConfig({ TRANSCRIPTION_STREAM_MAX_CONCURRENT_TRANSCRIPTIONS: "5" })).toThrow("no greater than 4");
+    expect(loadTranscriptionConfig({ TRANSCRIPTION_STREAM_MAX_ACTIVE_SESSIONS: "60" }).streamMaxActiveSessions).toBe(60);
+    expect(() => loadTranscriptionConfig({ TRANSCRIPTION_STREAM_MAX_ACTIVE_SESSIONS: "61" })).toThrow("no greater than 60");
+    // At the configured 60-session ceiling, PCM buffers plus one WAV copy per finalizing session stay bounded near 720 MiB (2 GiB instance).
+    expect(60 * 6 * 1024 * 1024 * 2).toBe(720 * 1024 * 1024);
+    expect(() => loadTranscriptionConfig({ TRANSCRIPTION_STREAM_MAX_CONCURRENT_TRANSCRIPTIONS: "13" })).toThrow("no greater than 12");
     expect(() => loadTranscriptionConfig({ TRANSCRIPTION_STREAM_MAX_BYTES: "7000000" })).toThrow("no greater than 6291456");
     expect(() => loadTranscriptionConfig({ TRANSCRIPTION_TIMEOUT_MS: "61000" })).toThrow("no greater than 60000");
   });

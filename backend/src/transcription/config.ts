@@ -45,9 +45,11 @@ export type TranscriptionConfig = {
   transcriptReviewTimeoutMs: number;
 };
 
-/** Cloud Run concurrency is 20; per-instance stream memory remains bounded by 20 x 6 MiB PCM plus WAV copies. */
-export const maxStreamingSessionsPerInstance = 20;
-export const defaultStreamingSessionsPerInstance = 20;
+/** Cloud Run concurrency is 60; per-instance stream memory remains bounded by 60 x 6 MiB PCM plus WAV copies (2 GiB instance). */
+export const maxStreamingSessionsPerInstance = 60;
+export const defaultStreamingSessionsPerInstance = 60;
+/** Final Whisper calls running at once per instance, and how many more may wait; a load test with 30 candidates overflowed 4 + 4. */
+export const maxFinalTranscriptionsPerInstance = 12;
 
 function parsePositiveNumber(value: string | undefined, fallback: number): number {
   if (value === undefined) return fallback;
@@ -104,8 +106,8 @@ export function loadTranscriptionConfig(environment = process.env): Transcriptio
     streamMaxDurationMs: parsePositiveInteger(environment.TRANSCRIPTION_STREAM_MAX_DURATION_MS, 180_000, 180_000),
     streamMaxBytes: parsePositiveInteger(environment.TRANSCRIPTION_STREAM_MAX_BYTES, 6 * 1024 * 1024, 6 * 1024 * 1024),
     streamMaxActiveSessions: parsePositiveInteger(environment.TRANSCRIPTION_STREAM_MAX_ACTIVE_SESSIONS, defaultStreamingSessionsPerInstance, maxStreamingSessionsPerInstance),
-    streamMaxConcurrentTranscriptions: parsePositiveInteger(environment.TRANSCRIPTION_STREAM_MAX_CONCURRENT_TRANSCRIPTIONS, 4, 4),
-    streamMaxQueuedTranscriptions: parsePositiveInteger(environment.TRANSCRIPTION_STREAM_MAX_QUEUED_TRANSCRIPTIONS, 4, 4),
+    streamMaxConcurrentTranscriptions: parsePositiveInteger(environment.TRANSCRIPTION_STREAM_MAX_CONCURRENT_TRANSCRIPTIONS, maxFinalTranscriptionsPerInstance, maxFinalTranscriptionsPerInstance),
+    streamMaxQueuedTranscriptions: parsePositiveInteger(environment.TRANSCRIPTION_STREAM_MAX_QUEUED_TRANSCRIPTIONS, maxFinalTranscriptionsPerInstance, maxFinalTranscriptionsPerInstance),
     vadTrailingSilenceMs: parsePositiveInteger(environment.TRANSCRIPTION_VAD_TRAILING_SILENCE_MS, 3_500, 10_000),
     vadFinalizationGraceMs: parsePositiveInteger(environment.TRANSCRIPTION_VAD_FINALIZATION_GRACE_MS, 1_500, 5_000),
     vadAmbientActivityHoldMs: parsePositiveInteger(environment.TRANSCRIPTION_VAD_AMBIENT_HOLD_MS, 8_000, 30_000),
