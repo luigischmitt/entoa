@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 /** Page ground per scheme (--ds-cream), used for the browser chrome / iOS status bar. */
-export const THEME_COLORS = { light: "#f3f4ee", dark: "#121316" } as const;
+export const THEME_COLORS = { light: "#f3f4ee", dark: "#121513" } as const;
 
 /**
  * The `theme-color` tags from the viewport export follow the OS scheme. The in-app toggle can disagree with the OS,

@@ -24,6 +24,8 @@
 @media (hover: hover) and (pointer: fine) {
   .shl-nav-utility .shl-nav-item:not([aria-current="page"]):hover { color: var(--ds-ink); background: var(--ds-sage-200); }
 }
+/* Dark: the engraving's fills are inverted to dark, so screen drops them into the surface and only the pale sage lines stay. */
+:root[data-color-scheme="dark"] .shl-sidebar::after, :root[data-color-scheme="dark"] .shl-home-card::after { mix-blend-mode: screen; }
 @media (max-height: 640px) { .shl-sidebar::after { display: none; } }
 
 .shl-nav-list { position: relative; display: flex; flex-direction: column; gap: 0.25rem; }
