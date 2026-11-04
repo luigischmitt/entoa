@@ -586,6 +586,21 @@ html.leaving .leave{opacity:1;visibility:visible;pointer-events:auto;transition:
 @keyframes leave-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.leave-spin{animation-duration:1.6s}}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+/* ===== phones (<=767px): size to content, art below the CTA, no empty blocks ===== */
+@media(max-width:767px){
+  /* hero: no full-screen height; copy near the top, the forest art sits entirely under the CTA */
+  .hero{min-height:0;padding-top:44px;padding-bottom:calc(clamp(150px,52vw,240px) + 8px)}
+  .hero-main{padding-block:0}
+  .hero::after{height:clamp(150px,52vw,240px);background-position:center bottom}
+  /* section gaps capped near 56px */
+  .compact{padding:36px 0 20px}
+  .demo-stage{padding-top:32px;padding-bottom:20px}
+  .pp-sec{padding-top:28px;padding-bottom:28px}
+  .rstage{padding:28px 0}
+  .voz{padding:28px 0}
+  /* demo window: a phone-height screen, not the desktop one */
+  .scenes{height:440px}
+}
 </style>
 </head>
 <body>
