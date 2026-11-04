@@ -121,8 +121,8 @@ gcloud builds submit backend --config backend/cloudbuild.production.yaml \
 gcloud run deploy english-interview-backend \
   --image $IMAGE --region $REGION \
   --allow-unauthenticated \
-  --max-instances 1 --min-instances 0 --cpu 1 --memory 1Gi \
-  --concurrency 20 --timeout 3600 --session-affinity \
+  --max-instances 1 --min-instances 0 --cpu 1 --memory 2Gi \
+  --concurrency 60 --timeout 3600 --session-affinity \
   --set-env-vars "SPEECH_PROVIDER=chatterbox-azure,TRANSCRIPTION_PROVIDER=whisper-incremental,AZURE_SPEECH_REGION=<region>,AZURE_SPEECH_ASSESSMENT_ENABLED=true,SUPABASE_URL=<supabase-url>,SUPABASE_PUBLISHABLE_KEY=<publishable-key>,ALLOWED_ORIGIN=<vercel-origin>" \
   --set-secrets "OPENROUTER_API_KEY=OPENROUTER_API_KEY:latest,DEEPINFRA_API_KEY=DEEPINFRA_API_KEY:latest,AZURE_SPEECH_KEY=AZURE_SPEECH_KEY:latest"
 ```
@@ -200,8 +200,11 @@ Logs never include audio, transcripts or keys by design; keep it that way.
 
 - `--max-instances 1` caps compute and concurrent sessions; `--min-instances 0`
   means no idle cost. A budget alert exists on the project.
-- With one instance, `TRANSCRIPTION_STREAM_MAX_ACTIVE_SESSIONS` (default 8) and
-  `--concurrency 20` bound parallel users; overflow gets a recoverable error.
+- With one instance, `TRANSCRIPTION_STREAM_MAX_ACTIVE_SESSIONS` (default 60),
+  `TRANSCRIPTION_STREAM_MAX_CONCURRENT_TRANSCRIPTIONS` / `_QUEUED_` (12 each) and
+  `--concurrency 60` bound parallel users; overflow gets a recoverable error.
+  The 2026-11-04 load test at concurrency 20 ran 15 candidates without errors at
+  23% CPU; 20+ hit Cloud Run 429s ("waiting too long for an available instance").
 - Cold start: expect about 1 to 3 s on the first request after idle. Open the
   app a few seconds before the first answer, or set `--min-instances 1` for
   demos (adds idle cost).
