@@ -1,5 +1,6 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import "./charts.css";
 
 export type RadarItem = { key: string; group: "english" | "voice"; label: string; value: number; display: string };
@@ -21,6 +22,32 @@ function point(index: number, total: number, radius: number) {
  * and Azure voice scores (0–100) share one scale. Each axis is labeled with its name and value, so nothing depends on
  * hover; English points are green circles and voice points warm diamonds. The entrance plays once on mount.
  */
+// Phones: long axis names wrap onto lines of at most 10 characters, so the labels stay inside the card.
+const narrowQuery = "(max-width: 559px)";
+const subscribeNarrow = (onChange: () => void) => {
+  const query = window.matchMedia(narrowQuery);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+};
+const useNarrowViewport = () => useSyncExternalStore(subscribeNarrow, () => window.matchMedia(narrowQuery).matches, () => false);
+const LABEL_LINE = 16;
+
+function wrapLabel(label: string, maxChars: number) {
+  const lines: string[] = [];
+  let current = "";
+  for (const word of label.split(" ")) {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length > maxChars && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = next;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
 /** A diamond drawn directly (no rotate transform), so CSS scale animations keep it on its axis. */
 const diamond = (x: number, y: number, r: number) => `${x},${y - r} ${x + r},${y} ${x},${y + r} ${x - r},${y}`;
 
@@ -34,6 +61,7 @@ export function ProfileRadar({ items, active, selected, onSelect, label }: {
   label: string;
 }) {
   const total = items.length;
+  const narrow = useNarrowViewport();
   const ring = (fraction: number) => items.map((_, i) => { const p = point(i, total, RADIUS * fraction); return `${p.x},${p.y}`; }).join(" ");
   const shape = items.map((item, i) => { const p = point(i, total, (RADIUS * Math.max(0, Math.min(100, item.value))) / 100); return `${p.x},${p.y}`; }).join(" ");
 
@@ -61,6 +89,9 @@ export function ProfileRadar({ items, active, selected, onSelect, label }: {
         const sin = Math.sin(a);
         const anchor = Math.abs(cos) < 0.2 ? "middle" : cos > 0 ? "start" : "end";
         const dy = sin < -0.5 ? -14 : sin > 0.5 ? 6 : -4;
+        const lines = narrow ? wrapLabel(item.label, 10) : [item.label];
+        // Extra lines grow away from the chart: up for labels above or beside it, down for labels below it.
+        const first = at.y + dy - (sin > 0.5 ? 0 : (lines.length - 1) * LABEL_LINE);
         return (
           <g
             key={item.key}
@@ -70,8 +101,10 @@ export function ProfileRadar({ items, active, selected, onSelect, label }: {
             style={{ "--k": i } as React.CSSProperties}
             onClick={() => onSelect(item.key)}
           >
-            <text className="pr-label-name" x={at.x} y={at.y + dy} textAnchor={anchor}>{item.label}</text>
-            <text className="pr-label-value" x={at.x} y={at.y + dy + 18} textAnchor={anchor}>{item.display}</text>
+            {lines.map((line, n) => (
+              <text key={n} className="pr-label-name" x={at.x} y={first + n * LABEL_LINE} textAnchor={anchor}>{line}</text>
+            ))}
+            <text className="pr-label-value" x={at.x} y={first + (lines.length - 1) * LABEL_LINE + 18} textAnchor={anchor}>{item.display}</text>
           </g>
         );
       })}

@@ -300,6 +300,13 @@
 }
 @media (max-width: 1023.98px) {
   .shl-mobile-item { min-height: 3.25rem; font-size: 0.625rem; }
+  /* The sign-out icon button renders ~24px tall without this; touch targets need 44px on phones. */
+  .shl-signout .btn { min-height: 2.75rem; min-width: 2.75rem; }
+}
+/* Six slots at 320px leave ~45px per label; trim the bar's side padding so "Entrevista" and "Progresso" fit whole. */
+@media (max-width: 360px) {
+  .shl-mobile-nav { padding-left: max(0.5rem, env(safe-area-inset-left, 0px)); padding-right: max(0.5rem, env(safe-area-inset-right, 0px)); }
+  .shl-mobile-item, .shl-mobile-item > span { letter-spacing: -0.02em; }
 }
 /* While a field is focused the keyboard needs the room: on Android (resizes-content) the nav and action bar would
    stack on top of it and cover the field being edited; on iOS they sit behind the keyboard anyway. */

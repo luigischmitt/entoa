@@ -5,6 +5,12 @@
  */
 .isu-root { position: relative; isolation: isolate; color: var(--ds-ink); }
 
+/* Duration segments are "10 min"; on phones the four columns are narrow, so keep each label on one line. */
+@media (max-width: 559px) {
+  .isu-duration .ds-seg-item > span { white-space: nowrap; }
+  .isu-root input[type="file"] { min-height: 2.75rem; }
+}
+
 /* Keep a focused card (and its open combobox popover) above the cards that follow it. */
 .isu-root .ds-card:focus-within { position: relative; z-index: 5; }
 

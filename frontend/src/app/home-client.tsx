@@ -51,7 +51,8 @@ const primaryNavigationItems = [
   { id: "progress" as const, label: "Progresso", icon: LineChart },
 ];
 
-const settingsNavigationItem = { id: "settings" as const, label: "Configurações", icon: SlidersHorizontal };
+// The bottom nav has six slots on phones, so its settings slot uses a short label; the accessible name stays the full one.
+const settingsNavigationItem = { id: "settings" as const, label: "Configurações", mobileLabel: "Ajustes", icon: SlidersHorizontal };
 const adminNavigationItem = { id: "admin-usage" as const, label: "Custos e limites", icon: Gauge };
 
 import { prewarmInterviewerUtterance, useSpeechWarmup, useVoiceReadiness } from "./hooks/use-speech-playback";
@@ -249,12 +250,14 @@ function Navigation({
         className="shl-mobile-nav fixed inset-x-0 bottom-0 z-20 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 lg:hidden"
       >
         <ul className="shl-mobile-list" style={{ "--nav-count": navigationItems.length } as CSSProperties}>
-          {navigationItems.map(({ id, label: sourceLabel, icon: Icon }) => {
+          {navigationItems.map(({ id, label: sourceLabel, icon: Icon, ...rest }) => {
             const label = t(sourceLabel);
+            const mobileLabel = "mobileLabel" in rest ? t(rest.mobileLabel) : label;
             return (
             <li key={id} className="min-w-0">
               <button
                 type="button"
+                aria-label={mobileLabel === label ? undefined : label}
                 aria-current={isNavigationItemActive(view, id) ? "page" : undefined}
                 onClick={() => onNavigate(id)}
                 onMouseEnter={() => onPrefetch(id)}
@@ -262,7 +265,7 @@ function Navigation({
                 className="shl-mobile-item"
               >
                 <Icon className="size-[1.125rem]" aria-hidden="true" />
-                <span>{label}</span>
+                <span>{mobileLabel}</span>
               </button>
             </li>
             );
