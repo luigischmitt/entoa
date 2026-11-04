@@ -16,6 +16,7 @@
 .pg-hero { display: grid; gap: 1.75rem; border: 1px solid var(--ds-hairline); border-radius: 28px; background: var(--ds-surface); padding: 1.5rem; box-shadow: var(--ds-shadow-card); min-width: 0; }
 @media (min-width: 768px) { .pg-hero { padding: 2.25rem 2.5rem 2rem; } }
 .pg-hero-body { display: grid; gap: 1.5rem; min-width: 0; }
+@media (max-width: 767.98px) { .pg-hero, .pg-hero-body { grid-template-columns: minmax(0, 1fr); } }
 .pg-hero-head { display: grid; gap: 1.5rem; }
 @media (min-width: 900px) { .pg-hero-head { grid-template-columns: minmax(0, 1fr) auto; align-items: end; } }
 .pg-totals { display: grid; grid-template-columns: repeat(3, auto); gap: 0; justify-content: start; margin: 0; }
@@ -23,6 +24,8 @@
 .pg-totals > div:first-child { padding-left: 0; border-left: 0; }
 .pg-totals dt { color: var(--ds-text-2); font-size: 0.75rem; font-weight: 600; }
 .pg-totals dd { margin-top: 0.25rem; color: var(--ds-ink); font-size: 1.5rem; }
+/* 320px: the three totals must fit the 240px inside the hero card; tighter gutters and values keep "1h 35m" whole. */
+@media (max-width: 379.98px) { .pg-totals > div { padding: 0 0.625rem; } .pg-totals dd { font-size: 1.25rem; } }
 
 .pg-metrics { display: grid; gap: 0.75rem; }
 @media (min-width: 720px) { .pg-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
@@ -61,6 +64,8 @@
 
 /* ---- Profile radar + dimension cells ---- */
 .pg-profile { display: grid; gap: 1.5rem; align-items: center; }
+/* Phones: one column that can shrink to the card, so the widest child (the view switch or stats) cannot push past the padding. */
+@media (max-width: 899.98px) { .pg-profile { grid-template-columns: minmax(0, 1fr); } }
 @media (min-width: 900px) { .pg-profile { grid-template-columns: minmax(0, 1fr) minmax(18rem, 1fr); gap: clamp(2rem, 5vw, 4.5rem); } }
 .pg-radar { min-width: 0; }
 .pg-profile-side { display: grid; align-content: center; gap: 0.875rem; min-width: 0; }

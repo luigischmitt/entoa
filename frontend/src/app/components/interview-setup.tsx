@@ -712,7 +712,7 @@ export function InterviewSetup({
                 <SlidingSegmented
                   name="duration"
                   ariaLabel={t("Duração da sessão")}
-                  className="grid-cols-4"
+                  className="grid-cols-4 isu-duration"
                   options={interviewDurationOptions.map((option) => ({ value: String(option), label: `${option} min` }))}
                   value={config.duration}
                   onChange={(value) => updateConfig("duration", value)}

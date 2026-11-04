@@ -273,6 +273,7 @@ const englishCopy: Record<string, string> = {
   "Começar entrevista": "Start an interview",
   "Preparando áudio": "Preparing audio",
   "Configurações": "Settings",
+  "Ajustes": "Settings",
   "Custos e limites": "Costs and limits",
   "Uso real dos provedores neste mês.": "Real provider usage this month.",
   "Atualizar": "Refresh",

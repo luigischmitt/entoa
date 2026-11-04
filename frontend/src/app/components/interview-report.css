@@ -29,6 +29,11 @@
 .rp-pdf:focus-visible { outline: var(--ds-focus-outline); outline-offset: 2px; }
 .rp-pdf svg { flex: none; }
 .rp-regenerate { flex: none; white-space: nowrap; padding: 0.45rem 1rem; font-size: 0.82rem; font-weight: 600; }
+/* Phones: the rename and export controls are finger targets, so they get the 44px minimum. */
+@media (max-width: 559px) {
+  .rp-rename { min-width: 2.75rem; min-height: 2.75rem; align-items: center; justify-content: center; }
+  .rp-pdf { min-height: 2.75rem; }
+}
 
 /* The paper: a printed page, read top to bottom. */
 .rp-paper { display: flex; flex-direction: column; gap: 2.6rem; margin-top: 0.75rem; background: #fff; border-radius: 6px; padding: clamp(1.2rem, 3vw, 2.2rem) clamp(1.1rem, 3.4vw, 2.4rem); box-shadow: 0 1px 2px rgba(14, 42, 31, 0.08), 0 16px 32px -24px rgba(14, 42, 31, 0.28); font-size: 0.92rem; color: var(--ds-ink); }
