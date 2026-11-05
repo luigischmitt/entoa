@@ -1,4 +1,6 @@
 import { authorizedFetch } from "@/lib/auth/backend-auth";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { invalidateDashboardCache } from "@/lib/dashboard-data-cache.mjs";
 import type { ConversationPlanInput, ConversationSuggestion, ConversationTurnReply, ConversationTurnRequest } from "./conversation-policy.mjs";
 
 const backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
@@ -142,4 +144,33 @@ export async function requestGermanConversationReport(
   });
   if (!response.ok) throw new Error(`German conversation report failed: ${response.status}`);
   return parseGermanReport(await response.json());
+}
+
+/** Marks a saved German report in interview_feedback.analysis, so the history shows it instead of the English report. */
+export const germanReportAnalysisVersion = "de1";
+
+/** The German report of a saved session, or null when the stored analysis is something else. */
+export function readStoredGermanReport(analysis: unknown): GermanConversationReport | null {
+  if (typeof analysis !== "object" || analysis === null || (analysis as { kind?: unknown }).kind !== "german") return null;
+  try { return parseGermanReport(analysis); } catch { return null; }
+}
+
+/** Saves the report with its session (RLS: only the owner can write it); a failure only means the history will not show it. */
+export async function saveGermanConversationReport(interviewId: string, report: GermanConversationReport): Promise<boolean> {
+  try {
+    const { error } = await getSupabaseBrowserClient().from("interview_feedback").upsert({
+      interview_id: interviewId,
+      status: "ready",
+      azure_summary: null,
+      analysis: { kind: "german", ...report },
+      model: "anthropic/claude-haiku-5.5",
+      analysis_version: germanReportAnalysisVersion,
+      generated_at: new Date().toISOString(),
+    }, { onConflict: "interview_id" });
+    if (error) return false;
+    invalidateDashboardCache("progress");
+    return true;
+  } catch {
+    return false;
+  }
 }

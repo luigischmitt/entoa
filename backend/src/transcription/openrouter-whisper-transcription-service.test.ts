@@ -225,7 +225,7 @@ describe("OpenRouter Whisper German answers", () => {
     const forms: FormData[] = [];
     const fetcher = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
       forms.push(init?.body as FormData);
-      return new Response(segmentBody, { status: 200 });
+      return new Response(JSON.stringify({ ...JSON.parse(segmentBody), language: "german" }), { status: 200 });
     });
     const service = new OpenRouterWhisperTranscriptionService({ key: "test", timeoutMs: 1_000, fetchImplementation: fetcher });
 
@@ -237,6 +237,25 @@ describe("OpenRouter Whisper German answers", () => {
     expect(forms[0]?.get("response_format")).toBe("verbose_json");
     expect(forms[1]?.get("language")).toBe("en");
     expect(forms[1]?.get("prompt")).toContain("Technical job interview answer.");
+  });
+
+  it("transcribes a German answer again as German when Whisper detects another language, and keeps Portuguese", async () => {
+    const forms: FormData[] = [];
+    const detected = ["en", "de", "Portuguese"];
+    const fetcher = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      forms.push(init?.body as FormData);
+      return new Response(JSON.stringify({ ...JSON.parse(segmentBody), language: detected[forms.length - 1] }), { status: 200 });
+    });
+    const service = new OpenRouterWhisperTranscriptionService({ key: "test", timeoutMs: 1_000, fetchImplementation: fetcher });
+
+    await service.transcribe(audio, "whisper-large-v3-turbo", "wav", undefined, { language: "de" });
+    expect(forms).toHaveLength(2);
+    expect(forms[0]?.has("language")).toBe(false);
+    expect(forms[1]?.get("language")).toBe("de");
+
+    await service.transcribe(audio, "whisper-large-v3-turbo", "wav", undefined, { language: "de" });
+    expect(forms).toHaveLength(3);
+    expect(forms[2]?.has("language")).toBe(false);
   });
 
   it("drops the language field and prompt on the segment timing recovery request too", async () => {
