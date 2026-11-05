@@ -48,7 +48,7 @@ const sentences = (value: string): string[] => value.match(/[^.!?]+[.!?]+["')\]]
 const humanVoice = /\b(?:we|us|our) (?:humans?|people)\b|\bas a (?:human|person)\b/iu;
 const providerName = /\b(?:gemini|gemma|gpt|chatgpt|openai|claude|anthropic|google|llama|mistral|haiku|kokoro)\b/iu;
 /** Stray "Bye." is a common recognition error, so only an explicit wish to stop ends the conversation. */
-const stopRequest = /\b(?:(?:i|we) (?:have|need|want|got) to (?:go|leave|stop)|i(?:'m| am) (?:leaving|done)|gotta go|(?:can|could) we (?:stop|finish|end)|let'?s (?:stop|finish|end)|stop (?:here|now)|end (?:the|this) (?:conversation|chat)|goodbye|bye bye|quero (?:parar|encerrar|terminar|sair)|preciso (?:ir|sair)|vou (?:sair|parar)|podemos (?:parar|encerrar)|tchau)\b/iu;
+export const stopRequest = /\b(?:(?:i|we) (?:have|need|want|got) to (?:go|leave|stop)|i(?:'m| am) (?:leaving|done)|gotta go|(?:can|could) we (?:stop|finish|end)|let'?s (?:stop|finish|end)|stop (?:here|now)|end (?:the|this) (?:conversation|chat)|goodbye|bye bye|quero (?:parar|encerrar|terminar|sair)|preciso (?:ir|sair)|vou (?:sair|parar)|podemos (?:parar|encerrar)|tchau)\b/iu;
 const maxShortReplyWords = 4;
 const closingLine = "This was a really nice chat. Thanks for talking with me, and I hope to hear more next time!";
 const stuckLine = "Hmm, I got a bit lost in the forest there. Tell me a little more about that?";

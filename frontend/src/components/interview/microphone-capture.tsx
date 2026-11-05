@@ -112,6 +112,8 @@ type MicrophoneCaptureProps = {
   disabled?: boolean;
   /** Conversation timing: the backend ends a turn after the shorter conversation pause graces (sent in the start message). */
   conversationTiming?: boolean;
+  /** German conversation: the start message asks the backend to auto-detect German or Portuguese answers. */
+  language?: "de";
   /** Renders the controls/notices; receives the live capture state. */
   render: (controls: MicControls) => ReactNode;
   /** Raw RMS level (0..1) of every captured frame; only fires while an answer window is open. */
@@ -200,7 +202,7 @@ function streamFailureMessage(reason: AnswerStreamFailure): string {
   return "A conexão de áudio foi interrompida. Tente novamente ou pule esta pergunta.";
 }
 
-export function MicrophoneCapture({ disabled = false, conversationTiming = false, render, onLevel, onTranscriptionChange, onAssessmentChange, onReviewedTranscript, onCaptureStateChange, onProvisionalAnswer, onSpeechResumed, onSpeechEpoch, onAnswerComplete, followUpCandidate = null, onFollowUpCandidateStatus, onPlannedQuestionStatus, getPlannedStartContext, onHandoffTimingEvent, autoStartSignal = null, micEngine = null, onDeviceFallback, preconnectSignal = null, assessmentSockets, assessmentContext }: MicrophoneCaptureProps) {
+export function MicrophoneCapture({ disabled = false, conversationTiming = false, language, render, onLevel, onTranscriptionChange, onAssessmentChange, onReviewedTranscript, onCaptureStateChange, onProvisionalAnswer, onSpeechResumed, onSpeechEpoch, onAnswerComplete, followUpCandidate = null, onFollowUpCandidateStatus, onPlannedQuestionStatus, getPlannedStartContext, onHandoffTimingEvent, autoStartSignal = null, micEngine = null, onDeviceFallback, preconnectSignal = null, assessmentSockets, assessmentContext }: MicrophoneCaptureProps) {
   const [status, setStatus] = useState<RecorderStatus>("idle");
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -238,6 +240,7 @@ export function MicrophoneCapture({ disabled = false, conversationTiming = false
   const micEngineRef = useRef(micEngine);
   const onDeviceFallbackRef = useRef(onDeviceFallback);
   const conversationTimingRef = useRef(conversationTiming);
+  const languageRef = useRef(language);
   const lastAutoStartSignalRef = useRef<string | null>(null);
   const lastPreconnectSignalRef = useRef<string | null>(null);
   const handlersRef = useRef<{
@@ -255,6 +258,7 @@ export function MicrophoneCapture({ disabled = false, conversationTiming = false
     onProvisionalAnswerRef.current = onProvisionalAnswer;
     onSpeechResumedRef.current = onSpeechResumed;
     conversationTimingRef.current = conversationTiming;
+    languageRef.current = language;
     onSpeechEpochRef.current = onSpeechEpoch;
     onAnswerCompleteRef.current = onAnswerComplete;
     onFollowUpCandidateStatusRef.current = onFollowUpCandidateStatus;
@@ -579,7 +583,7 @@ export function MicrophoneCapture({ disabled = false, conversationTiming = false
           throw new StreamSetupError("UNAUTHENTICATED");
         }
         const planned = getPlannedStartContextRef.current?.() ?? null;
-        return buildStreamStartMessage({ accessToken, speechThreshold, sampleRate: pcmSampleRate, question: toStreamQuestion(attempt.context.questionLabel), plannedQuestion: planned?.plannedQuestion ?? null, contextAnswers: planned?.contextAnswers, conversation: conversationTimingRef.current });
+        return buildStreamStartMessage({ accessToken, speechThreshold, sampleRate: pcmSampleRate, question: toStreamQuestion(attempt.context.questionLabel), plannedQuestion: planned?.plannedQuestion ?? null, contextAnswers: planned?.contextAnswers, conversation: conversationTimingRef.current, language: languageRef.current });
       },
       encodeFrame: (samples) => toPcm16(samples).buffer as ArrayBuffer,
       onMessage: (message, socket) => handlersRef.current?.message(attempt, message as StreamMessage, socket),

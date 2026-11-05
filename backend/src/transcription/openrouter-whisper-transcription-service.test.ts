@@ -216,3 +216,38 @@ describe("OpenRouter Whisper final request", () => {
     });
   });
 });
+
+describe("OpenRouter Whisper German answers", () => {
+  const audio = pcmToWav(Buffer.alloc(32_000));
+  const segmentBody = JSON.stringify({ text: "Ich arbeite als Entwickler.", segments: [{ text: "Ich arbeite als Entwickler.", start: 0.1, end: 1.2 }] });
+
+  it("sends no language field and no English prompt for German, and keeps both for English", async () => {
+    const forms: FormData[] = [];
+    const fetcher = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      forms.push(init?.body as FormData);
+      return new Response(segmentBody, { status: 200 });
+    });
+    const service = new OpenRouterWhisperTranscriptionService({ key: "test", timeoutMs: 1_000, fetchImplementation: fetcher });
+
+    await service.transcribe(audio, "whisper-large-v3-turbo", "wav", undefined, { question: "What is your job?", language: "de" });
+    await service.transcribe(audio, "whisper-large-v3-turbo", "wav", undefined, { question: "What is your job?" });
+
+    expect(forms[0]?.has("language")).toBe(false);
+    expect(forms[0]?.has("prompt")).toBe(false);
+    expect(forms[0]?.get("response_format")).toBe("verbose_json");
+    expect(forms[1]?.get("language")).toBe("en");
+    expect(forms[1]?.get("prompt")).toContain("Technical job interview answer.");
+  });
+
+  it("drops the language field and prompt on the segment timing recovery request too", async () => {
+    let fields: FormData | undefined;
+    const fetcher = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      fields = init?.body as FormData;
+      return new Response(segmentBody, { status: 200 });
+    });
+    await new OpenRouterWhisperTranscriptionService({ key: "test", timeoutMs: 1_000, fetchImplementation: fetcher })
+      .retrySegmentTimestamps(audio, "whisper-large-v3-turbo", "wav", undefined, { language: "de" });
+    expect(fields?.has("language")).toBe(false);
+    expect(fields?.has("prompt")).toBe(false);
+  });
+});

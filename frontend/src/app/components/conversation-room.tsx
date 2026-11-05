@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { MicrophoneCapture, type MicControls, type VoiceCaptureState, type VoiceTranscriptionState } from "@/components/interview/microphone-capture";
 import { createSpeechFeed, toucanStateFor } from "@/components/interview/toucan/toucan-engine.mjs";
 import { AssessmentSocketRegistry } from "@/lib/interview/assessment-socket-registry.mjs";
-import { buildConversationTurnRequest, fallbackConversationTurn, isConversationEnd, isMeaningQuestion, MAX_SILENCE_NUDGES, nextUsedPathIds, shouldReact,silenceWaitMs, type ConversationLine, type ConversationPlanInput } from "@/lib/interview/conversation-policy.mjs";
+import { buildConversationTurnRequest, fallbackConversationTurn, GERMAN_CONVERSATION_VOICE, isConversationEnd, isMeaningQuestion, MAX_SILENCE_NUDGES, nextUsedPathIds, shouldReact,silenceWaitMs, type ConversationLine, type ConversationPlanInput, type ConversationSuggestion } from "@/lib/interview/conversation-policy.mjs";
 import { requestConversationTurn } from "@/lib/interview/conversation";
 import { conversationAssessmentSamples } from "@/lib/interview/conversation-report.mjs";
 import { pairInterviewTurns } from "@/lib/interview/report";
@@ -29,6 +29,7 @@ import { SessionPreparing } from "./session-preparing";
 import { useSessionVoice } from "../hooks/use-session-voice";
 import { InterviewReport } from "./interview-report";
 import { EndCallDialog } from "./end-call-dialog";
+import { GermanDialogue, type GermanDialogueLine } from "./german-dialogue";
 import "./interview-room.css";
 
 type ConversationTurn = { sequenceNumber: number; speaker: "interviewer" | "candidate"; content: string | null };
@@ -49,6 +50,9 @@ function formatClock(seconds: number) {
 export function ConversationRoom({ config, plan, onLeave }: { config: InterviewConfig; plan: ConversationPlanInput; onLeave: () => void }) {
   const { t, locale } = useLocale();
   useSpeechWarmup();
+  // German conversations: the German voice, no static reactions, a longer turn timeout, and a transcript with translations.
+  const german = config.conversationLanguage === "de";
+  const voice = german ? GERMAN_CONVERSATION_VOICE : config.voice;
   const durationMinutes = Math.max(5, Number.parseInt(config.duration, 10) || 5);
   const [phase, setPhaseState] = useState<InterviewPhase>("introducing");
   const phaseRef = useRef<InterviewPhase>("introducing");
@@ -58,6 +62,9 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
   const [tuckLine, setTuckLine] = useState(plan.opening);
   const [lines, setLines] = useState<ConversationLine[]>(() => [{ speaker: "tuck", text: plan.opening }]);
   const linesRef = useRef(lines);
+  // The German transcript with translations (shown only in German); the backend record is kept in `turns`.
+  const [dialogue, setDialogue] = useState<GermanDialogueLine[]>(() => [{ speaker: "tuck", text: plan.opening, translation: plan.openingTranslation ?? null }]);
+  const [suggestions, setSuggestions] = useState<ConversationSuggestion[]>([]);
   const [turns, setTurns] = useState<ConversationTurn[]>(() => [{ sequenceNumber: 1, speaker: "interviewer", content: plan.opening }]);
   const turnsRef = useRef(turns);
   const usedPathIdsRef = useRef<string[]>([]);
@@ -91,15 +98,16 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
   }, []);
   const speechFeed = useMemo(() => createSpeechFeed(), []);
   // The instant static reactions ("Oh, really?") after an answer of two words or more.
-  const [acknowledgements] = useState(() => createInterviewerAcknowledgements(speechFeed.push, config.voice, CONVERSATION_REACTIONS));
-  useEffect(() => { void acknowledgements.preload(); }, [acknowledgements]);
+  const [acknowledgements] = useState(() => createInterviewerAcknowledgements(speechFeed.push, voice, CONVERSATION_REACTIONS));
+  // No static reactions in German (the preload and the reactions are both skipped).
+  useEffect(() => { if (!german) void acknowledgements.preload(); }, [acknowledgements, german]);
   // Already loaded when the room opens; kept for the quiet moment after the first line, as in the interview.
-  const preloadReactions = useCallback(() => { void acknowledgements.preload(); }, [acknowledgements]);
+  const preloadReactions = useCallback(() => { if (!german) void acknowledgements.preload(); }, [acknowledgements, german]);
   const leaveRef = useRef(onLeave);
   useEffect(() => { leaveRef.current = onLeave; });
 
   // The session's voice is decided on the opening line before it plays (see use-session-voice); a pin never leaks from another session.
-  const { voiceReady, waitForOpeningDelay } = useSessionVoice(config.playInterviewerAudio, plan.opening, config.voice, { fixedOpeningDelayMs: CONVERSATION_OPENING_DELAY_MS });
+  const { voiceReady, waitForOpeningDelay } = useSessionVoice(config.playInterviewerAudio, plan.opening, voice, { fixedOpeningDelayMs: CONVERSATION_OPENING_DELAY_MS });
   const { seconds, remaining, timeLimitReached } = useInterviewSession(phase, durationMinutes);
   useEffect(() => { secondsRef.current = seconds; }, [seconds]);
   const question = useMemo(() => ({ id: `tuck-${sequence}`, prompt: tuckLine, cue: "" }), [sequence, tuckLine]);
@@ -122,7 +130,8 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
     pendingReviewed: pendingReviewedRef.current.size,
   }), []);
   // The report of the whole conversation, built once when it ends (see use-conversation-report).
-  const { reportState, answerClipPaths } = useConversationReport({ phase, locale, sessionId, readInputs: readReportInputs, waitForSessionId, waitForCompletionSync });
+  // German conversations get no generated report (the ending shows the transcript instead).
+  const { reportState, answerClipPaths } = useConversationReport({ phase: german ? "introducing" : phase, locale, sessionId, readInputs: readReportInputs, waitForSessionId, waitForCompletionSync });
   const azureSummary = useMemo(() => ({
     ...summarizeAzureAssessments(conversationAssessmentSamples(voiceAssessments)),
     answers: buildAzureAnswerRecords(Object.values(voiceAssessments), answerClipPaths),
@@ -185,7 +194,7 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
   }, [acknowledgements, waitForOpeningDelay]);
   const isTuckTurn = phase === "introducing" || phase === "speaking" || phase === "closing";
   const speechSegments = useMemo(() => splitInterviewerSpeech(tuckLine), [tuckLine]);
-  const { activeSegment, speechMessage, retrySpeech } = useSpeechPlayback(speechSegments, onTuckSpoken, isTuckTurn && config.playInterviewerAudio && voiceReady, undefined, preloadReactions, speechSpeed, speechFeed.push, waitForReaction, config.voice);
+  const { activeSegment, speechMessage, retrySpeech } = useSpeechPlayback(speechSegments, onTuckSpoken, isTuckTurn && config.playInterviewerAudio && voiceReady, undefined, preloadReactions, speechSpeed, speechFeed.push, waitForReaction, voice);
 
   // Silence while the microphone listens (no speech yet, nothing transcribing): Tuck nudges after silenceWaitMs. Any speech
   // detected, or a transcription starting, changes these inputs and cancels the timer.
@@ -207,20 +216,32 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
     const tuckSequence = sequenceRef.current;
     const controller = new AbortController();
     abortRef.current = controller;
-    const body = buildConversationTurnRequest({ plan, usedPathIds: usedPathIdsRef.current, elapsedSeconds: secondsRef.current, durationMinutes, lines: personLines, transcript, silent });
-    const reply = await requestConversationTurn(body, AbortSignal.any([controller.signal, AbortSignal.timeout(5_000)]))
-      .catch(() => fallbackConversationTurn({ plan, usedPathIds: usedPathIdsRef.current, phase: body.phase, transcript: body.transcript }));
+    const language = german ? "de" as const : undefined;
+    const body = buildConversationTurnRequest({ plan, usedPathIds: usedPathIdsRef.current, elapsedSeconds: secondsRef.current, durationMinutes, lines: personLines, transcript, silent, language });
+    const reply = await requestConversationTurn(body, AbortSignal.any([controller.signal, AbortSignal.timeout(german ? 10_000 : 5_000)]))
+      .catch(() => fallbackConversationTurn({ plan, usedPathIds: usedPathIdsRef.current, phase: body.phase, transcript: body.transcript, language }));
     if (leftRef.current) return;
     abortRef.current = null;
     usedPathIdsRef.current = nextUsedPathIds(usedPathIdsRef.current, reply);
     const nextSequence = tuckSequence + 2;
     linesRef.current = [...personLines, { speaker: "tuck", text: reply.say }];
     setLines(linesRef.current);
+    if (german) {
+      // The person's German line (the last one) gets its translation; a silent nudge has no person line to update.
+      const personTranslation = reply.personTranslation ?? null;
+      setDialogue((current) => {
+        const answered = silent ? current : current.map((line, index) => (
+          index === current.length - 1 && line.speaker === "person" ? { ...line, translation: personTranslation } : line
+        ));
+        return [...answered, { speaker: "tuck", text: reply.say, translation: reply.sayTranslation ?? null }];
+      });
+      setSuggestions(reply.suggestions ?? []);
+    }
     sequenceRef.current = nextSequence;
     setSequence(nextSequence);
     setTuckLine(reply.say);
     record({ sequenceNumber: nextSequence, speaker: "interviewer", content: reply.say });
-    void prewarmInterviewerUtterance(reply.say, config.voice);
+    void prewarmInterviewerUtterance(reply.say, voice);
     submittingRef.current = false;
     setPhase(isConversationEnd(reply) || body.phase === "closing" ? "closing" : "speaking");
   };
@@ -231,6 +252,7 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
     const personLines: ConversationLine[] = [...linesRef.current, { speaker: "person", text: transcript }];
     linesRef.current = personLines;
     setLines(personLines);
+    if (german) setDialogue((current) => [...current, { speaker: "person", text: transcript, translation: null }]);
     silenceNudgesRef.current = 0;
     record({ sequenceNumber: tuckSequence + 1, speaker: "candidate", content: transcript });
     // The reviewed transcript may already have arrived; otherwise the report waits for it, as it does for voice assessments.
@@ -239,7 +261,7 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
     setVoiceCaptureState("idle");
     setAnswerError(null);
     setPhase("advancing");
-    if (shouldReact(transcript) && !isMeaningQuestion(transcript)) acknowledgements.schedule({ shouldPlay: () => !leftRef.current && phaseRef.current === "advancing" });
+    if (!german && shouldReact(transcript) && !isMeaningQuestion(transcript)) acknowledgements.schedule({ shouldPlay: () => !leftRef.current && phaseRef.current === "advancing" });
     await takeTuckTurn(personLines, transcript, false);
   };
 
@@ -324,6 +346,20 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
 
   /** The conversation is over: the report of the whole conversation, with a way back to the dashboard. */
   function renderEnding() {
+    if (german) {
+      return (
+        <main id="main-content" className="rm-root mx-auto min-h-dvh w-full max-w-7xl px-4 py-5 sm:px-8 sm:py-8">
+          <button type="button" className="ds-btn ds-btn-quiet -ml-3 mb-4 min-h-10 gap-2 px-3 text-sm" onClick={onLeave}>
+            <ArrowLeft className="size-4" aria-hidden="true" /> {t("Voltar ao dashboard")}
+          </button>
+          <h1 className="ds-title">{t("Conversa encerrada")}</h1>
+          <p className="ds-small mt-2">{plan.title} · {formatClock(seconds)}</p>
+          <div className="mt-8">
+            <GermanDialogue lines={dialogue} suggestions={[]} live={false} full />
+          </div>
+        </main>
+      );
+    }
     const samples = conversationAssessmentSamples(voiceAssessments);
     return (
       <main id="main-content" className="rm-root mx-auto min-h-dvh w-full max-w-7xl px-4 py-5 sm:px-8 sm:py-8">
@@ -393,6 +429,8 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
           />
         </section>
 
+        {german && <GermanDialogue lines={dialogue} suggestions={suggestions} live />}
+
         <EndCallDialog
           open={endOpen}
           canFinish={phase !== "closing"}
@@ -405,6 +443,7 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
           key={sequence}
           disabled={idle}
           conversationTiming
+          language={german ? "de" : undefined}
           assessmentSockets={assessmentSockets}
           assessmentContext={assessmentContext}
           onLevel={meter.push}

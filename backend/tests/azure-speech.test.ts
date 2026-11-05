@@ -108,3 +108,18 @@ describe("chatterbox-azure configuration", () => {
     await expect(new HybridSpeechProvider({ ...options, secondary: unavailable }).synthesize(req)).rejects.toBeInstanceOf(SpeechProviderUnavailableError);
   });
 });
+
+describe("Azure SSML language follows the voice", () => {
+  const ssmlFor = async (voice: string) => {
+    let init: RequestInit | undefined;
+    const provider = new AzureSpeechProvider({ key: "key", region: "brazilsouth", voice: "en-US-AndrewNeural", timeoutMs: 8_000, cooldownMs: 10_000, fetchImplementation: async (_url, requestInit) => { init = requestInit; return new Response("mp3"); } });
+    await provider.synthesize({ ...req, voice });
+    return String(init?.body);
+  };
+
+  it("uses de-DE for the German voice and the matching locale for English voices", async () => {
+    expect(await ssmlFor("de-DE-FlorianMultilingualNeural")).toContain("<speak version='1.0' xml:lang='de-DE'><voice name='de-DE-FlorianMultilingualNeural'>");
+    expect(await ssmlFor("en-US-BrianNeural")).toContain("xml:lang='en-US'");
+    expect(await ssmlFor("en-GB-RyanNeural")).toContain("xml:lang='en-GB'");
+  });
+});

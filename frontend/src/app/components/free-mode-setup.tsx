@@ -12,9 +12,9 @@ import { prewarmInterviewerUtterance } from "../hooks/use-speech-playback";
 import { useLocale } from "@/lib/locale";
 import { startNavigation } from "@/lib/navigation-progress.mjs";
 import type { InterviewConfig } from "@/lib/interview/types";
-import type { ConversationPlanInput } from "@/lib/interview/conversation-policy.mjs";
+import { GERMAN_CONVERSATION_VOICE, type ConversationPlanInput } from "@/lib/interview/conversation-policy.mjs";
 import type { ConversationTopic } from "@/lib/interview/conversation-topics.mjs";
-import { requestConversationPlan } from "@/lib/interview/conversation";
+import { requestConversationLanguages, requestConversationPlan } from "@/lib/interview/conversation";
 import { CONVERSATION_TOPICS, pickConversationTopic, readRecentTopicIds, rememberConversationTopic, topicToConversationPlan } from "@/lib/interview/conversation-topics.mjs";
 import { unlockSharedAudio } from "@/lib/interview/audio-unlock.mjs";
 import { storeRoomHandoff } from "@/lib/interview/room-handoff.mjs";
@@ -67,6 +67,11 @@ export function FreeModeSetup({ trialMinutes = null }: { trialMinutes?: number |
   const [preparing, setPreparing] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
   const [startError, setStartError] = useState(false);
+  // "de" is offered only to allow-listed users (the backend decides); English is always there.
+  const [languages, setLanguages] = useState<Array<"en" | "de">>(["en"]);
+  const [language, setLanguage] = useState<"en" | "de">("en");
+  const german = language === "de";
+  const languageOptions = [{ value: "en", label: t("Inglês") }, { value: "de", label: t("Alemão") }];
 
   // Preferences as the interview setup reads them (a per-browser choice, saved for the next session).
   const storedMicrophoneId = useSyncExternalStore(subscribeNever, () => readStoredMicrophoneDeviceId(window.localStorage), () => null);
@@ -79,23 +84,31 @@ export function FreeModeSetup({ trialMinutes = null }: { trialMinutes?: number |
     return () => { mountedRef.current = false; };
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    void requestConversationLanguages(controller.signal).then(setLanguages);
+    return () => controller.abort();
+  }, []);
+
   // Runs inside the click: the audio elements are unlocked before any request is awaited.
   const startConversation = (plan: ConversationPlanInput) => {
+    const configVoice = german ? GERMAN_CONVERSATION_VOICE : voice;
     const config: InterviewConfig = {
       ...defaultInterviewConfig,
-      role: "Modo livre",
+      role: german ? "Modo livre (alemão)" : "Modo livre",
       seniority: "mid-level",
       focus: "mixed",
       duration: trialDuration ?? duration,
       questionCount: null,
-      voice,
+      voice: configVoice,
       speechSpeed,
       showInterviewerCharacter: showCharacter,
       microphoneDeviceId: storedMicrophoneId,
       mode: "conversation",
       conversationPlan: plan,
+      ...(german ? { conversationLanguage: "de" as const } : {}),
     };
-    if (config.playInterviewerAudio) prewarmInterviewerUtterance(plan.opening, voice);
+    if (config.playInterviewerAudio) prewarmInterviewerUtterance(plan.opening, configVoice);
     if (storeRoomHandoff(window.sessionStorage, config)) {
       startNavigation();
       router.push("/interview");
@@ -122,7 +135,8 @@ export function FreeModeSetup({ trialMinutes = null }: { trialMinutes?: number |
     event.preventDefault();
     const text = topic.trim();
     if (!text || preparing) return;
-    if (bankTopic && text === bankTopic.title) {
+    // English bank topics start with no backend call; German always goes through Tuck's plan in German.
+    if (!german && bankTopic && text === bankTopic.title) {
       setPlanError(null);
       startBankTopic(bankTopic);
       return;
@@ -131,7 +145,10 @@ export function FreeModeSetup({ trialMinutes = null }: { trialMinutes?: number |
     setPreparing(true);
     setPlanError(null);
     try {
-      const plan = await requestConversationPlan(text, AbortSignal.timeout(20_000));
+      const plan = german
+        ? await requestConversationPlan(text, AbortSignal.timeout(20_000), "de")
+        : await requestConversationPlan(text, AbortSignal.timeout(20_000));
+      if (german && bankTopic && text === bankTopic.title) rememberConversationTopic(window.localStorage, bankTopic.id);
       if (mountedRef.current) startConversation(plan);
     } catch {
       if (!mountedRef.current) return;
@@ -144,12 +161,26 @@ export function FreeModeSetup({ trialMinutes = null }: { trialMinutes?: number |
     <main id="main-content" className="mx-auto w-full min-w-0 max-w-5xl px-4 pb-[calc(var(--shl-bottom-nav-h,0px)+2rem)] pt-6 sm:px-8 sm:pt-8 lg:pb-16 lg:pt-10">
       <PageIntro
         title={t("Modo livre")}
-        description={t("Converse em inglês com o Tuck sobre o que quiser, sem roteiro de entrevista.")}
+        description={german
+          ? t("Converse em alemão com o Tuck, bem devagar e com tradução.")
+          : t("Converse em inglês com o Tuck sobre o que quiser, sem roteiro de entrevista.")}
       />
 
       <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-8">
         <form onSubmit={startTyped} className="ds-card flex min-w-0 flex-col gap-6 p-5 sm:p-7" noValidate>
           <h2 id="free-mode-topic-title" className="ds-card-title">{t("Sobre o que vamos conversar?")}</h2>
+
+          {languages.includes("de") && (
+            <SlidingSegmented
+              name="free-mode-language"
+              ariaLabel={t("Idioma da conversa")}
+              className="grid-cols-2"
+              itemClassName="min-h-11"
+              options={languageOptions}
+              value={language}
+              onChange={(value) => setLanguage(value === "de" ? "de" : "en")}
+            />
+          )}
 
           <div className="flex flex-col gap-2">
             <label htmlFor="free-mode-topic" className="sr-only">{t("Tema da conversa")}</label>
@@ -224,14 +255,18 @@ export function FreeModeSetup({ trialMinutes = null }: { trialMinutes?: number |
               <span className="isu-step" aria-hidden="true">2</span>
               <div className="flex min-w-0 flex-col gap-1">
                 <p className="ds-label">{t("Converse com o Tuck")}</p>
-                <p className="ds-small">{t("A conversa é toda em inglês, sem perguntas de entrevista.")}</p>
+                <p className="ds-small">{german
+                  ? t("Frases simples em alemão. Você pode responder em português ou dizer que não entendeu.")
+                  : t("A conversa é toda em inglês, sem perguntas de entrevista.")}</p>
               </div>
             </li>
             <li className="flex items-start gap-4">
               <span className="isu-step" aria-hidden="true">3</span>
               <div className="flex min-w-0 flex-col gap-1">
                 <p className="ds-label">{t("Receba seu relatório")}</p>
-                <p className="ds-small">{t("Só sobre a conversa: seu inglês e sua voz, nada técnico.")}</p>
+                <p className="ds-small">{german
+                  ? t("No fim você revê a conversa com a tradução.")
+                  : t("Só sobre a conversa: seu inglês e sua voz, nada técnico.")}</p>
               </div>
             </li>
           </ol>

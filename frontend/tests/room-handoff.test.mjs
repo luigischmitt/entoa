@@ -115,3 +115,39 @@ test("a plan without the conversation mode is dropped, and unknown plan fields a
   const parsed = parseRoomHandoff(serializeRoomHandoff({ ...conversationConfig, conversationPlan: { ...conversationPlan, paths: [{ id: "p1", line: "a", extra: 1 }] } }, 1), 2);
   assert.deepEqual(parsed.conversationPlan.paths, [{ id: "p1", line: "a" }]);
 });
+
+test("a German conversation keeps its language and the German voice, whatever voice was chosen", () => {
+  const german = parseRoomHandoff(serializeRoomHandoff({ ...conversationConfig, conversationLanguage: "de", voice: "en-GB-SoniaNeural" }, 1), 2);
+  assert.equal(german.conversationLanguage, "de");
+  assert.equal(german.voice, "de-DE-FlorianMultilingualNeural");
+  assert.equal(german.mode, "conversation");
+  const withoutVoice = parseRoomHandoff(serializeRoomHandoff({ ...conversationConfig, conversationLanguage: "de" }, 1), 2);
+  assert.equal(withoutVoice.voice, "de-DE-FlorianMultilingualNeural");
+});
+
+test("an English conversation or an unknown language is dropped and keeps the chosen English voice", () => {
+  const english = parseRoomHandoff(serializeRoomHandoff({ ...conversationConfig, voice: "en-GB-SoniaNeural" }, 1), 2);
+  assert.equal("conversationLanguage" in english, false);
+  assert.equal(english.voice, "en-GB-SoniaNeural");
+  for (const language of ["en", "fr", "DE", 1]) {
+    const parsed = parseRoomHandoff(serializeRoomHandoff({ ...conversationConfig, conversationLanguage: language }, 1), 2);
+    assert.equal("conversationLanguage" in parsed, false);
+    assert.equal("voice" in parsed, false);
+  }
+});
+
+test("German is dropped together with a conversation that is not valid", () => {
+  const parsed = parseRoomHandoff(serializeRoomHandoff({ ...conversationConfig, conversationLanguage: "de", mode: "interview" }, 1), 2);
+  assert.equal("conversationLanguage" in parsed, false);
+  assert.equal("voice" in parsed, false);
+  const badPlan = parseRoomHandoff(serializeRoomHandoff({ ...conversationConfig, conversationLanguage: "de", conversationPlan: { ...conversationPlan, paths: [] } }, 1), 2);
+  assert.equal("conversationLanguage" in badPlan, false);
+  assert.equal("voice" in badPlan, false);
+});
+
+test("the plan keeps openingTranslation only when it is a string", () => {
+  const kept = parseRoomHandoff(serializeRoomHandoff({ ...conversationConfig, conversationPlan: { ...conversationPlan, openingTranslation: "Bom dia!" } }, 1), 2);
+  assert.equal(kept.conversationPlan.openingTranslation, "Bom dia!");
+  const dropped = parseRoomHandoff(serializeRoomHandoff({ ...conversationConfig, conversationPlan: { ...conversationPlan, openingTranslation: 3 } }, 1), 2);
+  assert.equal("openingTranslation" in dropped.conversationPlan, false);
+});

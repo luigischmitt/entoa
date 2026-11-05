@@ -12,7 +12,7 @@ import {
 import type { SpeechCache } from "./speech-cache.js";
 import { normalizeTextForSpeech } from "./text-normalization.js";
 import type { AudioFormat } from "./types.js";
-import { resolveVoice } from "./voices.js";
+import { isAzureOnlyVoice, resolveVoice } from "./voices.js";
 
 /** Texts that never change (acknowledgements, the closing line, the closing fallback reactions): cached longer and synthesized ahead of the interview. */
 export function staticSpeechTexts(): string[] {
@@ -84,6 +84,8 @@ export class InterviewerSpeechPrefetcher {
   async prefetchStaticFor(voice?: unknown, requestedSpeed?: unknown, options: { concurrency: number; deadlineMs?: number } = { concurrency: 1 }): Promise<void> {
     const { cache, speed, format } = this.options;
     const resolvedVoice = resolveVoice(voice, this.options.voice);
+    // Static English phrases must never be generated in an Azure-only (German) voice; that voice is spent per answer only.
+    if (isAzureOnlyVoice(resolvedVoice)) return Promise.resolve();
     const resolvedSpeed = typeof requestedSpeed === "number" && Number.isFinite(requestedSpeed) && requestedSpeed >= 0.25 && requestedSpeed <= 4 ? requestedSpeed : speed;
     // The client plays the acknowledgements from static files at any speed, so they are not synthesized here.
     const skipped = new Set(ACKNOWLEDGEMENT_PHRASES.map((phrase) => normalizeTextForSpeech(phrase.trim())));

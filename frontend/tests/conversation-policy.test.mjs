@@ -11,6 +11,7 @@ import {
   shouldReact,
   MAX_SILENCE_NUDGES,
   silenceWaitMs,
+  GERMAN_CONVERSATION_VOICE,
 } from "../src/lib/interview/conversation-policy.mjs";
 
 const plan = {
@@ -127,4 +128,40 @@ test("a failed turn for a meaning question asks the person to repeat the word, n
 
 test("meaning questions without the auxiliary verb are recognized", () => {
   for (const text of ["what cheers mean", "what means cheers", "What cheers means?"]) assert.equal(isMeaningQuestion(text), true);
+});
+
+test("the turn request carries the language only when it is German", () => {
+  const base = { plan, usedPathIds: [], elapsedSeconds: 200, durationMinutes: 5, transcript: "Ich wohne in Berlin" };
+  assert.equal(buildConversationTurnRequest({ ...base, language: "de" }).language, "de");
+  assert.equal("language" in buildConversationTurnRequest(base), false);
+  assert.equal("language" in buildConversationTurnRequest({ ...base, language: undefined }), false);
+  assert.equal("language" in buildConversationTurnRequest({ ...base, language: "en" }), false);
+});
+
+test("the German voice is the multilingual Azure voice", () => {
+  assert.equal(GERMAN_CONVERSATION_VOICE, "de-DE-FlorianMultilingualNeural");
+});
+
+test("German fallbacks: closing, next unused path and a simple follow-up, with Portuguese translations", () => {
+  assert.deepEqual(fallbackConversationTurn({ plan, usedPathIds: [], phase: "closing", language: "de" }), {
+    say: "Das war ein schönes Gespräch! Danke und tschüss!", move: "WRAP", pathId: null,
+    sayTranslation: "Foi uma conversa muito boa! Obrigado e tchau!", personTranslation: null, suggestions: [],
+  });
+  assert.deepEqual(fallbackConversationTurn({ plan, usedPathIds: ["p1"], phase: "explore", language: "de" }), {
+    say: plan.paths[1].line, move: "NEW_PATH", pathId: "p2", sayTranslation: null, personTranslation: null, suggestions: [],
+  });
+  assert.deepEqual(fallbackConversationTurn({ plan, usedPathIds: ["p1", "p2", "p3"], phase: "warmup", language: "de" }), {
+    say: "Erzähl mir ein bisschen mehr, bitte.", move: "FOLLOW", pathId: null,
+    sayTranslation: "Me conta um pouco mais, por favor.", personTranslation: null, suggestions: [],
+  });
+});
+
+test("German fallbacks have no meaning-question branch", () => {
+  const reply = fallbackConversationTurn({ plan, usedPathIds: [], phase: "explore", transcript: "Was bedeutet cheers?", language: "de" });
+  assert.equal(reply.move, "NEW_PATH");
+  assert.equal(reply.pathId, "p1");
+});
+
+test("English fallbacks keep their shape without German fields", () => {
+  assert.deepEqual(Object.keys(fallbackConversationTurn({ plan, usedPathIds: [], phase: "explore" })).sort(), ["move", "pathId", "say"]);
 });

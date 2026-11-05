@@ -50,6 +50,9 @@ export class AzureSpeechProvider implements SpeechProvider {
     if (now() < this.cooldownUntil) throw new SpeechProviderUnavailableError("Azure speech is cooling down.");
     const startedAt = now();
     const deadline = startedAt + this.options.timeoutMs;
+    const voice = isSelectableVoice(request.voice) ? request.voice : this.options.voice;
+    // The SSML language follows the voice (de-DE for the German voice, en-US or en-GB for the English ones).
+    const locale = voice.split("-").slice(0, 2).join("-");
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const remaining = deadline - now();
       if (remaining <= 0) throw new SpeechProviderUnavailableError("Azure speech timed out.");
@@ -67,7 +70,7 @@ export class AzureSpeechProvider implements SpeechProvider {
             "X-Microsoft-OutputFormat": "audio-24khz-48kbitrate-mono-mp3",
             "User-Agent": "entoa-backend",
           },
-          body: `<speak version='1.0' xml:lang='en-US'><voice name='${escapeXml(isSelectableVoice(request.voice) ? request.voice : this.options.voice)}'><prosody rate='${azureRate(request.speed)}'>${escapeXml(request.text)}</prosody></voice></speak>`,
+          body: `<speak version='1.0' xml:lang='${escapeXml(locale)}'><voice name='${escapeXml(voice)}'><prosody rate='${azureRate(request.speed)}'>${escapeXml(request.text)}</prosody></voice></speak>`,
           signal: controller.signal,
         });
         if (response.ok) {

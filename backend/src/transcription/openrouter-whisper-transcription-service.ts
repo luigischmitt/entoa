@@ -62,13 +62,14 @@ export class OpenRouterWhisperTranscriptionService implements TranscriptionServi
       const form = new FormData();
       form.set("model", modelForProvider[provider]);
       form.set("file", new Blob([new Uint8Array(audio)], { type: format === "wav" ? "audio/wav" : `audio/${format}` }), `response.${format}`);
-      form.set("language", "en");
+      // German answers: no language field (Whisper auto-detects German or Portuguese) and no English vocabulary prompt.
+      if (context?.language !== "de") form.set("language", "en");
       form.set("temperature", "0");
       form.set("response_format", "verbose_json");
       form.append("timestamp_granularities[]", "word");
       form.append("timestamp_granularities[]", "segment");
       let prompt: string | null = null;
-      if (this.options.promptEnabled !== false && !this.promptRejected) {
+      if (this.options.promptEnabled !== false && !this.promptRejected && context?.language !== "de") {
         prompt = buildWhisperPrompt(context);
         form.set("prompt", prompt);
       }
@@ -189,12 +190,12 @@ export class OpenRouterWhisperTranscriptionService implements TranscriptionServi
       const form = new FormData();
       form.set("model", modelForProvider[provider]);
       form.set("file", new Blob([new Uint8Array(audio)], { type: format === "wav" ? "audio/wav" : `audio/${format}` }), `response.${format}`);
-      form.set("language", "en");
+      if (context?.language !== "de") form.set("language", "en");
       form.set("temperature", "0");
       form.set("response_format", "verbose_json");
       // Ask only for coarse timing; the primary transcript remains canonical and is never replaced.
       form.append("timestamp_granularities[]", "segment");
-      if (this.options.promptEnabled !== false && !this.promptRejected) form.set("prompt", buildWhisperPrompt(context));
+      if (this.options.promptEnabled !== false && !this.promptRejected && context?.language !== "de") form.set("prompt", buildWhisperPrompt(context));
       const response = await this.fetchImplementation("https://openrouter.ai/api/v1/audio/transcriptions", {
         method: "POST",
         headers: { Authorization: `Bearer ${this.options.key}` },

@@ -25,7 +25,9 @@ export type InterviewConfig = {
   /** Free conversation with Tuck (absent or "interview" for interviews). */
   mode?: "interview" | "conversation";
   /** Plan of a conversation (only with mode "conversation"): the topic title, Tuck's opening and the paths he can take. */
-  conversationPlan?: { title: string; opening: string; paths: Array<{ id: string; line: string }> };
+  conversationPlan?: { title: string; opening: string; openingTranslation?: string; paths: Array<{ id: string; line: string }> };
+  /** Language of a conversation (only with mode "conversation"); "de" is the German option, absent means English. */
+  conversationLanguage?: "de";
 };
 
 export type InterviewQuestion = {
