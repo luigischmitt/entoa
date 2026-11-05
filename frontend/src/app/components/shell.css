@@ -159,8 +159,13 @@
 .shl-home-subcopy { max-width: 40ch; margin-top: 1.25rem; }
 .shl-home-primary { width: auto; margin-top: 2rem; padding-inline: 1.5rem; }
 .shl-home-facts { margin-top: 2.25rem; }
-.shl-home-trial { margin-top: 1rem; max-width: 34rem; color: var(--muted-foreground, inherit); }
-.shl-home-trial a, .shl-trial-used-card a { text-decoration: underline; text-underline-offset: 0.2em; }
+.shl-home-trial { display: flex; gap: 0.85rem; align-items: flex-start; max-width: 30rem; margin-top: 1.5rem; padding: 1rem 1.15rem; border: 1px solid color-mix(in srgb, var(--ds-green) 30%, transparent); border-radius: 14px; background: var(--ds-tint); color: var(--ds-text-2); }
+.shl-home-trial-icon { flex: none; margin-top: 0.1rem; color: var(--ds-green); }
+.shl-home-trial-title { margin: 0; color: var(--ds-ink); font-weight: 600; }
+.shl-home-trial-counts { display: flex; flex-wrap: wrap; gap: 0.25rem 1.1rem; margin: 0.35rem 0 0; color: var(--ds-text-2); font-size: 0.9375rem; }
+.shl-home-trial-counts b { color: var(--ds-green); font-family: var(--font-display); font-size: 1.45rem; font-weight: 400; line-height: 1; font-variant-numeric: tabular-nums; }
+.shl-home-trial-note { margin: 0.4rem 0 0; font-size: 0.875rem; }
+.shl-home-trial a, .shl-trial-used-card a { color: var(--ds-ink); text-decoration: underline; text-underline-offset: 0.2em; }
 .shl-trial-used-card { max-width: 36rem; margin: 3rem auto 0; padding: 2rem; display: grid; gap: 1rem; justify-items: start; }
 /* Highlight card: leaf wash in linen, with the bay and palms of the landing's closing art set in the lower right at full
    definition. The sky of the art is transparent, so the text above it reads on the plain wash; a short fade on the left
