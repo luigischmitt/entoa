@@ -94,9 +94,13 @@ export async function requestConversationTurn(body: ConversationTurnRequest, sig
 
 export type GermanConversationReport = {
   summary: string;
+  /** What went well in German (empty in reports saved before it existed). */
+  worked: Array<{ evidence: string; explanation: string }>;
   corrections: Array<{ original: string; corrected: string; explanation: string }>;
   vocabulary: Array<{ de: string; pt: string }>;
   practice: Array<{ de: string; pt: string }>;
+  /** Focus points for the next conversation (empty in reports saved before it existed). */
+  nextSteps: string[];
 };
 
 const maxCorrections = 6;
@@ -120,6 +124,8 @@ function parseGermanReport(body: unknown): GermanConversationReport {
   if (!isRecord(body) || typeof body.summary !== "string") throw new Error("Invalid German conversation report");
   return {
     summary: body.summary,
+    worked: parseItems(body.worked, 3, (item) =>
+      typeof item.evidence === "string" && typeof item.explanation === "string" ? { evidence: item.evidence, explanation: item.explanation } : null),
     corrections: parseItems(body.corrections, maxCorrections, (item) =>
       typeof item.original === "string" && typeof item.corrected === "string" && typeof item.explanation === "string"
         ? { original: item.original, corrected: item.corrected, explanation: item.explanation }
@@ -128,6 +134,7 @@ function parseGermanReport(body: unknown): GermanConversationReport {
       typeof item.de === "string" && typeof item.pt === "string" ? { de: item.de, pt: item.pt } : null),
     practice: parseItems(body.practice, maxPractice, (item) =>
       typeof item.de === "string" && typeof item.pt === "string" ? { de: item.de, pt: item.pt } : null),
+    nextSteps: Array.isArray(body.nextSteps) ? body.nextSteps.filter((step): step is string => typeof step === "string" && step.trim() !== "").slice(0, 3) : [],
   };
 }
 

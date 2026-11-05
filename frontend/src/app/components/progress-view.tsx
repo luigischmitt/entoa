@@ -3,7 +3,7 @@
 
 import { useLocale, t } from "@/lib/locale";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Play } from "lucide-react";
+import { Play } from "lucide-react";
 import { LoadingRegion, SkCard, SkChart } from "@/components/ui/loading-state";
 import { loadProgressRecords, renameInterview } from "@/lib/interview/persistence";
 import { purgeExpiredAnswerClips } from "@/lib/interview/answer-clips";
@@ -16,7 +16,6 @@ import type { ProgressRecord } from "@/lib/interview/progress-insights.mjs";
 import { PageIntro } from "./shared";
 import { formatPracticeDuration, ProgressContent } from "./progress/progress-content";
 import { InterviewReport } from "./interview-report";
-import { GermanReportView } from "./german-report";
 import { readStoredGermanReport } from "@/lib/interview/conversation";
 import type { ReportState } from "./interview-report";
 import { currentReportAnalysisVersion, requestPersistedInterviewReport } from "@/lib/interview/persisted-report";
@@ -86,12 +85,15 @@ export function ProgressView({
   const selectedStoredReport = selectedSession?.feedback?.status === "ready" && selectedSession.feedback.analysis
     ? selectedSession.feedback.analysis as InterviewReportResult
     : null;
-  const selectedReportState: ReportState = selectedStoredReport
-    ? { status: "ready", result: selectedStoredReport }
-    : recoveryStates[selectedSession?.id ?? ""]
-      ?? (selectedSession?.feedback?.status === "pending"
-        ? { status: "pending" }
-        : { status: "unavailable", message: selectedSession?.feedback?.status === "unavailable" ? "O relatório continua indisponível. Tente novamente em instantes." : "Este relatório ainda não foi gerado. Você pode tentar novamente agora." });
+  // A German report is a document of its own: its stored analysis is never read as the English result.
+  const selectedReportState: ReportState = selectedGerman
+    ? (selectedGermanReport ? { status: "idle" } : { status: "unavailable", message: "O relatório desta conversa não foi salvo." })
+    : selectedStoredReport
+      ? { status: "ready", result: selectedStoredReport }
+      : recoveryStates[selectedSession?.id ?? ""]
+        ?? (selectedSession?.feedback?.status === "pending"
+          ? { status: "pending" }
+          : { status: "unavailable", message: selectedSession?.feedback?.status === "unavailable" ? "O relatório continua indisponível. Tente novamente em instantes." : "Este relatório ainda não foi gerado. Você pode tentar novamente agora." });
 
   // An old report opens at its top, like a fresh one: jump there before paint (a smooth scroll up from the list would run
   // the report backwards, playing and skipping its entrances on the way).
@@ -172,7 +174,11 @@ export function ProgressView({
     jobDirection: selectedStoredReport?.jobDirection,
     interviewSource: "manual",
     // Conversations keep their own report wording; the topic stands in for the title when the session has none.
-    ...(selectedSession.mode === "conversation" ? {
+    ...(selectedGerman ? {
+      mode: "conversation" as const,
+      conversationLanguage: "de" as const,
+      conversationPlan: { title: selectedSession.title || selectedSession.conversationTopic || t("Conversa em alemão"), opening: "", paths: [] },
+    } : selectedSession.mode === "conversation" ? {
       mode: "conversation" as const,
       conversationPlan: selectedSession.conversationTopic ? { title: selectedSession.conversationTopic, opening: "", paths: [] } : undefined,
     } : {}),
@@ -240,19 +246,7 @@ export function ProgressView({
           <div hidden={!!selectedSession}>
             <ProgressContent insights={insights} onOpenReport={openHistoricalReport} />
           </div>
-          {selectedSession && selectedGerman && (
-            <section className="mt-8 lg:mt-10" aria-labelledby="pg-german-title">
-              <button type="button" className="ds-btn ds-btn-quiet -ml-3 mb-4 min-h-10 gap-2 px-3 text-sm" onClick={closeHistoricalReport}>
-                <ArrowLeft className="size-4" aria-hidden="true" /> {t("Voltar ao progresso")}
-              </button>
-              <h2 id="pg-german-title" className="ds-title">{selectedSession.title || selectedSession.conversationTopic || t("Conversa em alemão")}</h2>
-              <p className="ds-small mt-2">{t("Conversa em alemão")}{historicalDuration === null ? "" : ` · ${formatPracticeDuration(historicalDuration)}`}</p>
-              <div className="gr-root mt-8">
-                {selectedGermanReport ? <GermanReportView report={selectedGermanReport} /> : <p className="ds-small">{t("O relatório desta conversa não foi salvo.")}</p>}
-              </div>
-            </section>
-          )}
-          {selectedSession && !selectedGerman && historicalConfig && (
+          {selectedSession && historicalConfig && (
             <div className="mt-8 lg:mt-10">
               <InterviewReport
                 config={historicalConfig}
@@ -278,10 +272,11 @@ export function ProgressView({
                   }
                   return result;
                 }}
+                germanReport={selectedGermanReport}
                 historical
-                onRetry={() => { void generateHistoricalReport(selectedSession.id); }}
+                onRetry={selectedGerman ? undefined : () => { void generateHistoricalReport(selectedSession.id); }}
                 retrying={retryingSessionId === selectedSession.id}
-                canRegenerate={canRegenerateReports && selectedSession.mode !== "conversation" && selectedSession.feedback?.status === "ready" && selectedSession.feedback?.analysisVersion !== currentReportAnalysisVersion}
+                canRegenerate={canRegenerateReports && !selectedGerman && selectedSession.mode !== "conversation" && selectedSession.feedback?.status === "ready" && selectedSession.feedback?.analysisVersion !== currentReportAnalysisVersion}
                 onRegenerate={() => { void generateHistoricalReport(selectedSession.id, { regenerate: true }); }}
               />
             </div>

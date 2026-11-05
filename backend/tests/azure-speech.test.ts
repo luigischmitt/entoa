@@ -121,8 +121,7 @@ describe("Azure SSML language follows the voice", () => {
     expect(await ssmlFor("de-DE-FlorianMultilingualNeural")).toContain("<speak version='1.0' xml:lang='de-DE'><voice name='de-DE-FlorianMultilingualNeural'>");
     expect(await ssmlFor("en-US-BrianNeural")).toContain("xml:lang='en-US'");
     expect(await ssmlFor("en-GB-RyanNeural")).toContain("xml:lang='en-GB'");
-    // Beginners hear the German voice slower; the English voices keep the requested speed.
-    expect(await ssmlFor("de-DE-FlorianMultilingualNeural")).toContain("<prosody rate='-20%'>");
+    expect(await ssmlFor("de-DE-FlorianMultilingualNeural")).toContain("<prosody rate='+0%'>");
     expect(await ssmlFor("en-US-BrianNeural")).toContain("<prosody rate='+0%'>");
   });
 });

@@ -30,7 +30,7 @@ import { useSessionVoice } from "../hooks/use-session-voice";
 import { InterviewReport } from "./interview-report";
 import { EndCallDialog } from "./end-call-dialog";
 import { GermanDialogue, type GermanDialogueLine } from "./german-dialogue";
-import { GermanReport } from "./german-report";
+import { useGermanConversationReport } from "../hooks/use-german-conversation-report";
 import "./interview-room.css";
 
 type ConversationTurn = { sequenceNumber: number; speaker: "interviewer" | "candidate"; content: string | null };
@@ -131,7 +131,7 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
     pendingReviewed: pendingReviewedRef.current.size,
   }), []);
   // The report of the whole conversation, built once when it ends (see use-conversation-report).
-  // German conversations get no generated report (the ending shows the transcript instead).
+  // German conversations get no English-style report here (their report is useGermanConversationReport).
   const { reportState, answerClipPaths } = useConversationReport({ phase: german ? "introducing" : phase, locale, sessionId, readInputs: readReportInputs, waitForSessionId, waitForCompletionSync });
   const azureSummary = useMemo(() => ({
     ...summarizeAzureAssessments(conversationAssessmentSamples(voiceAssessments)),
@@ -355,25 +355,12 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
     await waitForCompletionSync(12_000);
     await saveGermanConversationReport(interviewId, report);
   };
+  // The German report of the ending (requested once when the conversation ends, then saved with the session).
+  const germanReportLines = useMemo(() => dialogue.slice(-80).map(({ speaker, text }) => ({ speaker, text })), [dialogue]);
+  const germanReport = useGermanConversationReport({ active: german && phase === "ending", topic: plan.title, lines: germanReportLines, onReady: saveGermanReport });
 
   /** The conversation is over: the report of the whole conversation, with a way back to the dashboard. */
   function renderEnding() {
-    if (german) {
-      return (
-        <main id="main-content" className="rm-root mx-auto min-h-dvh w-full max-w-7xl px-4 py-5 sm:px-8 sm:py-8">
-          <button type="button" className="ds-btn ds-btn-quiet -ml-3 mb-4 min-h-10 gap-2 px-3 text-sm" onClick={onLeave}>
-            <ArrowLeft className="size-4" aria-hidden="true" /> {t("Voltar ao dashboard")}
-          </button>
-          <h1 className="ds-title">{t("Conversa encerrada")}</h1>
-          <p className="ds-small mt-2">{plan.title} · {formatClock(seconds)}</p>
-          <div className="mt-8">
-            <GermanReport topic={plan.title} lines={dialogue.slice(-80).map(({ speaker, text }) => ({ speaker, text }))} onReady={(report) => { void saveGermanReport(report); }} />
-          </div>
-          <p className="ds-label mt-8 mb-3">{t("Conversa")}</p>
-          <GermanDialogue lines={dialogue} suggestions={[]} live={false} full />
-        </main>
-      );
-    }
     const samples = conversationAssessmentSamples(voiceAssessments);
     return (
       <main id="main-content" className="rm-root mx-auto min-h-dvh w-full max-w-7xl px-4 py-5 sm:px-8 sm:py-8">
@@ -388,7 +375,9 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
           persistenceLabel=""
           persistenceMessage={persistenceMessage}
           feedbackSyncMessage={null}
-          reportState={reportState}
+          reportState={german ? germanReport.reportState : reportState}
+          germanReport={german ? germanReport.report : undefined}
+          onRetry={german ? germanReport.retry : undefined}
           progressRecords={noProgressRecords}
           currentInterviewId={sessionId ?? undefined}
           customTitle={null}
@@ -402,6 +391,12 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
           }}
           onLeave={onLeave}
         />
+        {german && (
+          <div className="mx-auto w-full max-w-4xl">
+            <p className="ds-label mt-8 mb-3">{t("Conversa")}</p>
+            <GermanDialogue lines={dialogue} suggestions={[]} live={false} full />
+          </div>
+        )}
       </main>
     );
   }

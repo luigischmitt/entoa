@@ -9,12 +9,13 @@ import { ArrowLeft, ArrowUpRight, Download, LoaderCircle, Pencil } from "lucide-
 import { answerOrdinalForSequence, pairInterviewTurns, type InterviewReportResult } from "@/lib/interview/report";
 import type { AzureMetricSummary } from "@/lib/interview/report-metrics.mjs";
 import type { InterviewConfig } from "@/lib/interview/types";
+import type { GermanConversationReport } from "@/lib/interview/conversation";
 import type { ProgressRecord } from "@/lib/interview/progress-insights.mjs";
 import { RESUME_PRACTICE_LABEL } from "@/lib/interview/resume-neutral.mjs";
 import { normalizeFocus, normalizeSeniority } from "@/lib/interview/interview-normalization.mjs";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { findingsForAnswer } from "@/lib/interview/report-response.mjs";
-import { analysisCoverageNotice, displayInterviewerTakeaway, displayTechnicalFindings } from "@/lib/interview/report-presentation.mjs";
+import { analysisCoverageNotice, diffReportWords, displayInterviewerTakeaway, displayTechnicalFindings } from "@/lib/interview/report-presentation.mjs";
 import { voiceDeliveryInterpretation } from "@/lib/interview/voice-report-insights.mjs";
 import { buildErrorRows, buildJobCoverage, buildPracticePriorities, buildVoiceNotes, formatReportDate, reportFileBase, reportSummaryText, type JobCoverageItem } from "@/lib/interview/report-document.mjs";
 import { useReplayReveal } from "@/lib/use-replay-reveal";
@@ -48,6 +49,11 @@ const conversationLoadingSteps = [
   "Lendo o que funcionou na conversa",
   "Analisando seu inglês",
   "Juntando os sinais da sua voz",
+];
+const germanLoadingSteps = [
+  "Lendo a conversa",
+  "Encontrando os erros de alemão",
+  "Montando o relatório",
 ];
 const maxVisibleErrors = 8;
 const maxStrengths = 3;
@@ -123,25 +129,37 @@ function refLabel(sequenceNumber: number | null | undefined) {
 // One or two corrections in a whole session read as a strength, said once and plainly.
 const fewErrorsLimit = 2;
 
-/** "Seus erros de inglês": what the person said next to the natural English. Shared by the interview and the conversation document. */
-function ErrorBlock({ rows, reference, emptyText }: { rows: ReadyModel["errorRows"]; reference: ReadyModel["reference"]; emptyText: string }) {
+/** One correction: what the person said and the natural version, with the changed words marked. */
+type ErrorRow = {
+  sequenceNumber?: number;
+  said: Array<{ text: string; changed: boolean }>;
+  right: Array<{ text: string; changed: boolean }>;
+  note: string | null;
+};
+
+/** "Seus erros de inglês" (or de alemão): what the person said next to the natural version. Shared by the interview and both conversation documents. */
+function ErrorBlock({ rows, reference, emptyText, language }: { rows: ErrorRow[]; reference: ReadyModel["reference"]; emptyText: string; language?: "de" }) {
   const [showAllErrors, setShowAllErrors] = useState(false);
+  const german = language === "de";
+  const lang = german ? "de" : "en";
   return (
     <section className="rp-pblock rp-pblock-long">
-      <SectionHead title="Seus erros de inglês" hint="O que você disse e como fica natural em inglês." />
+      <SectionHead title={german ? "Seus erros de alemão" : "Seus erros de inglês"} hint={german ? "O que você disse e como fica natural em alemão." : "O que você disse e como fica natural em inglês."} />
       {rows.length > 0 ? (
         <>
-          {rows.length <= fewErrorsLimit && <p className="rp-pnote rp-errs-good">{t("Poucos erros de inglês: na maior parte das respostas, seu inglês saiu claro e correto.")}</p>}
+          {rows.length <= fewErrorsLimit && <p className="rp-pnote rp-errs-good">{german
+            ? t("Poucos erros de alemão: na maior parte das falas, seu alemão saiu claro e correto.")
+            : t("Poucos erros de inglês: na maior parte das respostas, seu inglês saiu claro e correto.")}</p>}
           <div className="rp-errh" aria-hidden="true"><span>{t("Você disse")}</span><span>{t("O certo")}</span></div>
           <ul className={`rp-errs${showAllErrors ? " is-all" : ""}`}>
             {rows.map((row, index) => {
               const meta = [row.note, refLabel(row.sequenceNumber === undefined ? null : reference(row.sequenceNumber))].filter(Boolean).join(" · ");
               return (
                 <li key={`${row.sequenceNumber}-${index}`} className={index >= maxVisibleErrors ? "rp-extra" : undefined}>
-                  <p lang="en" className="rp-said">
+                  <p lang={lang} className="rp-said">
                     {mergeChanged(row.said).map((part, partIndex) => part.changed ? <s key={partIndex}>{part.text}</s> : <span key={partIndex}>{part.text}</span>)}
                   </p>
-                  <p lang="en" className="rp-right">
+                  <p lang={lang} className="rp-right">
                     {mergeChanged(row.right).map((part, partIndex) => part.changed ? <u key={partIndex}>{part.text}</u> : <span key={partIndex}>{part.text}</span>)}
                   </p>
                   {meta && <small>{meta}</small>}
@@ -363,6 +381,84 @@ function ConversationDocument({ model, dateLabel }: { model: ConversationModel; 
   );
 }
 
+/** German corrections have no answer number to point to. */
+const noReference: ReadyModel["reference"] = () => null;
+
+/** German corrections as error rows: the same changed-word marks as the English rows, without a sequence reference. */
+function germanErrorRows(corrections: GermanConversationReport["corrections"]): ErrorRow[] {
+  return corrections.map((item) => {
+    const diff = diffReportWords(item.original, item.corrected);
+    return { said: diff.original, right: diff.revised, note: item.explanation.trim() || null };
+  });
+}
+
+/** German words or phrases next to their Portuguese, in the two columns of the error rows. */
+function PhrasePairsBlock({ title, hint, items }: { title: string; hint: string; items: Array<{ de: string; pt: string }> }) {
+  return (
+    <section className="rp-pblock rp-pblock-long">
+      <SectionHead title={title} hint={hint} />
+      <div className="rp-errh" aria-hidden="true"><span>{t("Em alemão")}</span><span>{t("Em português")}</span></div>
+      <ul className="rp-errs">
+        {items.map((item, index) => (
+          <li key={index}>
+            <p lang="de" className="rp-said">{item.de}</p>
+            <p className="rp-right">{item.pt}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** The German conversation document: summary, what worked, German errors, words and phrases, next steps. No voice part. */
+function GermanConversationDocument({ report, dateLabel }: { report: GermanConversationReport; dateLabel: string }) {
+  const { worked, vocabulary, practice, nextSteps } = report;
+  return (
+    <>
+      <section className="rp-pblock ds-item" style={rise(0)}>
+        <SectionHead title="Resumo da conversa" />
+        {report.summary && <p className="rp-psummary">{report.summary}</p>}
+      </section>
+      {worked.length > 0 && (
+        <section className="rp-pblock ds-item" style={rise(1)}>
+          <SectionHead title="O que funcionou" hint="O que soou bem no seu alemão." />
+          <ul className="rp-good">
+            {worked.map((item, index) => (
+              <li key={index}>
+                <span className="rp-good-body"><q lang="de" className="rp-good-q">{item.evidence}</q>{item.explanation}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <div className="ds-item" style={rise(2)}>
+        <ErrorBlock language="de" rows={germanErrorRows(report.corrections)} reference={noReference} emptyText="Nenhum erro de alemão recorrente apareceu nesta conversa: um ótimo sinal." />
+      </div>
+      {vocabulary.length > 0 && (
+        <div className="ds-item" style={rise(3)}>
+          <PhrasePairsBlock title="Palavras da conversa" hint="Vale guardar para as próximas conversas." items={vocabulary} />
+        </div>
+      )}
+      {practice.length > 0 && (
+        <div className="ds-item" style={rise(4)}>
+          <PhrasePairsBlock title="Para praticar em voz alta" hint="Frases desta conversa para repetir." items={practice} />
+        </div>
+      )}
+      {nextSteps.length > 0 && (
+        <section className="rp-pblock ds-item" style={rise(5)}>
+          <SectionHead title="Para a próxima conversa" />
+          <ol className="rp-prio">
+            {nextSteps.map((step, index) => <li key={index}><b>{step}</b></li>)}
+          </ol>
+        </section>
+      )}
+      <footer className="rp-pfoot ds-item" style={rise(6)}>
+        {t("Entoa · Gerado a partir da sua conversa com o Tuck de {date}", { date: dateLabel })}
+      </footer>
+    </>
+  );
+}
+
 /** Screen-only link below the paper: the paper itself already holds the whole report. */
 function ReadyAppendix() {
   return (
@@ -388,8 +484,8 @@ function exportPdf(fileBase: string) {
 
 type RenameResult = { ok: true; title: string | null } | { ok: false; message: string };
 
-export function InterviewReport({ config, elapsed, totalClock, answerCount, persistenceMessage, feedbackSyncMessage, reportState, turns, azureSummary, coverage, onLeave, progressRecords, currentInterviewId, historical = false, onRetry, retrying = false, canRegenerate = false, onRegenerate, customTitle, onRename }: {
-  config: InterviewConfig; elapsed: string; totalClock: string; answerCount: number; persistenceLabel: string; persistenceMessage: string | null; feedbackSyncMessage: string | null; reportState: ReportState; progressRecords: ProgressRecord[]; currentInterviewId?: string; historical?: boolean; turns: Turns; azureSummary: AzureMetricSummary; coverage: { available: number; pending: number; total: number }; onLeave: () => void; onRetry?: () => void; retrying?: boolean; canRegenerate?: boolean; onRegenerate?: () => void; customTitle?: string | null; onRename?: (title: string | null) => Promise<RenameResult>;
+export function InterviewReport({ config, elapsed, totalClock, answerCount, persistenceMessage, feedbackSyncMessage, reportState, turns, azureSummary, coverage, onLeave, progressRecords, currentInterviewId, historical = false, onRetry, retrying = false, canRegenerate = false, onRegenerate, customTitle, onRename, germanReport = null }: {
+  config: InterviewConfig; elapsed: string; totalClock: string; answerCount: number; persistenceLabel: string; persistenceMessage: string | null; feedbackSyncMessage: string | null; reportState: ReportState; progressRecords: ProgressRecord[]; currentInterviewId?: string; historical?: boolean; turns: Turns; azureSummary: AzureMetricSummary; coverage: { available: number; pending: number; total: number }; onLeave: () => void; onRetry?: () => void; retrying?: boolean; canRegenerate?: boolean; onRegenerate?: () => void; customTitle?: string | null; onRename?: (title: string | null) => Promise<RenameResult>; germanReport?: GermanConversationReport | null;
 }): ReactNode {
   // Leaving a live report starts a route change; the button shows it is working until the page changes.
   const [leaving, setLeaving] = useState(false);
@@ -444,7 +540,9 @@ export function InterviewReport({ config, elapsed, totalClock, answerCount, pers
   const role = isResume ? t(RESUME_PRACTICE_LABEL) : config.role;
   // A finished report decides by its own kind (historical reports have no config.mode); the setup's mode only words the report while it is pending.
   const isConversationResult = reportState.result?.reportKind === "conversation";
-  const conversationMode = isConversationResult || (!reportState.result && config.mode === "conversation");
+  // German conversations always read as conversations; their document comes from germanReport, not from reportState.result.
+  const german = config.conversationLanguage === "de";
+  const conversationMode = german || isConversationResult || (!reportState.result && config.mode === "conversation");
   const conversationTitle = config.conversationPlan?.title?.trim() || t("Conversa com o Tuck");
   // The document date is the record's own date when this interview is in progress history, otherwise today. Computed once per record set.
   const reportDate = useMemo(() => {
@@ -517,8 +615,10 @@ export function InterviewReport({ config, elapsed, totalClock, answerCount, pers
   );
   const readyResult = reportState.status === "ready" ? reportState.result : undefined;
   const ready = readyResult && readyModel ? { model: readyModel } : null;
-  const readyAny = Boolean(readyResult && (readyModel || conversationModel));
-  const loadingSteps = conversationMode ? conversationLoadingSteps : reportLoadingSteps;
+  // The German document shows once the report exists; pending and unavailable come from reportState, as for any report.
+  const germanDocument = german && germanReport && reportState.status !== "pending" && reportState.status !== "unavailable" ? germanReport : null;
+  const readyAny = Boolean(readyResult && (readyModel || conversationModel)) || Boolean(germanDocument);
+  const loadingSteps = german ? germanLoadingSteps : conversationMode ? conversationLoadingSteps : reportLoadingSteps;
   return (
     <section ref={rootRef} className="rp-root mx-auto w-full max-w-4xl" aria-labelledby="interview-complete-title">
       {historical && <button type="button" className="ds-btn ds-btn-quiet mb-3" onClick={onLeave}>
@@ -527,7 +627,7 @@ export function InterviewReport({ config, elapsed, totalClock, answerCount, pers
         </button>}
       <div className="rp-docbar">
         <span className="rp-file">{fileBase}.pdf</span>
-        <button type="button" className="rp-pdf" disabled={reportState.status !== "ready"} onClick={() => exportPdf(fileBase)}>
+        <button type="button" className="rp-pdf" disabled={reportState.status !== "ready" && !germanDocument} onClick={() => exportPdf(fileBase)}>
           <Download width={14} height={14} aria-hidden="true" />
           {t("Exportar PDF")}
         </button>
@@ -619,13 +719,15 @@ export function InterviewReport({ config, elapsed, totalClock, answerCount, pers
             {loadedTurns.length > 0 && <CapturedAnswers turns={loadedTurns} />}
             <AzureVoiceReport summary={azureSummary} coverage={coverage} />
           </div>
+        ) : germanDocument ? (
+          <GermanConversationDocument report={germanDocument} dateLabel={dateLabel} />
         ) : conversationModel ? (
           <ConversationDocument model={conversationModel} dateLabel={dateLabel} />
         ) : ready ? (
           <ReadyDocument model={ready.model} jobItems={jobItems} dateLabel={dateLabel} />
         ) : null}
       </article>
-      {readyAny && <ReadyAppendix />}
+      {readyAny && !german && <ReadyAppendix />}
       <div className="rp-foot">
         <button type="button" className={`ds-btn ${reportState.status === "pending" ? "ds-btn-quiet" : "ds-btn-cta-green"} rp-back`} onClick={leaveReport} disabled={leaving} aria-busy={leaving || undefined}>{t(leaving ? "Abrindo o início…" : historical ? "Voltar ao Progresso " : "Voltar ao dashboard ")}
           {leaving
