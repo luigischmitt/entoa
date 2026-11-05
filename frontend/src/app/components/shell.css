@@ -159,6 +159,9 @@
 .shl-home-subcopy { max-width: 40ch; margin-top: 1.25rem; }
 .shl-home-primary { width: auto; margin-top: 2rem; padding-inline: 1.5rem; }
 .shl-home-facts { margin-top: 2.25rem; }
+.shl-home-trial { margin-top: 1rem; max-width: 34rem; color: var(--muted-foreground, inherit); }
+.shl-home-trial a, .shl-trial-used-card a { text-decoration: underline; text-underline-offset: 0.2em; }
+.shl-trial-used-card { max-width: 36rem; margin: 3rem auto 0; padding: 2rem; display: grid; gap: 1rem; justify-items: start; }
 /* Highlight card: leaf wash in linen, with the bay and palms of the landing's closing art set in the lower right at full
    definition. The sky of the art is transparent, so the text above it reads on the plain wash; a short fade on the left
    keeps the link clear without dimming the picture. */
