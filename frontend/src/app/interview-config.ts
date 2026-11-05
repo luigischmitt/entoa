@@ -6,7 +6,7 @@ import { defaultInterviewRoomPreferences } from "@/lib/interview/setup-audio.mjs
 
 export const defaultInterviewConfig: InterviewConfig = {
   role: "",
-  seniority: "mid-level",
+  seniority: "intern",
   voice: DEFAULT_INTERVIEWER_VOICE,
   speechSpeed: DEFAULT_INTERVIEWER_SPEECH_SPEED,
   focus: "mixed",

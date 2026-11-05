@@ -192,6 +192,9 @@
   -webkit-mask-composite: source-in; mask-composite: intersect;
 }
 .shl-home-card > * { min-width: 0; }
+/* The first-visit card keeps its size; its steps run over the art, so each line sits on a soft wash chip. */
+.shl-home-card .shl-home-steps p { justify-self: start; width: fit-content; margin-left: -0.45rem; padding: 0.15rem 0.45rem; border-radius: 6px; background: color-mix(in srgb, var(--ds-sage-50) 84%, transparent); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); color: var(--ds-ink); font-weight: 500; }
+.shl-home-card .shl-home-steps span { text-shadow: 0 0 6px var(--ds-sage-50), 0 0 12px var(--ds-sage-50); }
 .shl-home-card .ds-hairline-top { border-color: var(--ds-sage-200); }
 /* The link sits near the art: a small surface chip keeps it readable. */
 .shl-home-card .shl-home-link { padding-inline: 0.875rem; border-radius: var(--ds-r-btn); background: var(--ds-surface); box-shadow: inset 0 0 0 1px var(--ds-sage-200); }
