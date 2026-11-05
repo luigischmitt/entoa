@@ -1,5 +1,6 @@
 "use client";
 
+import { followDashboardLink } from "@/lib/dashboard-navigation";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -119,6 +120,9 @@ function refLabel(sequenceNumber: number | null | undefined) {
   return sequenceNumber === null || sequenceNumber === undefined ? null : `${t("Resposta ")}${sequenceNumber}`;
 }
 
+// One or two corrections in a whole session read as a strength, said once and plainly.
+const fewErrorsLimit = 2;
+
 /** "Seus erros de inglês": what the person said next to the natural English. Shared by the interview and the conversation document. */
 function ErrorBlock({ rows, reference, emptyText }: { rows: ReadyModel["errorRows"]; reference: ReadyModel["reference"]; emptyText: string }) {
   const [showAllErrors, setShowAllErrors] = useState(false);
@@ -127,6 +131,7 @@ function ErrorBlock({ rows, reference, emptyText }: { rows: ReadyModel["errorRow
       <SectionHead title="Seus erros de inglês" hint="O que você disse e como fica natural em inglês." />
       {rows.length > 0 ? (
         <>
+          {rows.length <= fewErrorsLimit && <p className="rp-pnote rp-errs-good">{t("Poucos erros de inglês: na maior parte das respostas, seu inglês saiu claro e correto.")}</p>}
           <div className="rp-errh" aria-hidden="true"><span>{t("Você disse")}</span><span>{t("O certo")}</span></div>
           <ul className={`rp-errs${showAllErrors ? " is-all" : ""}`}>
             {rows.map((row, index) => {
@@ -208,7 +213,7 @@ function ReadyDocument({ model, jobItems, dateLabel }: { model: ReadyModel; jobI
         </section>
       )}
       <ReportPart title="Seu inglês" hint="Como seu inglês soou para o entrevistador." style={rise(1)}>
-        <ErrorBlock rows={errorRows} reference={reference} emptyText="Nenhum erro de inglês recorrente apareceu nesta entrevista." />
+        <ErrorBlock rows={errorRows} reference={reference} emptyText="Nenhum erro de inglês recorrente apareceu nesta entrevista: um ótimo sinal." />
         <VoiceBlock model={model} emptyText="Sem sinais de voz suficientes nesta entrevista." />
       </ReportPart>
       <ReportPart title="Conteúdo técnico" hint="O que suas respostas mostraram e o que faltou." style={rise(2)}>
@@ -333,7 +338,7 @@ function ConversationDocument({ model, dateLabel }: { model: ConversationModel; 
         </section>
       )}
       <div className="ds-item" style={rise(2)}>
-        <ErrorBlock rows={errorRows} reference={reference} emptyText="Nenhum erro de inglês recorrente apareceu nesta conversa." />
+        <ErrorBlock rows={errorRows} reference={reference} emptyText="Nenhum erro de inglês recorrente apareceu nesta conversa: um ótimo sinal." />
       </div>
       {keepPhrases.length > 0 && (
         <div className="ds-item" style={rise(3)}>
@@ -362,7 +367,7 @@ function ConversationDocument({ model, dateLabel }: { model: ConversationModel; 
 function ReadyAppendix() {
   return (
     <div className="rp-appendix">
-      <Link className="ds-btn ds-btn-cta-green rp-voice-link" href="/dashboard?view=voice">{t("Treinar minha voz")}</Link>
+      <Link className="ds-btn ds-btn-cta-green rp-voice-link" href="/dashboard?view=voice" onClick={(event) => followDashboardLink("voice", event)}>{t("Treinar minha voz")}</Link>
     </div>
   );
 }
