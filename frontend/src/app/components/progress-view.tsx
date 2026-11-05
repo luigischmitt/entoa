@@ -3,7 +3,7 @@
 
 import { useLocale, t } from "@/lib/locale";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Play } from "lucide-react";
+import { ArrowLeft, Play } from "lucide-react";
 import { LoadingRegion, SkCard, SkChart } from "@/components/ui/loading-state";
 import { loadProgressRecords, renameInterview } from "@/lib/interview/persistence";
 import { purgeExpiredAnswerClips } from "@/lib/interview/answer-clips";
@@ -16,6 +16,8 @@ import type { ProgressRecord } from "@/lib/interview/progress-insights.mjs";
 import { PageIntro } from "./shared";
 import { formatPracticeDuration, ProgressContent } from "./progress/progress-content";
 import { InterviewReport } from "./interview-report";
+import { GermanReportView } from "./german-report";
+import { readStoredGermanReport } from "@/lib/interview/conversation";
 import type { ReportState } from "./interview-report";
 import { currentReportAnalysisVersion, requestPersistedInterviewReport } from "@/lib/interview/persisted-report";
 import { normalizeFocus, normalizeSeniority } from "@/lib/interview/interview-normalization.mjs";
@@ -78,6 +80,9 @@ export function ProgressView({
 
   const insights = useMemo(() => buildProgressInsights(records, { locale }), [records, locale]);
   const selectedSession = records.find((record) => record.id === selectedSessionId);
+  // A German conversation keeps its own report; it is never sent to the English report (or regenerated as one).
+  const selectedGerman = selectedSession?.targetRole === "Modo livre (alemão)";
+  const selectedGermanReport = selectedGerman ? readStoredGermanReport(selectedSession?.feedback?.analysis) : null;
   const selectedStoredReport = selectedSession?.feedback?.status === "ready" && selectedSession.feedback.analysis
     ? selectedSession.feedback.analysis as InterviewReportResult
     : null;
@@ -129,7 +134,7 @@ export function ProgressView({
     progressScrollTop.current = window.scrollY;
     setSelectedSessionId(sessionId);
     const session = records.find((record) => record.id === sessionId);
-    if (session?.feedback?.status === "pending") void generateHistoricalReport(sessionId);
+    if (session?.feedback?.status === "pending" && session.targetRole !== "Modo livre (alemão)") void generateHistoricalReport(sessionId);
   };
 
   useEffect(() => {
@@ -235,7 +240,19 @@ export function ProgressView({
           <div hidden={!!selectedSession}>
             <ProgressContent insights={insights} onOpenReport={openHistoricalReport} />
           </div>
-          {selectedSession && historicalConfig && (
+          {selectedSession && selectedGerman && (
+            <section className="mt-8 lg:mt-10" aria-labelledby="pg-german-title">
+              <button type="button" className="ds-btn ds-btn-quiet -ml-3 mb-4 min-h-10 gap-2 px-3 text-sm" onClick={closeHistoricalReport}>
+                <ArrowLeft className="size-4" aria-hidden="true" /> {t("Voltar ao progresso")}
+              </button>
+              <h2 id="pg-german-title" className="ds-title">{selectedSession.title || selectedSession.conversationTopic || t("Conversa em alemão")}</h2>
+              <p className="ds-small mt-2">{t("Conversa em alemão")}{historicalDuration === null ? "" : ` · ${formatPracticeDuration(historicalDuration)}`}</p>
+              <div className="gr-root mt-8">
+                {selectedGermanReport ? <GermanReportView report={selectedGermanReport} /> : <p className="ds-small">{t("O relatório desta conversa não foi salvo.")}</p>}
+              </div>
+            </section>
+          )}
+          {selectedSession && !selectedGerman && historicalConfig && (
             <div className="mt-8 lg:mt-10">
               <InterviewReport
                 config={historicalConfig}

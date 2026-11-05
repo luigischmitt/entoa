@@ -11,7 +11,12 @@ type OpenRouterWhisperTranscriptionServiceOptions = {
   sleepImplementation?: (milliseconds: number) => Promise<void>;
 };
 
-type OpenRouterResponse = { text?: string; words?: unknown; segments?: unknown };
+/** Whisper reports the detected language as a name ("german") or a code ("de"); an unknown or missing value counts as neither. */
+function isGermanOrPortuguese(language: unknown): boolean {
+  return typeof language === "string" && ["german", "de", "portuguese", "pt"].includes(language.trim().toLowerCase());
+}
+
+type OpenRouterResponse = { text?: string; words?: unknown; segments?: unknown; language?: unknown };
 
 /** Extra timing recovery stays short so optional vocal feedback cannot delay an interview turn. */
 export const segmentTimestampRetryTimeoutMs = 12_000;
@@ -64,6 +69,7 @@ export class OpenRouterWhisperTranscriptionService implements TranscriptionServi
       form.set("file", new Blob([new Uint8Array(audio)], { type: format === "wav" ? "audio/wav" : `audio/${format}` }), `response.${format}`);
       // German answers: no language field (Whisper auto-detects German or Portuguese) and no English vocabulary prompt.
       if (context?.language !== "de") form.set("language", "en");
+      else if (context.forceGerman) form.set("language", "de");
       form.set("temperature", "0");
       form.set("response_format", "verbose_json");
       form.append("timestamp_granularities[]", "word");
@@ -171,6 +177,12 @@ export class OpenRouterWhisperTranscriptionService implements TranscriptionServi
         });
         if (attempts > 1) Object.defineProperty(normalized, "attempts", { enumerable: false, value: attempts });
         logCreditRetryOutcome("recovered");
+        // A Brazilian accent in German is often detected as English (and written in English): anything that is neither
+        // German nor Portuguese is transcribed again as German.
+        if (context?.language === "de" && !context.forceGerman && !isGermanOrPortuguese(result.language)) {
+          console.info(JSON.stringify({ event: "transcription_language_retry", detected: typeof result.language === "string" ? result.language.slice(0, 20) : null }));
+          return this.transcribe(audio, provider, format, signal, { ...context, forceGerman: true });
+        }
         return normalized;
       }
     } catch (error) {

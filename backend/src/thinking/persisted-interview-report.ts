@@ -193,6 +193,9 @@ async function generatePerAnswerReport(reportService: InterviewReportService, in
 export type GeneratePersistedReportInput = { locale: "pt-BR" | "en"; azureSummary?: unknown; regenerate?: boolean };
 export type GeneratePersistedReportResult = { status: "ready"; report: InterviewReport & { model: string; analysisVersion: string }; feedback: FeedbackRow };
 
+/** target_role of German free conversations (set by the free mode setup). */
+const germanConversationRole = "Modo livre (alemão)";
+
 export function createPersistedInterviewReportService(reportService: InterviewReportService | null, persistence: ReportPersistence | null) {
   const inFlight = new Map<string, Promise<GeneratePersistedReportResult>>();
 
@@ -216,6 +219,8 @@ export function createPersistedInterviewReportService(reportService: InterviewRe
         if (existing?.status === "ready" && existing.analysis) {
           return { status: "ready" as const, report: { ...existing.analysis, model: existing.model ?? "unknown", analysisVersion: existing.analysis_version }, feedback: existing };
         }
+        // A German conversation saves its own report from the room; the English report must never be made from German answers.
+        if (interview.target_role === germanConversationRole) throw Object.assign(new Error("German conversations keep their own report."), { status: 409 });
         const pending = await persistence.ensurePending(token, interviewId, input.azureSummary);
         pendingCreated = true;
         if (pending.status === "ready" && pending.analysis) {

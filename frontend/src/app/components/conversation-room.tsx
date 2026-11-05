@@ -6,7 +6,7 @@ import { MicrophoneCapture, type MicControls, type VoiceCaptureState, type Voice
 import { createSpeechFeed, toucanStateFor } from "@/components/interview/toucan/toucan-engine.mjs";
 import { AssessmentSocketRegistry } from "@/lib/interview/assessment-socket-registry.mjs";
 import { buildConversationTurnRequest, fallbackConversationTurn, GERMAN_CONVERSATION_VOICE, isConversationEnd, isMeaningQuestion, MAX_SILENCE_NUDGES, nextUsedPathIds, shouldReact,silenceWaitMs, type ConversationLine, type ConversationPlanInput, type ConversationSuggestion } from "@/lib/interview/conversation-policy.mjs";
-import { requestConversationTurn } from "@/lib/interview/conversation";
+import { requestConversationTurn, saveGermanConversationReport, type GermanConversationReport } from "@/lib/interview/conversation";
 import { conversationAssessmentSamples } from "@/lib/interview/conversation-report.mjs";
 import { pairInterviewTurns } from "@/lib/interview/report";
 import { buildAzureAnswerRecords, summarizeAzureAssessments } from "@/lib/interview/report-metrics.mjs";
@@ -348,6 +348,14 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
     );
   };
 
+  // The German report is saved with the session, once it is saved and complete, so the history can show it.
+  const saveGermanReport = async (report: GermanConversationReport) => {
+    const interviewId = sessionId ?? await waitForSessionId(5_000);
+    if (!interviewId) return;
+    await waitForCompletionSync(12_000);
+    await saveGermanConversationReport(interviewId, report);
+  };
+
   /** The conversation is over: the report of the whole conversation, with a way back to the dashboard. */
   function renderEnding() {
     if (german) {
@@ -359,7 +367,7 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
           <h1 className="ds-title">{t("Conversa encerrada")}</h1>
           <p className="ds-small mt-2">{plan.title} · {formatClock(seconds)}</p>
           <div className="mt-8">
-            <GermanReport topic={plan.title} lines={dialogue.slice(-80).map(({ speaker, text }) => ({ speaker, text }))} />
+            <GermanReport topic={plan.title} lines={dialogue.slice(-80).map(({ speaker, text }) => ({ speaker, text }))} onReady={(report) => { void saveGermanReport(report); }} />
           </div>
           <p className="ds-label mt-8 mb-3">{t("Conversa")}</p>
           <GermanDialogue lines={dialogue} suggestions={[]} live={false} full />
