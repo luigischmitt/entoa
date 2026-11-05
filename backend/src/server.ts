@@ -1,4 +1,5 @@
 import "dotenv/config";
+import "./logging/install.js";
 
 import { createServer } from "node:http";
 

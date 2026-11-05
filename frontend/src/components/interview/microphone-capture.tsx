@@ -15,6 +15,7 @@ import { nextAutoStartSignal } from "@/lib/interview/session-policy.mjs";
 import { MAX_SPECULATIVE_REVISIONS } from "@/lib/interview/speculative-epoch.mjs";
 import type { AssessmentSocketRegistry } from "@/lib/interview/assessment-socket-registry.mjs";
 import { validateAssessmentDetails, type AssessmentDetails } from "@/lib/interview/assessment-details.mjs";
+import { getActiveInterviewId } from "@/lib/interview/active-interview.mjs";
 import { parseReviewedTranscript } from "@/lib/interview/reviewed-transcript.mjs";
 
 type RecorderStatus = "idle" | "requesting" | "recording" | "finalizing" | "error";
@@ -150,6 +151,9 @@ const maximumDurationSeconds = 180;
 function getStreamUrl(): string {
   const url = new URL("/api/v1/transcriptions/stream", backendBaseUrl);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  // Browsers cannot set headers on a WebSocket, so the interview id (for backend logs) travels in the URL.
+  const interviewId = getActiveInterviewId();
+  if (interviewId) url.searchParams.set("interviewId", interviewId);
   return url.toString();
 }
 
