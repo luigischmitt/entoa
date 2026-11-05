@@ -208,7 +208,7 @@ main{overflow-x:clip}
 .hair{position:absolute;left:4px;right:4px;bottom:0;height:2px;background:rgba(14,42,31,.07)}
 .hair i{display:block;height:100%;width:0;background:var(--green)}
 .stage{display:grid;grid-template-columns:1fr 1fr;gap:12px;min-height:0}
-@media(max-width:700px){.stage{grid-template-columns:1fr;grid-template-rows:1fr 1fr;gap:8px}.avwall img{height:34%}.av-you{width:54px;height:54px}.cap{font-size:.76rem;padding:7px 10px;bottom:34px;left:8px;right:8px}.mt-top{padding-bottom:8px}.rb{width:40px;height:40px}.rb.end{padding:0 12px}.bar{gap:6px}}
+@media(max-width:700px){.stage{grid-template-columns:1fr;grid-template-rows:1fr 1fr;gap:8px}.av-you{width:54px;height:54px}.cap{font-size:.76rem;padding:7px 10px;bottom:34px;left:8px;right:8px}.mt-top{padding-bottom:8px}.rb{width:40px;height:40px}.rb.end{padding:0 12px}.bar{gap:6px}}
 .room{grid-template-columns:minmax(0,1fr)}.stage>.tile{min-width:0}
 @media(max-width:700px){.stage{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:520px){.sg.grid2 span{white-space:normal;line-height:1.2;padding:.45rem .3rem;font-size:.7rem}}
@@ -220,9 +220,16 @@ main{overflow-x:clip}
 @keyframes ringp{from{opacity:.35}to{opacity:1}}
 .tile.me{--lvl:0}
 .tile.me.rec::after{opacity:calc(.18 + var(--lvl) * .82)}
-.avwall{flex:1;display:grid;place-items:center;background:radial-gradient(closest-side,#f2e6cf,transparent 90%),#e9eee3;position:relative}
-.avwall img{height:46%;max-height:150px;width:auto;transition:transform .3s}
-.tile.int.talk .avwall img{animation:bob .9s ease-in-out infinite alternate}
+.avwall{flex:1;position:relative}
+/* the app's toucan interviewer (engine: /landing/toucan-engine.mjs); it paints its own wall, with a warm glow blended over it */
+.toucan{--tc-wall-a:#f7f5ee;--tc-wall-b:#e6e3d6;--tc-floor:rgba(14,42,31,.15);--tc-body:#0e2a1f;--tc-wing:#1f4d36;--tc-wing2:#173f2c;--tc-wingline:#f3ead6;--tc-bib:#f3ead6;
+  --tc-up:#e9cb8e;--tc-up-shade:#d9b673;--tc-low:#c2834f;--tc-tip:#0e2a1f;--tc-ring:#58a39c;--tc-ringedge:#0a1f16;--tc-iris:#17342a;--tc-feet:#e2cf9c;--tc-branch:#2b5a43;--tc-edge:rgba(14,42,31,.55);
+  position:absolute;inset:0;z-index:0;pointer-events:none;background:var(--tc-wall-b)}
+.toucan svg{position:absolute;left:0;top:9%;display:block;width:100%;height:62%;overflow:visible}
+.toucan-wedge{fill:#7a4b2b}
+@media(max-width:700px){.toucan svg{top:2%;height:44%}}
+.tile.int::before{content:"";position:absolute;left:50%;top:38%;z-index:1;width:min(80%,440px);aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;
+  background:radial-gradient(closest-side,#f0c27c,transparent 100%);mix-blend-mode:multiply;opacity:.4;pointer-events:none}
 @keyframes bob{from{transform:translateY(0) rotate(-2deg)}to{transform:translateY(-6px) rotate(2deg)}}
 .cap{position:absolute;left:12px;right:12px;bottom:40px;z-index:4;background:rgba(14,42,31,.82);color:#f3f4ee;border-radius:12px;padding:9px 13px;font-size:clamp(.82rem,1.4vw,1rem);line-height:1.4;max-height:58%;overflow:hidden;transition:opacity .25s}
 .cap:empty,.cap.off{opacity:0}
@@ -299,6 +306,11 @@ main{overflow-x:clip}
 .icon-btn{border:0;background:var(--surface);box-shadow:var(--shadow);width:44px;height:44px;border-radius:50%;display:grid;place-items:center;flex:none;transition:background .2s,color .2s}
 .icon-btn[aria-pressed=true]{background:var(--green);color:#fff}
 .fine{font-size:.8rem;color:var(--text2);margin-top:.6rem}
+.snd{display:flex;align-items:center;gap:.6rem;flex:none}
+.snd-btn{height:44px;border:0;border-radius:22px;padding:0 1rem 0 .9rem;display:flex;align-items:center;gap:.45rem;background:var(--surface);box-shadow:var(--shadow);font:inherit;font-size:.9rem;font-weight:600;color:var(--ink);cursor:pointer;transition:background .2s,color .2s}
+.snd-btn .w{display:none}
+.snd.on .snd-btn{width:44px;padding:0;justify-content:center}.snd.on .snd-btn span,.snd.on .snd-btn .x{display:none}.snd.on .snd-btn .w{display:inline}
+#dVol{width:96px;accent-color:var(--green)}
 
 
 /* ===== mobile ===== */
@@ -724,7 +736,7 @@ AWS e observabilidade</div></div>
             </div>
             <div class="stage">
               <div class="tile int" id="tInt">
-                <div class="avwall"><img src="/landing/tucano-320.webp" alt="" width="320" height="365" loading="lazy" decoding="async"></div>
+                <div class="avwall"><div class="toucan" id="toucan" aria-hidden="true"><svg viewBox="30 0 350 280" preserveAspectRatio="xMidYMid meet" focusable="false"> <defs> <radialGradient id="dtc-wall" cx=".5" cy=".42" r=".75"><stop offset="0" style="stop-color:var(--tc-wall-a)" /><stop offset="1" style="stop-color:var(--tc-wall-b)" /></radialGradient> <radialGradient id="dtc-floor" cx=".5" cy=".5" r=".5"><stop offset="0" style="stop-color:var(--tc-floor)" /><stop offset="1" style="stop-color:var(--tc-floor);stop-opacity:0" /></radialGradient> <clipPath id="dtc-eye"><circle r="9.8" /></clipPath> <clipPath id="dtc-up"><path d="M211,52 C248,29 332,33 372,88 C330,80 272,86 219,92 C207,86 203,66 211,52Z" /></clipPath> </defs> <rect x="-400" y="-300" width="1200" height="900" fill="url(#dtc-wall)" /> <ellipse cx="168" cy="246" rx="150" ry="13" fill="url(#dtc-floor)" /> <g transform="translate(-16 -10) scale(.94)"> <path d="M30 268 C96 250 170 248 266 238" fill="none" stroke="var(--tc-branch)" stroke-width="9" stroke-linecap="round" /> <path d="M232 241 C246 228 252 218 250 206" fill="none" stroke="var(--tc-branch)" stroke-width="5" stroke-linecap="round" /> <g fill="none" stroke="var(--tc-feet)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"> <path data-tc="footL" d="M152,228 L152,240 M152,240 C150,247 144,250 139,248 M152,240 C155,247 161,250 166,247 M152,240 L152,251" /> <path data-tc="footR" d="M180,224 L180,238 M180,238 C178,246 172,249 167,247 M180,238 C183,246 189,249 194,246 M180,238 L180,250" /> </g> <g data-tc="tail"> <path d="M106,200 C106,236 103,262 99,284 Q112,294 126,284 C136,264 146,246 154,222Z" fill="var(--tc-body)" /> <g data-tc="tailtip"> <path d="M100,272 Q113,280 125,272 L126,279 Q113,288 99,280Z" fill="var(--tc-wingline)" opacity=".92" /> </g> </g> <g data-tc="body"> <path d="M118,112 C100,150 98,190 108,214 L152,234 L180,228 C206,214 226,186 226,152 C226,134 222,118 208.6,103.7Z" fill="var(--tc-body)" /> <g data-tc="wing"> <path d="M104,170 C106,150 128,142 146,152 C160,162 166,184 164,198 C162,222 150,238 138,250 C120,228 106,200 104,170Z" fill="var(--tc-wing)" /> <path d="M112,188 C128,184 148,194 154,216 C150,232 144,242 138,250 C124,232 114,210 112,188Z" fill="var(--tc-wing2)" /> <path d="M114,188 C120,210 128,232 138,250 L134,250 C124,232 116,212 111,192Z" fill="var(--tc-wingline)" /> </g> </g> <path data-tc="skin" d="M143.40 58.00C133.40 75.30 126.60 94.00 118.00 112.00L122.00 130.00L212.00 130.00L208.60 103.70L208.60 103.70Z" fill="var(--tc-body)" /> <g data-tc="head"> <path data-tc="tuft0" d="M148,52 C141,47 136,46 131,48 C133,52 137,57 144,60Z" fill="var(--tc-body)" stroke-linejoin="round" stroke="var(--tc-body)" stroke-width="2.5" /> <path data-tc="tuft1" d="M154,46 C149,38 143,35 137,36 C138,42 143,49 149,53Z" fill="var(--tc-body)" stroke-linejoin="round" stroke="var(--tc-body)" stroke-width="2.5" /> <path data-tc="tuft2" d="M162,42 C159,34 154,30 148,30 C148,36 151,42 156,46Z" fill="var(--tc-body)" stroke-linejoin="round" stroke="var(--tc-body)" stroke-width="2.5" /> <circle cx="178" cy="78" r="40" fill="var(--tc-body)" /> <path d="M186,40.5 C198,43 207,48 210,55 C214,66 221,82 222,96 C219,103 206,106 190,106 C176,100 174,70 186,40.5Z" fill="var(--tc-body)" /> <path data-tc="bib" d="M168,82C180,98 198,96 220,98C222,114 216,140 208,160C205,180 195,196 180,212C166,200 150,186 146,158C143,128 150,100 168,82Z" fill="var(--tc-bib)" /> <g transform="translate(186 70)"> <circle r="14.5" fill="var(--tc-ring)" stroke="var(--tc-ringedge)" stroke-width="1.5" /> <g clip-path="url(#dtc-eye)"> <circle r="9.8" fill="var(--tc-iris)" /> <g data-tc="pup"><circle r="6" fill="#050706" /></g> <g data-tc="glint"><circle cx="-3" cy="-3.4" r="2.5" fill="#fff" /><circle cx="3" cy="3" r="1.1" fill="#fff" opacity=".75" /></g> <g data-tc="lid"><path d="M-13,-30 H13 V-1.5 Q0,3 -13,-1.5 Z" fill="var(--tc-ring)" /><path d="M-13,-1.5 Q0,3 13,-1.5" fill="none" stroke="var(--tc-ringedge)" stroke-width="1.8" stroke-linecap="round" /></g> <g data-tc="lowlid"><path d="M-13,30 H13 V4 Q0,0 -13,4 Z" fill="var(--tc-ring)" /></g> </g> <path data-tc="lash" d="M-7,1.5 Q0,6.5 7,1.5" fill="none" stroke="var(--tc-ringedge)" stroke-width="2" stroke-linecap="round" opacity="0" /> </g> <g data-tc="beak"> <path data-tc="wedge" d="" class="toucan-wedge" /> <g data-tc="mouth" /> <g data-tc="lower"> <path d="M219,92 C267,86.6 319,81.2 358.8,86 C340,104 286,114 227,110 C212,106 211,98 219,92Z" fill="var(--tc-low)" /> <path d="M219,92 C267,86.6 319,81.2 358.8,86" fill="none" stroke="#8a5a36" stroke-width="1.1" stroke-linecap="round" opacity=".8" /> <path d="M229,104 C264,106 318,100 350,90" fill="none" stroke="var(--tc-up-shade)" stroke-width="2" stroke-linecap="round" opacity=".55" /> <path d="M227,111 C264,114 322,106 359,87" fill="none" stroke="var(--tc-edge)" stroke-width="1.4" stroke-linecap="round" /> </g> <g data-tc="upper"> <path d="M211,52 C248,29 332,33 372,88 C330,80 272,86 219,92 C207,86 203,66 211,52Z" fill="var(--tc-up)" /> <g clip-path="url(#dtc-up)"> <path d="M203,70 C250,70 310,66 380,80 L380,104 L190,104Z" fill="var(--tc-up-shade)" /> <path d="M318,20 C346,54 330,80 312,108 L392,108 L392,20Z" fill="var(--tc-tip)" /> </g> <path d="M227,89 C272,84 328,78 364,84" fill="none" stroke="var(--tc-edge)" stroke-width="1.2" opacity=".8" /> <path d="M229,47 C266,39 318,45 348,64" fill="none" stroke="var(--tc-edge)" stroke-width="1.6" stroke-linecap="round" opacity=".55" /> <path d="M227,57 C260,50 306,55 336,70" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2.4" stroke-linecap="round" /> <path d="M211,52 C248,29 332,33 372,88 C330,80 272,86 219,92 C207,86 203,66 211,52Z" fill="none" stroke="var(--tc-edge)" stroke-width="1.8" stroke-linejoin="round" /> <ellipse cx="241" cy="62" rx="5.5" ry="2.5" transform="rotate(10 241 62)" fill="var(--tc-body)" opacity=".8" /> <path d="M235,57 C241,55 247,57 251,60" fill="none" stroke="var(--tc-edge)" stroke-width="1.2" stroke-linecap="round" /> </g> </g> </g> </g> </svg></div></div>
                 <p class="cap" id="cap" lang="en"></p>
                 <div class="nm"><span class="bars"><i></i><i></i><i></i></span>Entrevistador</div>
               </div>
@@ -856,10 +868,14 @@ AWS e observabilidade</div></div>
       </div>
       <div class="dctl">
         <button class="icon-btn" id="dPlay" aria-label="Pausar animação"><svg id="icoPause" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="2" width="3.5" height="12" rx="1"/><rect x="9.5" y="2" width="3.5" height="12" rx="1"/></svg><svg id="icoPlay" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" hidden><path d="M4 2l10 6-10 6z"/></svg></button>
+        <div class="snd" id="snd">
+          <button class="snd-btn" id="dSnd" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="w" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path class="x" d="M17 9.5l5 5M22 9.5l-5 5"/></svg><span>Ativar som</span></button>
+          <input type="range" id="dVol" min="0" max="1" step="0.05" value="0.8" aria-label="Volume" hidden>
+        </div>
         <p id="dCap" aria-live="off"></p>
         <a class="btn sm" href="/signup" data-cta>Fazer a minha</a>
       </div>
-      <p class="fine">Exemplo ilustrativo. Na entrevista real o entrevistador fala em voz alta, com áudio.</p>
+      <p class="fine">Exemplo ilustrativo.</p>
     </div>
   </div>
 </section>
@@ -1075,7 +1091,7 @@ AWS e observabilidade</div></div>
   const LINE1="Hi, I'm Tuk, and I'll be your interviewer today. We have about 5 minutes for your senior Backend Engineer role, with a focus on technical depth. Tell me about your experience with backend systems.";
   const LINE2="Got it. You mentioned payment APIs. How did you keep a payment from being charged twice?";
   const ANS="I have five years experience on backend and I am working with Go since 2021. I built payment APIs for make them safer, and the payments got more fast.";
-  const CPS=16, T1=27.0, T2=54.0;
+  const CPS=16, T1=27.0, T2=54.0, ANS_T=42.0, ANS_CPS=14;
   const CAPTXT=['Cole a vaga e a IA monta a entrevista.','O entrevistador pergunta, você responde falando.','O relatório separa seu inglês do conteúdo técnico e mostra o que treinar.'];
 
   const scenes=$('#scenes'),cur=$('#cur'),panels=$$('.sc'),pg0=$('#pg0'),pg2=$('#pg2');
@@ -1152,12 +1168,12 @@ AWS e observabilidade</div></div>
     const showCap=document.getElementById('bCap').dataset.off!=='1';
     let c='';if(t>=T2)c=LINE2.slice(0,l2);else if(t>=T1)c=LINE1.slice(0,l1);
     txt(E.cap,c);E.cap.scrollTop=E.cap.scrollHeight;tg(E.cap,'off',!showCap);
-    const am=Math.floor(clamp((t-42.0)*14,0,ANS.length));
-    txt(E.capMe,t>=42.0&&t<57?ANS.slice(0,am):'');E.capMe.scrollTop=E.capMe.scrollHeight;tg(E.capMe,'off',!showCap||t<42.0||t>=57);
+    const am=Math.floor(clamp((t-ANS_T)*ANS_CPS,0,ANS.length));
+    txt(E.capMe,t>=ANS_T&&t<57?ANS.slice(0,am):'');E.capMe.scrollTop=E.capMe.scrollHeight;tg(E.capMe,'off',!showCap||t<ANS_T||t>=57);
     tg(E.tInt,'talk',talk1||talk2);
     const rec=t>=41.5&&t<52.5;
     tg(E.tMe,'rec',rec);tg(E.bMic,'rec',rec);tg(E.live,'on',rec);
-    const lvl=rec?clamp(.45+.3*Math.sin(t*7.3)+.2*Math.sin(t*13.1)):0;css(E.tMe,'--lvl',lvl.toFixed(2));
+    const lvl=rec?(VO.ready?candLevel(t):clamp(.45+.3*Math.sin(t*7.3)+.2*Math.sin(t*13.1))):0;css(E.tMe,'--lvl',lvl.toFixed(2));
     const el=Math.max(0,t-T1+.5);txt(E.rEl,fmt(el));txt(E.rRem,fmt(Math.max(0,300-el)));css(E.rProg,'width',(el/300*100).toFixed(2)+'%');
     tg(E.dlg,'on',t>=60.8&&t<63.5);
   }
@@ -1181,6 +1197,79 @@ AWS e observabilidade</div></div>
     txt($('#dCap'),CAPTXT[s]);
   }
 
+  /* voices, the app's toucan and a soft forest bed. Tuk's and the candidate's lines are real audio: while one plays, the
+     timeline follows it so the caption ends with the line, and the beak lip-syncs through the app's own engine (loaded
+     when the demo gets close). Sound stays off until the visitor turns it on. */
+  const VO={ready:false};
+  const SEG=[['tuk1',T1,LINE1.length/CPS],['tuk2',T2,LINE2.length/CPS],['ans',ANS_T,ANS.length/ANS_CPS]]; // [line, start, caption length]
+  const segAt=t=>VO.ready?SEG.find(([,a,l])=>t>=a&&t<a+l):undefined;
+  const speedAt=t=>{const g=segAt(t);return g?g[2]/VO[g[0]].dur:SPEED};
+  const posIn=(g,t)=>(t-g[1])/g[2]*VO[g[0]].dur; // seconds into the line's audio
+  function candLevel(t){const g=segAt(t);if(!g||g[0]!=='ans')return 0;const f=VO.ans.f;return clamp(f.env[Math.min(f.n-1,Math.floor(posIn(g,t)/f.hopT))]*1.15)}
+  let tc=null,speech=null,tcState='',loading=null;
+  const loadVoices=()=>loading||(loading=(async()=>{
+    try{
+      const eng=await import('/landing/toucan-engine.mjs'),off=new OfflineAudioContext(1,1,48000);
+      await Promise.all(['tuk1','tuk2','ans'].map(async n=>{
+        const buf=await off.decodeAudioData(await (await fetch(`/landing/demo-${n}.m4a`)).arrayBuffer());
+        VO[n]={buf,dur:buf.duration,f:eng.analyseSamples(buf.getChannelData(0),buf.sampleRate)};
+      }));
+      tc=eng.createToucanEngine({root:$('#toucan'),reducedMotion:()=>reduce});
+      tc.setFeed({push(){},reset(){},sample:()=>speech,get size(){return speech?1:0}});
+      VO.ready=true;
+    }catch(e){/* the demo keeps its silent pace and the still toucan */}
+  })());
+  function toucanFrame(now){
+    if(!tc||!inView||t<CH[1]||t>=CH[2])return;
+    const g=playing()?segAt(t):undefined,talk=!!g&&g[0]!=='ans',rec=t>=41.5&&t<52.5;
+    speech=talk?{id:g[0]==='tuk1'?1:2,features:VO[g[0]].f,failed:false,pos:posIn(g,t),endsWithQuestion:true}:null;
+    const s=talk?'speaking':rec?'listening':(t>=52.5&&t<T2)?'thinking':'idle';
+    if(s!==tcState){tcState=s;tc.setState(s,now)}
+    tc.setCandidateLevel(rec?candLevel(t):0);
+    tc.frame(now);
+  }
+  // audio graph: the voices and the forest loop (16 bars, crossfaded over its last 2s) under one volume
+  const BED=.6,LOOP=16*4*60/84,XF=2;
+  let ac=null,master=null,bed=null,vGain=null,forest=null,fNext=0,soundOn=false,voice=null,bedWant=-1;
+  async function startSound(){
+    ac=new AudioContext();
+    master=ac.createGain();master.gain.value=+$('#dVol').value;master.connect(ac.destination);
+    vGain=ac.createGain();vGain.gain.value=.9;vGain.connect(master);
+    bed=ac.createGain();bed.gain.value=0;bed.connect(master);
+    fetch('/landing/demo-forest.m4a').then(r=>r.arrayBuffer()).then(b=>ac.decodeAudioData(b)).then(b=>{forest=b}).catch(()=>{});
+  }
+  const stopVoice=()=>{if(voice){try{voice.src.stop()}catch(e){}voice=null}};
+  // while a line plays, its audio is the clock
+  function voiceT(){
+    if(!voice)return null;
+    const g=SEG.find(x=>x[0]===voice.name),p=ac.currentTime-voice.at+voice.off;
+    return p<VO[voice.name].dur?g[1]+p/VO[voice.name].dur*g[2]:null;
+  }
+  function soundFrame(){
+    if(!ac)return;
+    const live=soundOn&&playing(),g=live?segAt(t):undefined,want=g?posIn(g,t):0;
+    if(voice&&(!g||voice.name!==g[0]||Math.abs(ac.currentTime-voice.at+voice.off-want)>.3))stopVoice();
+    if(g&&!voice&&want<VO[g[0]].dur-.05){
+      const src=ac.createBufferSource();src.buffer=VO[g[0]].buf;src.connect(vGain);src.start(0,want);
+      voice={name:g[0],src,at:ac.currentTime,off:want};
+    }
+    const bw=live?(g?BED*.4:BED):0;
+    if(bw!==bedWant){bedWant=bw;bed.gain.setTargetAtTime(bw,ac.currentTime,.35)}
+    while(forest&&fNext<ac.currentTime+4){
+      const at=Math.max(fNext,ac.currentTime+.05),s=ac.createBufferSource(),fg=ac.createGain();
+      s.buffer=forest;fg.gain.setValueAtTime(0,at);fg.gain.linearRampToValueAtTime(1,at+XF);fg.gain.setValueAtTime(1,at+LOOP);fg.gain.linearRampToValueAtTime(0,at+LOOP+XF);
+      s.connect(fg).connect(bed);s.start(at);s.stop(at+LOOP+XF+.05);fNext=at+LOOP;
+    }
+  }
+  const snd=$('#snd'),sBtn=$('#dSnd'),vol=$('#dVol');
+  function syncSnd(){snd.classList.toggle('on',soundOn);sBtn.setAttribute('aria-pressed',String(soundOn));sBtn.setAttribute('aria-label',soundOn?'Desativar som':'Ativar som');vol.hidden=!soundOn}
+  sBtn.addEventListener('click',async()=>{
+    soundOn=!soundOn;syncSnd();
+    if(soundOn){if(!ac)await startSound();ac.resume();if(!VO.ready)loadVoices()}else stopVoice();
+  });
+  vol.addEventListener('input',()=>{if(master)master.gain.setTargetAtTime(+vol.value,ac.currentTime,.05)});
+  new IntersectionObserver((es,o)=>{if(es.some(e=>e.isIntersecting)){o.disconnect();loadVoices()}},{rootMargin:'800px 0px'}).observe($('#screen'));
+
   /* clock */
   let t=0,userPaused=false,ended=false,inView=false,armed=0,last=0,dragging=false;
   const playing=()=>!userPaused&&inView&&!dragging&&performance.now()>=armed;
@@ -1188,10 +1277,12 @@ AWS e observabilidade</div></div>
     const dt=Math.min(.1,(now-last)/1000);last=now;
     const prev=t;
     if(playing()){
-      t+=dt*SPEED;
+      const v=voiceT();
+      t=v!==null?v:t+dt*speedAt(t);
       if(t>=DUR){t=DUR;userPaused=true;ended=true;syncUI()}
     }
     render(t);
+    toucanFrame(now/1000);soundFrame();
     frozenSync();
     requestAnimationFrame(frame);
   }
@@ -1208,13 +1299,13 @@ AWS e observabilidade</div></div>
   $('#dPlay').addEventListener('click',toggle);
   scenes.addEventListener('click',toggle);
   /* seeking */
-  function seekFromEvent(e){const r=$('#tr').getBoundingClientRect();t=clamp((e.clientX-r.left)/r.width)*DUR;if(t<DUR)ended=false}
+  function seekFromEvent(e){stopVoice();const r=$('#tr').getBoundingClientRect();t=clamp((e.clientX-r.left)/r.width)*DUR;if(t<DUR)ended=false}
   scrub.addEventListener('pointerdown',e=>{dragging=true;scrub.setPointerCapture(e.pointerId);seekFromEvent(e)});
   scrub.addEventListener('pointermove',e=>{if(dragging)seekFromEvent(e)});
   const endDrag=()=>{dragging=false};
   scrub.addEventListener('pointerup',endDrag);scrub.addEventListener('pointercancel',endDrag);
-  scrub.addEventListener('keydown',e=>{const d=e.key==='ArrowRight'?5:e.key==='ArrowLeft'?-5:0;if(d){e.preventDefault();t=clamp(t+d,0,DUR)}});
-  chapBtns.forEach(b=>b.addEventListener('click',()=>{t=+b.dataset.t;if(ended){ended=false;userPaused=false;syncUI()}}));
+  scrub.addEventListener('keydown',e=>{const d=e.key==='ArrowRight'?5:e.key==='ArrowLeft'?-5:0;if(d){e.preventDefault();stopVoice();t=clamp(t+d,0,DUR)}});
+  chapBtns.forEach(b=>b.addEventListener('click',()=>{stopVoice();t=+b.dataset.t;if(ended){ended=false;userPaused=false;syncUI()}}));
   $('#bCap').dataset.off='0';
   $('#bCap').addEventListener('click',e=>{e.stopPropagation();const b=$('#bCap');const off=b.dataset.off!=='1';b.dataset.off=off?'1':'0';b.classList.toggle('off',off)});
   new IntersectionObserver(es=>es.forEach(e=>{
