@@ -429,7 +429,7 @@ function HomeView({
               </>
             ) : (
               <>
-                <p className="ds-kicker">{t("Como a Entoa funciona")}</p>
+                <p className="ds-kicker">{t("Como o Entoa funciona")}</p>
                 <ol className="shl-home-steps ds-rows">
                   <li><span>1</span><p>{t("Você faz uma entrevista por voz.")}</p></li>
                   <li><span>2</span><p>{t("Recebe um relatório do que ficou claro e do que praticar.")}</p></li>
