@@ -7,6 +7,10 @@ const HISTORY_TEXT_LENGTH = 2000;
 const TRANSCRIPT_LENGTH = 4000;
 export const CONVERSATION_CLOSING_LINE = "This was a really nice chat. Thanks for talking with me!";
 export const CONVERSATION_FOLLOW_LINE = "Tell me a little more about that?";
+/** German conversations: the Azure voice that speaks German and Portuguese. */
+export const GERMAN_CONVERSATION_VOICE = "de-DE-FlorianMultilingualNeural";
+const GERMAN_CLOSING = { say: "Das war ein schönes Gespräch! Danke und tschüss!", sayTranslation: "Foi uma conversa muito boa! Obrigado e tchau!" };
+const GERMAN_FOLLOW = { say: "Erzähl mir ein bisschen mehr, bitte.", sayTranslation: "Me conta um pouco mais, por favor." };
 /** Silence after Tuck's line: a question gets longer to think; after this many nudges in a row Tuck stops prompting. */
 export const MAX_SILENCE_NUDGES = 2;
 const SILENCE_QUESTION_WAIT_MS = 12_000;
@@ -34,7 +38,7 @@ export function silenceWaitMs(tuckLine) {
 }
 
 /** The body of POST /api/v1/thinking/conversation-turn (the backend validates every field). A silent turn has no answer: `silent: true`. */
-export function buildConversationTurnRequest({ plan, usedPathIds = [], elapsedSeconds, durationMinutes, lines = [], transcript, silent = false }) {
+export function buildConversationTurnRequest({ plan, usedPathIds = [], elapsedSeconds, durationMinutes, lines = [], transcript, silent = false, language }) {
   const history = lines
     .filter((line) => (line?.speaker === "tuck" || line?.speaker === "person") && clip(line.text, HISTORY_TEXT_LENGTH) !== "")
     .slice(-HISTORY_LINES)
@@ -48,6 +52,7 @@ export function buildConversationTurnRequest({ plan, usedPathIds = [], elapsedSe
     history,
     transcript: silent ? "(silence)" : clip(transcript, TRANSCRIPT_LENGTH),
     ...(silent ? { silent: true } : {}),
+    ...(language === "de" ? { language: "de" } : {}),
   };
 }
 
@@ -88,14 +93,25 @@ export function isMeaningQuestion(text) {
   });
 }
 
-/** Used when the turn request fails: a closing line in the closing phase, a missed-word line for a meaning question, otherwise the next unused path. */
-export function fallbackConversationTurn({ plan, usedPathIds = [], phase, transcript = "" }) {
+/** Used when the turn request fails: a closing line in the closing phase, a missed-word line for a meaning question, otherwise the next unused path. German has no meaning-question branch. */
+export function fallbackConversationTurn({ plan, usedPathIds = [], phase, transcript = "", language }) {
+  if (language === "de") {
+    if (phase === "closing") return germanReply("WRAP", GERMAN_CLOSING.say, GERMAN_CLOSING.sayTranslation, null);
+    const used = new Set(usedPathIds);
+    const next = plan.paths.find((path) => !used.has(path.id));
+    if (next) return germanReply("NEW_PATH", next.line, null, next.id);
+    return germanReply("FOLLOW", GERMAN_FOLLOW.say, GERMAN_FOLLOW.sayTranslation, null);
+  }
   if (phase === "closing") return { say: CONVERSATION_CLOSING_LINE, move: "WRAP", pathId: null };
   if (isMeaningQuestion(transcript)) return { say: MISSED_WORD_LINE, move: "FOLLOW", pathId: null };
   const used = new Set(usedPathIds);
   const next = plan.paths.find((path) => !used.has(path.id));
   if (next) return { say: next.line, move: "NEW_PATH", pathId: next.id };
   return { say: CONVERSATION_FOLLOW_LINE, move: "FOLLOW", pathId: null };
+}
+
+function germanReply(move, say, sayTranslation, pathId) {
+  return { say, move, pathId, sayTranslation, personTranslation: null, suggestions: [] };
 }
 
 export function isConversationEnd(reply) {

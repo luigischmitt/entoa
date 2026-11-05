@@ -1,5 +1,5 @@
 import { SpeechProviderUnavailableError } from "./errors.js";
-import { resolveChatterboxVoice, resolveVoice } from "./voices.js";
+import { isAzureOnlyVoice, resolveChatterboxVoice, resolveVoice } from "./voices.js";
 import type {
   HedgeOutcome,
   SpeechProvider,
@@ -45,6 +45,7 @@ export class HybridSpeechProvider implements SpeechProvider {
   }
 
   async synthesize(request: SpeechSynthesisRequest, signal?: AbortSignal): Promise<SynthesizedSpeech> {
+    if (isAzureOnlyVoice(request.voice)) return this.synthesizeAzureOnly(request, signal);
     const { primary, secondary, secondaryVoice, timeoutMs, hedgeAfterMs } = this.options;
     const primaryVoiceForRequest = resolveChatterboxVoice(request.voice);
     const secondaryVoiceForRequest = resolveVoice(request.voice, secondaryVoice);
@@ -130,6 +131,21 @@ export class HybridSpeechProvider implements SpeechProvider {
         if (fallbackAfterMs > 0) hedgeTimer = setTimeout(startSecondary, fallbackAfterMs);
       }
     });
+  }
+
+  /** Azure-only voice: one request to the secondary, no primary attempt and no hedge. Background work never spends it. */
+  private async synthesizeAzureOnly(request: SpeechSynthesisRequest, signal?: AbortSignal): Promise<SynthesizedSpeech> {
+    if (request.primaryOnly === true) throw new SpeechProviderUnavailableError("Azure-only voices are not used for background work.");
+    const timeout = AbortSignal.timeout(this.options.timeoutMs);
+    try {
+      const speech = await this.options.secondary.synthesize(withoutRoutingHints(request), signal ? AbortSignal.any([signal, timeout]) : timeout);
+      if (speech.audio.length === 0) throw new SpeechProviderUnavailableError("Speech provider returned no audio.");
+      return { ...speech, diagnostics: { ...speech.diagnostics, hedge: "not_needed", voiceSource: secondarySource } };
+    } catch (error) {
+      if (signal?.aborted) throw signal.reason ?? error;
+      if (error instanceof SpeechProviderUnavailableError) throw error;
+      throw new SpeechProviderUnavailableError("Speech providers are unavailable.", { cause: error, diagnostics: { hedge: "both_failed" } });
+    }
   }
 
   // No network call: health must not spend paid requests.

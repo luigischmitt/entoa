@@ -91,13 +91,14 @@ class ExperimentalTranscriptionService implements TranscriptionService {
     logFallback(provider, other, primaryError);
     let secondError: unknown;
     try {
-      return await openRouter.transcribe(audio, other, format, signal, undefined);
+      return await openRouter.transcribe(audio, other, format, signal, context?.language ? { language: context.language } : undefined);
     } catch (error) {
       if (isAbortFailure(error, signal)) throw error;
       secondError = error;
     }
 
-    if (this.azure && (format === undefined || format === "wav")) {
+    // Azure STT is fixed to en-US, so a German answer is never sent there: it would come back as English garbage.
+    if (this.azure && (format === undefined || format === "wav") && context?.language !== "de") {
       logFallback(other, "azure", secondError);
       try {
         return await this.azure.transcribe(audio, "azure");

@@ -26,7 +26,8 @@ export type SegmentTimestampResult = { segments?: TranscriptionWord[] };
 export type AudioFormat = "wav" | "webm" | "mp4";
 
 /** Optional Whisper vocabulary-biasing context (question and earlier text of the same answer); never logged. */
-export type TranscribeContext = { question?: string | null; previousText?: string };
+/** `language: "de"` makes Whisper auto-detect (German or Portuguese) and drops the English vocabulary prompt; absent means English. */
+export type TranscribeContext = { question?: string | null; previousText?: string; language?: "de" };
 
 export interface TranscriptionService {
   availableProviders(): TranscriptionProvider[];

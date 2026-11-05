@@ -19,7 +19,7 @@ import type { TranscriptReviewService } from "./transcript-review-service.js";
 import { defaultRetainedAnswerAudio, type RetainedAnswerAudio } from "./retained-answer-audio.js";
 
 type ClientMessage =
-  | { type: "start"; accessToken?: unknown; version: 2; sampleRate: number; channels: 1; encoding: "s16le"; speechThreshold: number; captions?: unknown; conversation?: unknown; question?: unknown; plannedQuestion?: unknown; contextAnswers?: unknown; transcriptionEngine?: unknown }
+  | { type: "start"; accessToken?: unknown; version: 2; sampleRate: number; channels: 1; encoding: "s16le"; speechThreshold: number; captions?: unknown; conversation?: unknown; language?: unknown; question?: unknown; plannedQuestion?: unknown; contextAnswers?: unknown; transcriptionEngine?: unknown }
   | { type: "level"; value: number }
   | { type: "finalize"; reason: "manual" | "silence" }
   | { type: "follow-up-candidate"; turnId: unknown; revision: unknown; question: unknown; anchor: unknown }
@@ -391,6 +391,9 @@ export function attachTranscriptionWebSocket(
     let requestedEngine: RequestedEngine | null = null;
     // Set by the start message: a conversation session uses the shorter pause graces (conversationGraceOptions).
     let conversationTiming = false;
+    // Set by the start message: a German answer skips Whisper vocabulary bias, transcript review, pronunciation assessment and the semantic check.
+    let answerLanguage: "de" | null = null;
+    const whisperLanguageContext = () => (answerLanguage ? { language: answerLanguage } : {});
     let graceTimer: ReturnType<typeof setTimeout> | null = null;
     // Provisional answer for next-turn preparation (never logged; only the count is).
     let prepareTimer: ReturnType<typeof setTimeout> | null = null;
@@ -711,7 +714,7 @@ export function attachTranscriptionWebSocket(
     // Hedge outcome of the call whose result (or failure) is being reported.
     let activeHedge: { outcome: HedgeOutcome } = { outcome: "not_needed" };
     const hedged = (audio: Buffer, signal: AbortSignal, hedge: { outcome: HedgeOutcome }) => hedgedTranscribe({
-      start: (callSignal) => transcriptionService.transcribe(audio, "whisper-large-v3-turbo", "wav", callSignal, { question: whisperQuestion }),
+      start: (callSignal) => transcriptionService.transcribe(audio, "whisper-large-v3-turbo", "wav", callSignal, { question: whisperQuestion, ...whisperLanguageContext() }),
       hedgeAfterMs: limits.hedgeAfterMs,
       tryReserve: () => finalQueue.reserve(),
       signal,
@@ -988,7 +991,7 @@ export function attachTranscriptionWebSocket(
           send(socket, { type: "complete", status: "complete", provider: "whisper-incremental", durationMs, transcript, speechEpoch, pendingFollowUpCheck: pendingFollowUpCheck() });
           clearTimeout(timer);
 
-          if (!assessmentService && !streaming?.transcriptReviewEnabled && !streaming?.transcriptReview) return;
+          if (answerLanguage === "de" || (!assessmentService && !streaming?.transcriptReviewEnabled && !streaming?.transcriptReview)) return;
           audio = sessions.toWav(id);
           handedOff = true;
           const assessmentAudio = audio;
@@ -1000,7 +1003,7 @@ export function attachTranscriptionWebSocket(
               const timingSlot = await acquireTimingRecoverySlot(abortController.signal);
               if (!timingSlot) return null;
               try {
-                return { result: await transcriptionService.transcribe(assessmentAudio, "whisper-large-v3-turbo", "wav", abortController.signal, { question: whisperQuestion }), origin: "full_fallback" as const };
+                return { result: await transcriptionService.transcribe(assessmentAudio, "whisper-large-v3-turbo", "wav", abortController.signal, { question: whisperQuestion, ...whisperLanguageContext() }), origin: "full_fallback" as const };
               } finally {
                 timingSlot();
               }
@@ -1096,7 +1099,7 @@ export function attachTranscriptionWebSocket(
               });
               clearTimeout(timer);
 
-              if (!assessmentService && !streaming?.transcriptReviewEnabled && !streaming?.transcriptReview) return;
+              if (answerLanguage === "de" || (!assessmentService && !streaming?.transcriptReviewEnabled && !streaming?.transcriptReview)) return;
               assessmentOwnsAudio = true;
               startAssessment({ session, audio, durationMs, transcriptionDurationMs, abortController, release, draftTranscript: result.transcript, getTiming: async () => ({ result, origin: "full" }) });
             } catch (error) {
@@ -1230,9 +1233,10 @@ export function attachTranscriptionWebSocket(
           if (parsedEngine === undefined) logStreamDiagnostic({ status: "invalid_message", field: "start.transcriptionEngine" });
           requestedEngine = parsedEngine ?? null;
           conversationTiming = message.conversation === true;
+          answerLanguage = message.language === "de" ? "de" : null;
           captionsEnabled = streaming !== null && message.captions === true;
           whisperQuestion = sanitizeQuestion(message.question);
-          interviewerQuestion = streaming?.answerCompletion ? sanitizeQuestion(message.question) : null;
+          interviewerQuestion = streaming?.answerCompletion && answerLanguage === null ? sanitizeQuestion(message.question) : null;
           plannedQuestion = streaming?.plannedCoverage && sanitizeQuestion(message.question) ? sanitizePlannedQuestion(message.plannedQuestion) : null;
           contextAnswers = plannedQuestion ? sanitizeContextAnswers(message.contextAnswers) : [];
           if (streaming) {
@@ -1328,6 +1332,7 @@ export function attachTranscriptionWebSocket(
               service: transcriptionService,
               speechThreshold: session.config.speechThreshold,
               question: whisperQuestion,
+              ...(answerLanguage ? { language: answerLanguage } : {}),
               ...streaming.incrementalWhisper,
               ...sessionCallbacks,
               onSegmentCommitted: (_transcript, info) => {
@@ -1351,7 +1356,7 @@ export function attachTranscriptionWebSocket(
             sampleRate: pcmSampleRate,
             limits: { maximumDurationMs: session.limits.maxDurationMs, maximumBytes: session.limits.maxBytes },
             transcription: { mode: "on-finalize", maxConcurrent: limits.maxConcurrentTranscriptions, maxQueued: limits.maxQueuedTranscriptions },
-            features: { pronunciationAssessment: assessmentService !== null },
+            features: { pronunciationAssessment: assessmentService !== null && answerLanguage === null },
           });
         } catch (error) {
           const code = error instanceof Error ? error.message : "STREAM_UNAVAILABLE";

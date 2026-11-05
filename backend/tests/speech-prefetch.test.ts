@@ -497,3 +497,20 @@ describe("voice source preference", () => {
     expect(bareResponse.headers["x-voice-source"]).toBeUndefined();
   });
 });
+
+describe("German voice is never prefetched", () => {
+  it("skips static phrases for the Azure-only German voice and keeps English prefetch working", async () => {
+    const { isAzureOnlyVoice, isSelectableVoice, germanConversationVoice, selectableVoices } = await import("../src/speech/voices.js");
+    expect(isAzureOnlyVoice(germanConversationVoice)).toBe(true);
+    expect(isSelectableVoice(germanConversationVoice)).toBe(true);
+    expect(selectableVoices).not.toContain(germanConversationVoice);
+    const provider = new ControlledProvider(true);
+    const cache = new SpeechCache({ provider, ttlMs: 60_000 });
+    const prefetcher = new InterviewerSpeechPrefetcher({ cache, voice: "en-US-BrianNeural", speed: 1, format: "mp3", chunks: 1 });
+    await prefetcher.prefetchStaticFor(germanConversationVoice, 1, { concurrency: 3 });
+    expect(provider.calls).toHaveLength(0);
+    await prefetcher.prefetchStaticFor("en-US-AvaNeural", 1, { concurrency: 3, deadlineMs: 5_000 });
+    expect(provider.calls.length).toBeGreaterThan(0);
+    expect(provider.calls.every((call) => call.voice === "en-US-AvaNeural" && call.primaryOnly === true)).toBe(true);
+  });
+});

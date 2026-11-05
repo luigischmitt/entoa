@@ -83,6 +83,13 @@ test("the start message carries conversation timing only when it is set", () => 
   assert.equal("conversation" in buildStreamStartMessage({ ...base, conversation: false }), false);
 });
 
+test("the start message carries the German language only when it is set", () => {
+  const base = { accessToken: "ws-token", speechThreshold: 0.025, sampleRate: 16_000, question: "Why?" };
+  assert.equal(buildStreamStartMessage({ ...base, language: "de" }).language, "de");
+  assert.equal("language" in buildStreamStartMessage(base), false);
+  assert.equal("language" in buildStreamStartMessage({ ...base, language: undefined }), false);
+});
+
 test("an UNAUTHENTICATED stream error maps to the session-expired message", () => {
   assert.match(transcriptionFailureMessage("UNAUTHENTICATED"), /sessão expirou/u);
 });

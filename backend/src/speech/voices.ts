@@ -17,8 +17,16 @@ export const selectableVoiceList: readonly SelectableVoiceInfo[] = [
 
 export const selectableVoices: readonly string[] = selectableVoiceList.map((voice) => voice.id);
 
+/** Azure-only German voice for the German conversation (multilingual: speaks German and Portuguese). Never shown in the voice list. */
+export const germanConversationVoice = "de-DE-FlorianMultilingualNeural";
+
+/** Voices served only by Azure (no Chatterbox clone): no primary attempt, no hedge and never used for background prefetch. */
+export function isAzureOnlyVoice(value: unknown): value is string {
+  return value === germanConversationVoice;
+}
+
 export function isSelectableVoice(value: unknown): value is string {
-  return typeof value === "string" && selectableVoices.includes(value);
+  return typeof value === "string" && (selectableVoices.includes(value) || isAzureOnlyVoice(value));
 }
 
 /** The requested voice when it is selectable, otherwise `fallback` (the configured default). */

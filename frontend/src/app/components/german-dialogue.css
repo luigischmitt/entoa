@@ -1,0 +1,48 @@
+/* German conversation transcript: quiet, tokens only (light and dark). The list has its own max height and scrolls. */
+
+.gd-root {
+  display: flex;
+  min-width: 0;
+  width: 100%;
+  max-width: 48rem;
+  margin: 0 auto;
+  flex-direction: column;
+  gap: 0.875rem;
+  /* Inside the call grid it takes its own row under the stage: capped so the tiles keep most of the height. */
+  max-height: min(42dvh, 22rem);
+  color: var(--ds-ink);
+}
+
+.gd-list {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.25rem 0.125rem;
+}
+
+.gd-root[data-full] { max-height: none; }
+
+.gd-line { display: flex; min-width: 0; flex-direction: column; gap: 0.125rem; }
+.gd-speaker { margin: 0; font-size: 0.75rem; font-weight: 600; line-height: 1.25; color: var(--ds-text-2); }
+.gd-text { margin: 0; font-size: 0.9375rem; line-height: 1.45; overflow-wrap: anywhere; color: var(--ds-ink); }
+.gd-translation { margin: 0; font-size: 0.8125rem; line-height: 1.4; overflow-wrap: anywhere; color: var(--ds-text-2); }
+
+.gd-suggestions {
+  display: flex;
+  flex: none;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.5rem;
+  border-top: 1px solid var(--ds-line);
+  padding-top: 0.75rem;
+}
+.gd-suggestions-title { margin: 0; font-size: 0.75rem; font-weight: 600; line-height: 1.25; color: var(--ds-text-2); }
+.gd-suggestion-list { display: flex; margin: 0; min-width: 0; flex-direction: column; gap: 0.5rem; padding: 0; list-style: none; }
+.gd-suggestion { display: flex; min-width: 0; flex-direction: column; gap: 0.125rem; }
+.gd-suggestion-de { font-size: 0.9375rem; font-weight: 400; line-height: 1.4; overflow-wrap: anywhere; color: var(--ds-ink); }
+.gd-suggestion-pt { font-size: 0.8125rem; line-height: 1.4; overflow-wrap: anywhere; color: var(--ds-text-2); }

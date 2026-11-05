@@ -41,6 +41,8 @@ export type IncrementalWhisperOptions = {
   forcedCutWindowMs?: number;
   /** Interviewer question of this answer, used only as Whisper vocabulary context (never logged). */
   question?: string | null;
+  /** `"de"` for a German answer: segments are auto-detected without the English prompt. Absent means English. */
+  language?: "de";
   /** Test hook. */
   now?: () => number;
   onTurnStart?: () => void;
@@ -392,7 +394,7 @@ export class IncrementalWhisperSession implements StreamingTurnSession {
     return hedgedTranscribe({
       start: async (callSignal) => {
         try {
-          return await this.options.service.transcribe(wav, "whisper-large-v3-turbo", "wav", AbortSignal.any([signal, callSignal]), { question: this.options.question ?? null, previousText: this.joined() });
+          return await this.options.service.transcribe(wav, "whisper-large-v3-turbo", "wav", AbortSignal.any([signal, callSignal]), { question: this.options.question ?? null, previousText: this.joined(), ...(this.options.language ? { language: this.options.language } : {}) });
         } catch (error) {
           // An empty recognition is a result (nothing said), not a failure.
           if (error instanceof TranscriptionUnavailableError && error.providerStatus === "empty") return { provider: "whisper-large-v3-turbo", transcript: "" } as TranscriptionResult;

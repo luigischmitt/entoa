@@ -1,6 +1,7 @@
 import { normalizeDeviceId } from "./mic-device.mjs";
 import { isValidJobDirection } from "./job-direction.mjs";
 import { INTERVIEWER_VOICES } from "./voices.mjs";
+import { GERMAN_CONVERSATION_VOICE } from "./conversation-policy.mjs";
 import { resolveInterviewerSpeechSpeed } from "./interviewer-speech-speed.mjs";
 import { normalizeFocus, normalizeSeniority } from "./interview-normalization.mjs";
 
@@ -24,7 +25,12 @@ function parseConversationPlan(plan) {
     : null));
   if (paths.some((path) => path === null || path.id.trim() === "" || path.line.trim() === "")) return null;
   if (plan.title.trim() === "" || plan.opening.trim() === "") return null;
-  return { title: plan.title, opening: plan.opening, paths };
+  return {
+    title: plan.title,
+    opening: plan.opening,
+    ...(typeof plan.openingTranslation === "string" ? { openingTranslation: plan.openingTranslation } : {}),
+    paths,
+  };
 }
 const booleanFields = ["playInterviewerAudio", "showQuestionCaptions", "candidateCameraEnabled", "autoCaptureVoice"];
 
@@ -59,6 +65,8 @@ export function parseRoomHandoff(raw, now = Date.now()) {
       : "manual";
   // A conversation keeps its mode and plan only together; anything else is an interview.
   const conversationPlan = config.mode === "conversation" ? parseConversationPlan(config.conversationPlan) : null;
+  // German is kept only inside a valid conversation; it selects the German voice.
+  const german = conversationPlan !== null && config.conversationLanguage === "de";
   return {
     role: config.role,
     seniority: normalizeSeniority(config.seniority),
@@ -76,8 +84,9 @@ export function parseRoomHandoff(raw, now = Date.now()) {
     ...(jobDirection ? { jobDirection } : {}),
     ...(interviewSource !== "manual" ? { interviewSource } : {}),
     ...(conversationPlan ? { mode: "conversation", conversationPlan } : {}),
+    ...(german ? { conversationLanguage: "de", voice: GERMAN_CONVERSATION_VOICE } : {}),
     // Optional (older hand-offs have none): only a known interviewer voice is kept; otherwise the room uses the default.
-    ...(INTERVIEWER_VOICES.includes(config.voice) ? { voice: config.voice } : {}),
+    ...(!german && INTERVIEWER_VOICES.includes(config.voice) ? { voice: config.voice } : {}),
     ...(typeof config.speechSpeed === "number" ? { speechSpeed: resolveInterviewerSpeechSpeed(config.speechSpeed) } : {}),
   };
 }

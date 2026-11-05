@@ -1049,3 +1049,25 @@ describe("looksUnfinished", () => {
     expect(looksUnfinished("")).toBe(true);
   });
 });
+
+describe("German answers over the stream WebSocket", () => {
+  it("transcribes without the English language or prompt and skips review, pronunciation assessment and the semantic check", async () => {
+    const answer = "Ich arbeite als Entwickler in Berlin.";
+    const whisper = createWhisper([answer]);
+    const assess = vi.fn(async () => ({ provider: "azure" as const, locale: "en-US" as const, mode: "scripted" as const, scores: { accuracy: 90, fluency: 85, prosody: 80 } }));
+    const isComplete = vi.fn(async () => true);
+    const review = vi.fn(async () => null);
+    const { connect } = await startServer(whisper.service, incremental({ answerCompletion: { isComplete } as AnswerCompletionService, transcriptReviewEnabled: true, transcriptReview: { review } }), { assess });
+    const { socket, messages, waitFor } = await connect({ question: "Was machst du beruflich?", language: "de" });
+    expect(messages.find((message) => message.type === "ready")?.features).toEqual({ pronunciationAssessment: false });
+    await speak(socket, 800, 0.05);
+    await speak(socket, 500, 0.001);
+    await expect(waitFor("complete")).resolves.toMatchObject({ provider: "whisper-incremental", transcript: answer });
+    await delay(300);
+    expect((whisper.transcribe.mock.calls[0] as unknown[])[4]).toEqual({ question: "Was machst du beruflich?", previousText: "", language: "de" });
+    expect(assess).not.toHaveBeenCalled();
+    expect(review).not.toHaveBeenCalled();
+    expect(isComplete).not.toHaveBeenCalled();
+    expect(messages.some((message) => message.type === "assessment" || message.type === "reviewed_transcript")).toBe(false);
+  });
+});

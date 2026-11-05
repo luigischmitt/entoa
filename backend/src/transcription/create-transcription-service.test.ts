@@ -115,3 +115,21 @@ describe("Whisper fallback chain", () => {
     expect(azure.transcribe).not.toHaveBeenCalled();
   });
 });
+
+describe("Whisper fallback for German answers", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("keeps the German language on the other Whisper model and never sends German audio to Azure", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const { openRouter, azure } = makeDeps();
+    openRouter.transcribe.mockRejectedValueOnce(rejected(400)).mockRejectedValueOnce(rejected(400));
+    const service = createTranscriptionService(config, { openRouter: openRouter as never, azure: azure as never });
+
+    await expect(service.transcribe(audio, "whisper-large-v3-turbo", "wav", undefined, { question: "Was machst du?", language: "de" })).rejects.toBeInstanceOf(TranscriptionUnavailableError);
+    expect(openRouter.transcribe).toHaveBeenCalledTimes(2);
+    expect(openRouter.transcribe.mock.calls[1]?.[4]).toEqual({ language: "de" });
+    expect(azure.transcribe).not.toHaveBeenCalled();
+  });
+});

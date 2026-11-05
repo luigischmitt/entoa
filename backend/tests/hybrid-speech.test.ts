@@ -358,3 +358,27 @@ describe("static warmup is background work", () => {
     expect(seen.every((request) => request.primaryOnly === true)).toBe(true);
   });
 });
+
+describe("hybrid Azure-only German voice", () => {
+  const german = "de-DE-FlorianMultilingualNeural";
+
+  it("sends the German voice to Azure only: no Chatterbox attempt and no hedge", async () => {
+    vi.useFakeTimers();
+    const { provider, primary, secondary } = hybrid();
+    const pending = provider.synthesize({ ...req, voice: german });
+    expect(secondary.calls).toHaveLength(1);
+    expect(secondary.calls[0].request.voice).toBe(german);
+    secondary.calls[0].resolve(audio("d"));
+    expect(await pending).toMatchObject({ audio: Buffer.from("d"), diagnostics: { voiceSource: "azure" } });
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(primary.calls).toHaveLength(0);
+    expect(secondary.calls).toHaveLength(1);
+  });
+
+  it("refuses primaryOnly background work for the German voice without calling any provider", async () => {
+    const { provider, primary, secondary } = hybrid();
+    await expect(provider.synthesize({ ...req, voice: german, primaryOnly: true })).rejects.toBeInstanceOf(SpeechProviderUnavailableError);
+    expect(primary.calls).toHaveLength(0);
+    expect(secondary.calls).toHaveLength(0);
+  });
+});

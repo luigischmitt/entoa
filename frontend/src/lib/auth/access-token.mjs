@@ -53,7 +53,7 @@ export function createAuthorizedFetch(getAccessToken, fetcher = (...args) => fet
 }
 
 /** First message of the transcription socket; browsers cannot set headers, so the token travels in the message. */
-export function buildStreamStartMessage({ accessToken, speechThreshold, sampleRate, question, plannedQuestion, contextAnswers, conversation = false }) {
+export function buildStreamStartMessage({ accessToken, speechThreshold, sampleRate, question, plannedQuestion, contextAnswers, conversation = false, language }) {
   return {
     type: "start",
     version: 2,
@@ -65,6 +65,8 @@ export function buildStreamStartMessage({ accessToken, speechThreshold, sampleRa
     ...(question ? { question } : {}),
     // Conversations end a turn sooner after the person stops (shorter pause graces on the backend); absent otherwise.
     ...(conversation ? { conversation: true } : {}),
+    // German answers: the backend auto-detects German or Portuguese instead of assuming English; absent otherwise.
+    ...(language === "de" ? { language: "de" } : {}),
     // Next planned question and earlier answers: the backend judges at each pause whether the answers already cover it.
     ...(question && plannedQuestion ? { plannedQuestion, ...(contextAnswers?.length ? { contextAnswers } : {}) } : {}),
   };
