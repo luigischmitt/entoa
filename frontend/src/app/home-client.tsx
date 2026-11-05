@@ -9,6 +9,7 @@ import {
   Home,
   AudioLines,
   Gauge,
+  Gift,
   LineChart,
   MessagesSquare,
   PanelLeftClose,
@@ -361,6 +362,27 @@ function HomeView({
           <button type="button" className="ds-btn ds-btn-cta-green shl-home-primary" onClick={onStart}>
             <Play className="size-4 fill-current" aria-hidden="true" /> {t("Começar entrevista")}
           </button>
+          {allowance?.limited && (
+            <div className="shl-home-trial" role="note">
+              <Gift className="shl-home-trial-icon size-5" aria-hidden="true" />
+              {allowance.interviewsLeft + allowance.conversationsLeft > 0 ? (
+                <div>
+                  <p className="shl-home-trial-title">{t("Seu teste gratuito")}</p>
+                  <p className="shl-home-trial-counts">
+                    <span><b>{allowance.interviewsLeft}</b> {t(allowance.interviewsLeft === 1 ? "entrevista" : "entrevistas")}</span>
+                    <span><b>{allowance.conversationsLeft}</b> {t(allowance.conversationsLeft === 1 ? "conversa" : "conversas")}</span>
+                    <span>{t("{minutes} min cada", { minutes: allowance.minutes })}</span>
+                  </p>
+                  <p className="shl-home-trial-note">{t("Cada sessão termina com um relatório do seu inglês.")}</p>
+                </div>
+              ) : (
+                <div>
+                  <p className="shl-home-trial-title">{t("Você usou suas sessões de teste.")}</p>
+                  <p className="shl-home-trial-note">{t("Para continuar praticando, escreva para")} <a href={`mailto:${TRIAL_CONTACT_EMAIL}`}>{TRIAL_CONTACT_EMAIL}</a>.</p>
+                </div>
+              )}
+            </div>
+          )}
           <ul className="ds-facts shl-home-facts">
             {hasInterviews ? (
               <>
@@ -376,17 +398,6 @@ function HomeView({
               </>
             )}
           </ul>
-          {allowance?.limited && (
-            <p className="shl-home-trial ds-small">
-              {allowance.interviewsLeft + allowance.conversationsLeft > 0
-                ? t("Teste gratuito: você ainda tem {interviews} e {conversations}, de {minutes} minutos cada.", {
-                  interviews: t(allowance.interviewsLeft === 1 ? "1 entrevista" : "{count} entrevistas", { count: allowance.interviewsLeft }),
-                  conversations: t(allowance.conversationsLeft === 1 ? "1 conversa" : "{count} conversas", { count: allowance.conversationsLeft }),
-                  minutes: allowance.minutes,
-                })
-                : <>{t("Você usou suas sessões de teste. Para continuar praticando, escreva para")} <a href={`mailto:${TRIAL_CONTACT_EMAIL}`}>{TRIAL_CONTACT_EMAIL}</a>.</>}
-            </p>
-          )}
         </div>
 
           <div className="ds-block shl-home-card">
