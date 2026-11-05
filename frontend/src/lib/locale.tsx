@@ -308,7 +308,6 @@ const englishCopy: Record<string, string> = {
   "Navegação principal": "Main navigation",
   "Navegação utilitária": "Utility navigation",
   "Navegação móvel": "Mobile navigation",
-  "Pratique inglês para entrevistas.": "Practice English for interviews.",
   "Vamos praticar?": "Ready to practice?",
   "Seu próximo ensaio começa aqui.": "Your next rehearsal starts here.",
   "Sua próxima entrevista começa aqui.": "Your next interview starts here.",

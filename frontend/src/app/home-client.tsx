@@ -233,9 +233,6 @@ function Navigation({
             </ul>
           </nav>
         </div>
-        <p className={`mt-5 px-2 text-xs leading-5 text-muted-foreground ${sidebarExpanded ? "" : "sr-only"}`}>
-          {t("Pratique inglês para entrevistas.")}
-        </p>
         {tooltip && (
           <div
             aria-hidden="true"
