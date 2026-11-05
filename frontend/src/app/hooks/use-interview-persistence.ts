@@ -18,6 +18,7 @@ import {
   type InterviewCheckpointSnapshot,
   type LocalInterviewCheckpoint,
 } from "@/lib/interview/local-checkpoint.mjs";
+import { clearActiveInterviewId, setActiveInterviewId } from "@/lib/interview/active-interview.mjs";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getLocalSessionUserId } from "@/lib/auth/browser-session";
 import type { InterviewConfig, InterviewPhase, InterviewQuestion } from "@/lib/interview/types";
@@ -203,12 +204,15 @@ export function useInterviewPersistence(
 
   useEffect(() => {
     let current = true;
+    // Set before anything else so the first calls of the interview (speech, thinking, socket) already carry the id.
+    localSessionIdRef.current ||= resumedCheckpoint?.localSessionId ?? createLocalSessionId();
+    const interviewId = localSessionIdRef.current;
+    setActiveInterviewId(interviewId);
     const createAndSync = async () => {
       const userId = await getLocalSessionUserId(getSupabaseBrowserClient());
       if (!current) return;
       if (!userId) { markUnsafe(); return; }
       userIdRef.current = userId;
-      localSessionIdRef.current ||= resumedCheckpoint?.localSessionId ?? createLocalSessionId();
       if (!resumedCheckpoint) {
         snapshotRef.current = {
           ...snapshotRef.current,
@@ -225,7 +229,7 @@ export function useInterviewPersistence(
         if (sessionIdRef.current) { void syncTurns(); return Promise.resolve(); }
         if (sessionCreationRef.current) return sessionCreationRef.current;
         const localSaved = writeLocal();
-        const creation = createInterviewSession(configRef.current, localSessionIdRef.current)
+        const creation = createInterviewSession(configRef.current, localSessionIdRef.current, resumedCheckpoint ? "resumed" : "new")
           .catch(() => ({ ok: false as const, message: "Não foi possível criar a sessão remota." }))
           .then(async (result) => {
           if (!current) return;
@@ -249,7 +253,7 @@ export function useInterviewPersistence(
       await attemptCreate();
     };
     void createAndSync();
-    return () => { current = false; };
+    return () => { current = false; clearActiveInterviewId(interviewId); };
   // This is a one-time session bootstrap. Subsequent checkpoint changes are handled below.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

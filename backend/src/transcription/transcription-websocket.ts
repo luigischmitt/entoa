@@ -14,6 +14,7 @@ import { PlannedCoverageError, type PlannedCoverage, type PlannedCoverageService
 import { AnswerCompletionError, type AnswerCompletionService, type CandidateCompatibility, type FollowUpCandidate } from "../thinking/answer-completion-service.js";
 import { aggregateAzureBlockScores, alignSegmentTimingToTranscript, createAzureAlignedBlocks, mapAzureBlockReferencesToReviewed, materializeAzureBlock, type AzureAudioBlock } from "./azure-aligned-blocks.js";
 import { buildAnswerPhrases, calculateDeliveryMetrics, createPhraseClips } from "./answer-voice-detail.js";
+import { parseInterviewId, runWithLogContext, shortUserId, type LogContext } from "../logging/structured-logging.js";
 import type { TranscriptReviewService } from "./transcript-review-service.js";
 import { defaultRetainedAnswerAudio, type RetainedAnswerAudio } from "./retained-answer-audio.js";
 
@@ -369,7 +370,9 @@ export function attachTranscriptionWebSocket(
     websocketServer.handleUpgrade(request, socket, head, (websocket) => websocketServer.emit("connection", websocket, request));
   });
 
-  websocketServer.on("connection", (socket) => {
+  websocketServer.on("connection", (socket, request) => {
+    // Every line this connection writes carries the interview it belongs to (sent by the client as a query parameter).
+    const logContext: LogContext = { interviewId: parseInterviewId(new URL(request.url ?? "/", "http://localhost").searchParams.get("interviewId")) };
     let sessionId: string | null = null;
     let retainedSession: StreamingSession | null = null;
     let nextSequence = 0;
@@ -1155,7 +1158,7 @@ export function attachTranscriptionWebSocket(
       }, authStartTimeoutMs);
     }
 
-    socket.on("message", (data, isBinary) => {
+    socket.on("message", (data, isBinary) => runWithLogContext(logContext, () => {
       if (!authenticated) {
         if (authenticating) return;
         const candidate = isBinary || !Buffer.isBuffer(data) ? null : parseMessage(data);
@@ -1170,6 +1173,7 @@ export function attachTranscriptionWebSocket(
           if (socket.readyState !== WebSocket.OPEN || finishing) return;
           authenticated = true;
           authenticatedUserId = user.userId;
+          logContext.userId = shortUserId(user.userId);
           if (authTimer !== null) clearTimeout(authTimer);
           authTimer = null;
           handleMessage(data, isBinary);
@@ -1181,7 +1185,7 @@ export function attachTranscriptionWebSocket(
         return;
       }
       handleMessage(data, isBinary);
-    });
+    }));
 
     const handleMessage = (data: Buffer | ArrayBuffer | Buffer[], isBinary: boolean) => {
       if (isBinary) {
@@ -1458,7 +1462,7 @@ export function attachTranscriptionWebSocket(
       }
     };
 
-    socket.on("close", () => {
+    socket.on("close", () => runWithLogContext(logContext, () => {
       if (started && !finalRequested && !finishing) {
         const band = maxLevel === 0 ? "zero" : maxLevel < 0.005 ? "below_0.005" : maxLevel < 0.015 ? "below_0.015" : maxLevel < 0.05 ? "below_0.05" : "above_0.05";
         const current = sessionId ? sessions.get(sessionId) : undefined;
@@ -1479,7 +1483,7 @@ export function attachTranscriptionWebSocket(
       if (retainedSession) retainedSession.cancelled = true;
       sessionId = null;
       retainedSession = null;
-    });
+    }));
   });
 }
 

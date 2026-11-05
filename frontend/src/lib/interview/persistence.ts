@@ -6,6 +6,7 @@ import { invalidateDashboardCache, sharedLoad } from "@/lib/dashboard-data-cache
 import type { ProgressRecord } from "./progress-insights.mjs";
 import type { AzureMetricSummary } from "./report-metrics.mjs";
 import type { JobDirection } from "./job-direction.mjs";
+import { reportInterviewLifecycle } from "./audio-diagnostics";
 import { buildInterviewSessionPayload } from "./session-payload.mjs";
 import { normalizeFocus, normalizeSeniority } from "./interview-normalization.mjs";
 
@@ -109,7 +110,7 @@ async function authenticatedClient(): Promise<PersistenceResult<{ client: Supaba
   }
 }
 
-export async function createInterviewSession(config: InterviewConfig, id?: string): Promise<PersistenceResult<InterviewSession>> {
+export async function createInterviewSession(config: InterviewConfig, id?: string, origin: "new" | "resumed" = "new"): Promise<PersistenceResult<InterviewSession>> {
   const auth = await authenticatedClient();
   if (!auth.ok) return auth;
   const { client, userId } = auth.value;
@@ -120,9 +121,17 @@ export async function createInterviewSession(config: InterviewConfig, id?: strin
     .single();
   if (error?.code === "23505" && id) {
     const existing = await client.from("interviews").select(sessionColumns).eq("id", id).eq("user_id", userId).single();
-    if (!existing.error && existing.data) return { ok: true, value: toSession(existing.data as InterviewRow) };
+    if (!existing.error && existing.data) {
+      // The same id was already saved: a retry, a reload or a second tab. Logged so a duplicate can be told apart from a new session.
+      reportInterviewLifecycle({ interviewId: id, lifecycleOutcome: "existing", lifecycleOrigin: origin });
+      return { ok: true, value: toSession(existing.data as InterviewRow) };
+    }
   }
-  if (error) return failure(error);
+  if (error) {
+    reportInterviewLifecycle({ interviewId: id, lifecycleOutcome: error.message?.includes("SESSION_LIMIT_REACHED") ? "limit_reached" : "failed", lifecycleOrigin: origin });
+    return failure(error);
+  }
+  reportInterviewLifecycle({ interviewId: id ?? (data as InterviewRow).id, lifecycleOutcome: "created", lifecycleOrigin: origin });
   invalidateDashboardCache("progress");
   return { ok: true, value: toSession(data as InterviewRow) };
 }
@@ -184,6 +193,8 @@ export async function updateInterviewStatus(
     .select(sessionColumns)
     .single();
   if (error) return failure(error);
+  // Only the first transition: the status is synced again on every re-sync of a finished interview.
+  if (first.data) reportInterviewLifecycle({ interviewId, lifecycleOutcome: status });
   invalidateDashboardCache("progress");
   return { ok: true, value: toSession(data as InterviewRow) };
 }

@@ -38,12 +38,14 @@ export function createAccessTokenReader(getSession, target = globalThis) {
   };
 }
 
-/** fetch with `Authorization: Bearer <access token>`; a 401 response also raises the session-expired notice. */
-export function createAuthorizedFetch(getAccessToken, fetcher = (...args) => fetch(...args), target = globalThis) {
+/** fetch with `Authorization: Bearer <access token>`; a 401 response also raises the session-expired notice. `getInterviewId` tags the call with the open interview (X-Interview-Id) so backend logs can be followed per session. */
+export function createAuthorizedFetch(getAccessToken, fetcher = (...args) => fetch(...args), target = globalThis, getInterviewId = () => null) {
   return async function authorizedFetch(input, init = {}) {
     const token = await getAccessToken();
     const headers = new Headers(init.headers);
     headers.set("Authorization", `Bearer ${token}`);
+    const interviewId = getInterviewId();
+    if (interviewId) headers.set("X-Interview-Id", interviewId);
     const response = await fetcher(input, { ...init, headers });
     if (response.status === 401) notifySessionExpired(target);
     return response;

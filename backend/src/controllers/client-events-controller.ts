@@ -1,11 +1,13 @@
 import type { RequestHandler } from "express";
 
+import { parseInterviewId } from "../logging/structured-logging.js";
+
 /** Content-free client audio diagnostics. Only the whitelisted fields below ever reach the logs. */
 export const maxClientEventsPerRequest = 20;
 /** Global safety valve against log flooding (events per minute, per process). */
 export const maxClientEventsPerMinute = 1_200;
 
-const kinds = ["playback_start", "playback_playing", "playback_play_resolved", "playback_ended", "playback_error", "playback_timeout", "unlock", "mic_open", "mic_close", "mic_error", "mic_level_check", "audio_session", "ack_preloaded", "ack_play", "ack_play_resolved", "ack_play_failed", "ack_ended", "ack_skipped", "ack_overlap", "ack_question_gap", "turn_preparation", "handoff_timing", "question_start_timing", "transcription_failure", "resume_analysis", "closing_reaction"] as const;
+const kinds = ["playback_start", "playback_playing", "playback_play_resolved", "playback_ended", "playback_error", "playback_timeout", "unlock", "mic_open", "mic_close", "mic_error", "mic_level_check", "audio_session", "ack_preloaded", "ack_play", "ack_play_resolved", "ack_play_failed", "ack_ended", "ack_skipped", "ack_overlap", "ack_question_gap", "turn_preparation", "handoff_timing", "question_start_timing", "transcription_failure", "resume_analysis", "closing_reaction", "interview_lifecycle"] as const;
 /** Why an instant acknowledgement was not spoken. */
 const ackSkipReasons = ["not_loaded", "not_applicable", "question_started"] as const;
 const reactionSources = ["model", "fallback", "none"] as const;
@@ -20,6 +22,9 @@ const failureReasons = ["connection", "timeout", "setup", "unsupported", "closed
 const errorNames = ["NotAllowedError", "NotSupportedError", "AbortError", "NotFoundError", "InvalidStateError", "EncodingError", "NotReadableError", "SecurityError", "OverconstrainedError", "TypeError", "Error", "MediaError", "other"] as const;
 const audioContextStates = ["suspended", "running", "closed", "interrupted", "none"] as const;
 const audioSessionTypes = ["auto", "playback", "transient", "transient-solo", "ambient", "play-and-record"] as const;
+/** What happened to an interview (kind "interview_lifecycle") and how the screen was reached. */
+const lifecycleOutcomes = ["created", "existing", "failed", "limit_reached", "completed", "abandoned"] as const;
+const lifecycleOrigins = ["new", "resumed"] as const;
 const platforms = ["ios", "android", "desktop"] as const;
 const inAppBrowsers = ["google", "instagram", "facebook", "linkedin", "tiktok", "line", "twitter", "none"] as const;
 const outputs = ["element", "webaudio"] as const;
@@ -45,6 +50,8 @@ const enumFields: Record<string, readonly string[]> = {
   resumeStage: resumeStages,
   resumeCode: resumeCodes,
   resumeReason: resumeReasons,
+  lifecycleOutcome: lifecycleOutcomes,
+  lifecycleOrigin: lifecycleOrigins,
 };
 // Numeric fields with their inclusive [min, max] range.
 const numberFields: Record<string, readonly [number, number]> = {
@@ -104,6 +111,8 @@ export function sanitizeClientEvent(raw: unknown): UnknownRecord | null {
     if (typeof value === "string" && allowed.includes(value)) event[field] = value;
   }
   if (typeof event.kind !== "string") return null;
+  const interviewId = parseInterviewId(raw.interviewId);
+  if (interviewId) event.interviewId = interviewId;
   for (const [field, [min, max]] of Object.entries(numberFields)) {
     const value = raw[field];
     if (typeof value === "number" && Number.isFinite(value) && value >= min && value <= max) event[field] = Math.round(value * 1_000) / 1_000;
@@ -132,7 +141,7 @@ export function createClientEventsController(log: (line: string) => void = (line
       if (!event || windowCount >= maxClientEventsPerMinute) continue;
       windowCount += 1;
       accepted += 1;
-      log(JSON.stringify({ event: "client_audio_diagnostic", ...event }));
+      log(JSON.stringify({ event: event.kind === "interview_lifecycle" ? "interview_lifecycle" : "client_audio_diagnostic", ...event }));
     }
     response.status(202).json({ accepted });
   };

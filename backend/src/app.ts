@@ -15,6 +15,7 @@ import type { SpeechProvider } from "./speech/types.js";
 import { loadThinkingConfig, type ThinkingConfig } from "./thinking/config.js";
 import { createThinkingService } from "./thinking/openrouter-thinking-service.js";
 import { createOrchestrationService } from "./thinking/openrouter-orchestration-service.js";
+import { bindLogContext, bindLogUser } from "./logging/structured-logging.js";
 import { createInterviewReportService } from "./thinking/openrouter-interview-report-service.js";
 import { createJobDirectionService } from "./thinking/openrouter-job-direction-service.js";
 import { createResumeDirectionService } from "./thinking/openrouter-resume-direction-service.js";
@@ -141,7 +142,9 @@ export function createApp({ speechConfig, speechProvider, transcriptionConfig, t
   });
 
   const verifier = accessTokenVerifier === undefined ? defaultAccessTokenVerifier : accessTokenVerifier;
+  app.use("/api/v1", bindLogContext);
   app.use("/api/v1", requireAccessToken(verifier, (request) => request.method === "GET" && request.path === "/speech/health"));
+  app.use("/api/v1", bindLogUser);
   app.use("/api/v1", createApiRouter(resolvedSpeechProvider, resolvedSpeechConfig, resolvedTranscriptionService, resolvedThinkingService, resolvedOrchestrationService, resolvedReportService, resolvedJobDirectionService, resolvedResumeDirectionService, resolvedJobDirectionUserLimit, clientEventLogger, speculativeService, resolvedThinkingConfig.speculativeHandoffEnabled === true, resolvedClosingReactionService, resolvedPolishedAnswerService, resolvedRedoCheckService, adminUsageService, adminUserIds, resolvedPronunciationAssessmentService, practiceDailyLimit, practiceLogger, persistedReportGenerator, resolvedShortReplyService, resolvedConversationTurnService, resolvedConversationPlanService, conversationPlanUserLimit));
   app.use(notFoundHandler);
   app.use(errorHandler);
