@@ -222,6 +222,8 @@ main{overflow-x:clip}
 .tile.me.rec::after{opacity:calc(.18 + var(--lvl) * .82)}
 .avwall{flex:1;display:grid;place-items:center;background:radial-gradient(closest-side,#f2e6cf,transparent 90%),#e9eee3;position:relative}
 .avwall img{height:46%;max-height:150px;width:auto;transition:transform .3s}
+.tile.int.talk .avwall img{animation:bob .9s ease-in-out infinite alternate}
+@keyframes bob{from{transform:translateY(0) rotate(-2deg)}to{transform:translateY(-6px) rotate(2deg)}}
 .cap{position:absolute;left:12px;right:12px;bottom:40px;z-index:4;background:rgba(14,42,31,.82);color:#f3f4ee;border-radius:12px;padding:9px 13px;font-size:clamp(.82rem,1.4vw,1rem);line-height:1.4;max-height:58%;overflow:hidden;transition:opacity .25s}
 .cap:empty,.cap.off{opacity:0}
 .nm{position:absolute;left:10px;bottom:10px;z-index:4;display:inline-flex;align-items:center;gap:8px;background:rgba(14,42,31,.82);color:#f3f4ee;border-radius:99px;padding:4px 11px;font-size:.74rem}
