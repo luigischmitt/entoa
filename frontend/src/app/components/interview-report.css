@@ -73,6 +73,7 @@
 .rp-phint { margin: 0 0 0 1.05rem; font-size: 0.82rem; line-height: 1.45; color: var(--ds-text-2); }
 .rp-psummary { margin: 0; font-size: 0.98rem; line-height: 1.65; color: var(--ds-ink); }
 .rp-pnote { margin: 0; font-size: 0.76rem; line-height: 1.5; color: var(--ds-text-2); }
+.rp-errs-good { margin-bottom: 0.75rem; color: var(--ds-green); font-weight: 600; }
 .rp-good { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
 .rp-good li { display: flex; gap: 0.55rem; align-items: baseline; font-size: 0.9rem; line-height: 1.4; }
 .rp-good li::before { content: ""; width: 6px; height: 6px; flex: none; border-radius: 2px; background: var(--ds-green); transform: translateY(-1px); }

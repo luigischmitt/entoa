@@ -31,6 +31,7 @@ import { DEFAULT_INTERVIEWER_VOICE } from "@/lib/interview/voices.mjs";
 import { readStoredInterviewerCharacter, storeInterviewerCharacter } from "@/lib/interview/interviewer-character-preference.mjs";
 import { readDashboardCache } from "@/lib/dashboard-data-cache.mjs";
 import { loadProgressRecords } from "@/lib/interview/persistence";
+import { registerDashboardNavigator } from "@/lib/dashboard-navigation";
 import { loadSessionAllowance, readCachedSessionAllowance, TRIAL_CONTACT_EMAIL, type SessionAllowance } from "@/lib/interview/session-allowance";
 import { buildHomeInsights } from "@/lib/interview/home-insights.mjs";
 import { buildProgressInsights, type ProgressRecord } from "@/lib/interview/progress-insights.mjs";
@@ -749,6 +750,9 @@ export default function App({ initialView = "home" }: { initialView?: InitialVie
     startViewTransition(() => setView(nextView));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  // Report links to /dashboard?view=… switch the view in place while the dashboard is mounted.
+  useEffect(() => registerDashboardNavigator(navigate));
 
   return (
     <div lang={locale === "en" ? "en" : "pt-BR"} className="min-h-dvh overflow-x-clip bg-background text-foreground">
