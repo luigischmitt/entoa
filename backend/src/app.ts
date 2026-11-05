@@ -27,6 +27,7 @@ import { createShortReplyService, type ShortReplyService } from "./thinking/shor
 import { createConversationTurnService, type ConversationTurnService } from "./thinking/conversation-turn-service.js";
 import { createConversationPlanService, type ConversationPlanService } from "./thinking/conversation-plan-service.js";
 import { createGermanConversationPlanService, createGermanConversationTurnService, type GermanConversationPlanService, type GermanConversationTurnService } from "./thinking/german-conversation-service.js";
+import { createGermanConversationReportService, type GermanConversationReportService } from "./thinking/german-conversation-report-service.js";
 import { createRedoCheckService, type RedoCheckService } from "./thinking/redo-check-service.js";
 import { SpeculativeTurnAnalysisService } from "./thinking/speculative-turn-analysis-service.js";
 import { FollowUpWriter } from "./thinking/follow-up-writer.js";
@@ -97,9 +98,11 @@ type AppDependencies = {
   germanConversationPlanService?: GermanConversationPlanService | null;
   /** Omit to create the German turn service from the thinking config; pass null to disable German conversations. */
   germanConversationTurnService?: GermanConversationTurnService | null;
+  /** Omit to create the German report service from the thinking config; pass null to disable the German report. */
+  germanConversationReportService?: GermanConversationReportService | null;
 };
 
-export function createApp({ speechConfig, speechProvider, transcriptionConfig, transcriptionService, thinkingConfig, thinkingService, orchestrationService, reportService, jobDirectionService, resumeDirectionService, jobDirectionUserLimit, accessTokenVerifier, clientEventLogger, closingReactionService, shortReplyService, polishedAnswerService, redoCheckService, adminUsageService, adminUserIds, pronunciationAssessmentService, practiceDailyLimit, practiceLogger, persistedReportPersistence, conversationTurnService, conversationPlanService, germanConversationPlanService, germanConversationTurnService }: AppDependencies = {}) {
+export function createApp({ speechConfig, speechProvider, transcriptionConfig, transcriptionService, thinkingConfig, thinkingService, orchestrationService, reportService, jobDirectionService, resumeDirectionService, jobDirectionUserLimit, accessTokenVerifier, clientEventLogger, closingReactionService, shortReplyService, polishedAnswerService, redoCheckService, adminUsageService, adminUserIds, pronunciationAssessmentService, practiceDailyLimit, practiceLogger, persistedReportPersistence, conversationTurnService, conversationPlanService, germanConversationPlanService, germanConversationTurnService, germanConversationReportService }: AppDependencies = {}) {
   const resolvedSpeechConfig = speechConfig ?? loadSpeechConfig();
   const resolvedSpeechProvider = speechProvider ?? createSpeechProvider(resolvedSpeechConfig);
   const resolvedTranscriptionService = transcriptionService
@@ -125,6 +128,7 @@ export function createApp({ speechConfig, speechProvider, transcriptionConfig, t
   const germanConversationModel = resolvedThinkingConfig.interviewDirectionModel ?? "anthropic/claude-haiku-5.5";
   const resolvedGermanConversationPlanService = germanConversationPlanService === undefined ? createGermanConversationPlanService(resolvedThinkingConfig.openRouterApiKey ?? undefined, germanConversationModel) : germanConversationPlanService;
   const resolvedGermanConversationTurnService = germanConversationTurnService === undefined ? createGermanConversationTurnService(resolvedThinkingConfig.openRouterApiKey ?? undefined, germanConversationModel) : germanConversationTurnService;
+  const resolvedGermanConversationReportService = germanConversationReportService === undefined ? createGermanConversationReportService(resolvedThinkingConfig.openRouterApiKey ?? undefined, germanConversationModel) : germanConversationReportService;
   const conversationPlanUserLimit = new JobDirectionUserLimit();
   // Only mistral is served by the pinned provider; other models use plain OpenRouter routing.
   const speculativeService = resolvedThinkingConfig.openRouterApiKey ? new SpeculativeTurnAnalysisService({ apiKey: resolvedThinkingConfig.openRouterApiKey, model: speculativeModel, timeoutMs: speculativeAnalysisTimeoutMs() }, speculativeModel.startsWith("mistralai/") ? pinnedOpenRouterFetch : fetch, new FollowUpWriter({ apiKey: resolvedThinkingConfig.openRouterApiKey, model: process.env.INTERVIEW_FOLLOW_UP_MODEL?.trim() || speculativeModel, timeoutMs: speculativeAnalysisTimeoutMs() }, speculativeModel.startsWith("mistralai/") ? pinnedOpenRouterFetch : fetch)) : null;
@@ -154,7 +158,7 @@ export function createApp({ speechConfig, speechProvider, transcriptionConfig, t
   app.use("/api/v1", bindLogContext);
   app.use("/api/v1", requireAccessToken(verifier, (request) => request.method === "GET" && request.path === "/speech/health"));
   app.use("/api/v1", bindLogUser);
-  app.use("/api/v1", createApiRouter(resolvedSpeechProvider, resolvedSpeechConfig, resolvedTranscriptionService, resolvedThinkingService, resolvedOrchestrationService, resolvedReportService, resolvedJobDirectionService, resolvedResumeDirectionService, resolvedJobDirectionUserLimit, clientEventLogger, speculativeService, resolvedThinkingConfig.speculativeHandoffEnabled === true, resolvedClosingReactionService, resolvedPolishedAnswerService, resolvedRedoCheckService, adminUsageService, adminUserIds, resolvedPronunciationAssessmentService, practiceDailyLimit, practiceLogger, persistedReportGenerator, resolvedShortReplyService, resolvedConversationTurnService, resolvedConversationPlanService, conversationPlanUserLimit, resolvedGermanConversationPlanService, resolvedGermanConversationTurnService));
+  app.use("/api/v1", createApiRouter(resolvedSpeechProvider, resolvedSpeechConfig, resolvedTranscriptionService, resolvedThinkingService, resolvedOrchestrationService, resolvedReportService, resolvedJobDirectionService, resolvedResumeDirectionService, resolvedJobDirectionUserLimit, clientEventLogger, speculativeService, resolvedThinkingConfig.speculativeHandoffEnabled === true, resolvedClosingReactionService, resolvedPolishedAnswerService, resolvedRedoCheckService, adminUsageService, adminUserIds, resolvedPronunciationAssessmentService, practiceDailyLimit, practiceLogger, persistedReportGenerator, resolvedShortReplyService, resolvedConversationTurnService, resolvedConversationPlanService, conversationPlanUserLimit, resolvedGermanConversationPlanService, resolvedGermanConversationTurnService, resolvedGermanConversationReportService));
   app.use(notFoundHandler);
   app.use(errorHandler);
 

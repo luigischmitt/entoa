@@ -89,3 +89,57 @@ export async function requestConversationTurn(body: ConversationTurnRequest, sig
   if (!response.ok) throw new Error(`Conversation turn failed: ${response.status}`);
   return parseReply(await response.json());
 }
+
+export type GermanConversationReport = {
+  summary: string;
+  corrections: Array<{ original: string; corrected: string; explanation: string }>;
+  vocabulary: Array<{ de: string; pt: string }>;
+  practice: Array<{ de: string; pt: string }>;
+};
+
+const maxCorrections = 6;
+const maxVocabulary = 8;
+const maxPractice = 3;
+
+/** Keeps the well-formed items of an array (up to `max`); anything else is dropped. */
+function parseItems<T>(value: unknown, max: number, parse: (item: Record<string, unknown>) => T | null): T[] {
+  if (!Array.isArray(value)) return [];
+  const items: T[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    const parsed = parse(item);
+    if (parsed) items.push(parsed);
+    if (items.length === max) break;
+  }
+  return items;
+}
+
+function parseGermanReport(body: unknown): GermanConversationReport {
+  if (!isRecord(body) || typeof body.summary !== "string") throw new Error("Invalid German conversation report");
+  return {
+    summary: body.summary,
+    corrections: parseItems(body.corrections, maxCorrections, (item) =>
+      typeof item.original === "string" && typeof item.corrected === "string" && typeof item.explanation === "string"
+        ? { original: item.original, corrected: item.corrected, explanation: item.explanation }
+        : null),
+    vocabulary: parseItems(body.vocabulary, maxVocabulary, (item) =>
+      typeof item.de === "string" && typeof item.pt === "string" ? { de: item.de, pt: item.pt } : null),
+    practice: parseItems(body.practice, maxPractice, (item) =>
+      typeof item.de === "string" && typeof item.pt === "string" ? { de: item.de, pt: item.pt } : null),
+  };
+}
+
+/** The written report of a German conversation. Rejects on any failure; the room shows a retry state. */
+export async function requestGermanConversationReport(
+  body: { topic: string; lines: Array<{ speaker: "tuck" | "person"; text: string }> },
+  signal: AbortSignal,
+): Promise<GermanConversationReport> {
+  const response = await authorizedFetch(`${backendBaseUrl}/api/v1/thinking/german-conversation-report`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!response.ok) throw new Error(`German conversation report failed: ${response.status}`);
+  return parseGermanReport(await response.json());
+}

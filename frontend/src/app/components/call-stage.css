@@ -223,14 +223,15 @@
    "blurred edges"), so it carries padding sized to the toast shadow and cancels it with negative margins: layout is unchanged. */
 .mt-toasts { box-sizing: border-box; display: flex; width: calc(100% + 32px); max-width: calc(34rem + 32px); max-height: 34dvh; flex-direction: column; gap: 8px; margin: 0 -16px -14px; padding: 2px 16px 14px; overflow-y: auto; overscroll-behavior: contain; }
 .mt-toasts:empty { margin: 0; padding: 0; }
-.mt-toast { display: flex; align-items: flex-start; gap: 10px; border-radius: 14px; background: var(--mt-toast-bg); color: var(--mt-toast-fg); padding: 10px 12px; font-size: 0.875rem; line-height: 1.25rem; box-shadow: 0 0 0 1px var(--mt-toast-line), 0 6px 14px -8px rgb(0 0 0 / 0.4); animation: mt-toast-in 340ms var(--ease-out) backwards; }
+/* The message keeps a readable width: when the actions do not fit beside it, they wrap onto their own row. */
+.mt-toast { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; border-radius: 14px; background: var(--mt-toast-bg); color: var(--mt-toast-fg); padding: 10px 12px; font-size: 0.875rem; line-height: 1.25rem; box-shadow: 0 0 0 1px var(--mt-toast-line), 0 6px 14px -8px rgb(0 0 0 / 0.4); animation: mt-toast-in 340ms var(--ease-out) backwards; }
 @keyframes mt-toast-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 .mt-toast-icon { flex: none; margin-top: 2px; color: var(--ds-green); }
 .mt-toast[data-tone="warn"] .mt-toast-icon { color: var(--ds-warning); }
 .mt-toast[data-tone="error"] { background: var(--ds-error-tint); color: var(--ds-error); }
 .mt-toast[data-tone="error"] .mt-toast-icon { color: var(--ds-error); }
-.mt-toast-body { min-width: 0; flex: 1; overflow-wrap: anywhere; }
-.mt-toast-actions { display: flex; flex: none; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; }
+.mt-toast-body { min-width: 0; flex: 1 1 14rem; overflow-wrap: anywhere; }
+.mt-toast-actions { display: flex; flex: none; max-width: 100%; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; margin-left: auto; }
 .mt-toast-btn { min-height: 36px; border-radius: 9999px; background: var(--ds-ink); color: var(--ds-cream); padding: 0 14px; font-size: 0.8125rem; font-weight: 600; transition: transform var(--ds-dur-press) var(--ease-out), opacity var(--ds-dur-fast) ease; }
 .mt-toast-btn:active:not(:disabled) { transform: scale(0.97); }
 .mt-toast-btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -352,6 +353,7 @@
 }
 
 .mt-toast-link { display: inline-flex; align-items: center; text-decoration: none; }
-.mt-toast-select { min-height: 44px; max-width: 100%; border-radius: 9999px; background: var(--ds-ink); color: var(--ds-cream); padding: 0 14px; font-size: 0.8125rem; font-weight: 600; text-overflow: ellipsis; cursor: pointer; }
+/* Device names can be very long: the picker keeps a fixed width and the option list shows them in full. */
+.mt-toast-select { min-height: 44px; width: 12rem; max-width: 100%; border-radius: 9999px; background: var(--ds-ink); color: var(--ds-cream); padding: 0 14px; font-size: 0.8125rem; font-weight: 600; text-overflow: ellipsis; cursor: pointer; }
 .mt-toast-select option { background: var(--ds-popover); color: var(--ds-ink); }
 .mt-toast .mt-toast-select:focus-visible { outline: 2px solid var(--ds-green); outline-offset: 2px; }

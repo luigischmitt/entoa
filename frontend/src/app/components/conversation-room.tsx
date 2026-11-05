@@ -30,6 +30,7 @@ import { useSessionVoice } from "../hooks/use-session-voice";
 import { InterviewReport } from "./interview-report";
 import { EndCallDialog } from "./end-call-dialog";
 import { GermanDialogue, type GermanDialogueLine } from "./german-dialogue";
+import { GermanReport } from "./german-report";
 import "./interview-room.css";
 
 type ConversationTurn = { sequenceNumber: number; speaker: "interviewer" | "candidate"; content: string | null };
@@ -358,8 +359,10 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
           <h1 className="ds-title">{t("Conversa encerrada")}</h1>
           <p className="ds-small mt-2">{plan.title} · {formatClock(seconds)}</p>
           <div className="mt-8">
-            <GermanDialogue lines={dialogue} suggestions={[]} live={false} full />
+            <GermanReport topic={plan.title} lines={dialogue.slice(-80).map(({ speaker, text }) => ({ speaker, text }))} />
           </div>
+          <p className="ds-label mt-8 mb-3">{t("Conversa")}</p>
+          <GermanDialogue lines={dialogue} suggestions={[]} live={false} full />
         </main>
       );
     }
