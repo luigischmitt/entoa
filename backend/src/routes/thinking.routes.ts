@@ -9,7 +9,9 @@ import { createSpeculativeTurnController, createSpeculativeTurnStatusController 
 import { createClosingReactionController } from "../controllers/closing-reaction-controller.js";
 import { createShortReplyController } from "../controllers/short-reply-controller.js";
 import { createConversationLanguagesController, createConversationPlanController, createConversationTurnController } from "../controllers/conversation-controller.js";
+import { createGermanConversationReportController } from "../controllers/german-conversation-report-controller.js";
 import type { GermanConversationPlanService, GermanConversationTurnService } from "../thinking/german-conversation-service.js";
+import type { GermanConversationReportService } from "../thinking/german-conversation-report-service.js";
 import { createResumeDirectionHandlers } from "../controllers/resume-direction-controller.js";
 import type { InterviewerSpeechPrefetcher } from "../speech/interviewer-prefetcher.js";
 import { JobDirectionUserLimit } from "../thinking/job-direction-user-limit.js";
@@ -25,7 +27,7 @@ import type { RedoCheckService } from "../thinking/redo-check-service.js";
 import type { PersistedReportGenerator } from "../controllers/persisted-interview-report-controller.js";
 import { createPersistedInterviewReportController } from "../controllers/persisted-interview-report-controller.js";
 
-export function createThinkingRouter(service: ThinkingService | null, orchestrationService: InterviewOrchestrationService, reportService: InterviewReportService | null, jobDirectionService: JobDirectionService | null, resumeDirectionService: ResumeDirectionService | null, jobDirectionUserLimit: JobDirectionUserLimit, speechPrefetcher: InterviewerSpeechPrefetcher | null = null, speculativeService: SpeculativeTurnAnalysisService | null = null, speculativeEnabled = false, closingReactionService: ClosingReactionService | null = null, polishedAnswerService: PolishedAnswerService | null = null, redoCheckService: RedoCheckService | null = null, persistedReportGenerator: PersistedReportGenerator | null = null, shortReplyService: ShortReplyService | null = null, conversationTurnService: ConversationTurnService | null = null, conversationPlanService: ConversationPlanService | null = null, conversationPlanUserLimit: JobDirectionUserLimit = new JobDirectionUserLimit(), germanConversationPlanService: GermanConversationPlanService | null = null, germanConversationTurnService: GermanConversationTurnService | null = null) {
+export function createThinkingRouter(service: ThinkingService | null, orchestrationService: InterviewOrchestrationService, reportService: InterviewReportService | null, jobDirectionService: JobDirectionService | null, resumeDirectionService: ResumeDirectionService | null, jobDirectionUserLimit: JobDirectionUserLimit, speechPrefetcher: InterviewerSpeechPrefetcher | null = null, speculativeService: SpeculativeTurnAnalysisService | null = null, speculativeEnabled = false, closingReactionService: ClosingReactionService | null = null, polishedAnswerService: PolishedAnswerService | null = null, redoCheckService: RedoCheckService | null = null, persistedReportGenerator: PersistedReportGenerator | null = null, shortReplyService: ShortReplyService | null = null, conversationTurnService: ConversationTurnService | null = null, conversationPlanService: ConversationPlanService | null = null, conversationPlanUserLimit: JobDirectionUserLimit = new JobDirectionUserLimit(), germanConversationPlanService: GermanConversationPlanService | null = null, germanConversationTurnService: GermanConversationTurnService | null = null, germanConversationReportService: GermanConversationReportService | null = null) {
   const thinkingRouter = Router();
   thinkingRouter.post("/", createThinkingController(service));
   thinkingRouter.post("/job-direction", createJobDirectionController(jobDirectionService, jobDirectionUserLimit));
@@ -38,6 +40,7 @@ export function createThinkingRouter(service: ThinkingService | null, orchestrat
   thinkingRouter.get("/conversation-languages", createConversationLanguagesController());
   thinkingRouter.post("/conversation-turn", createConversationTurnController(conversationTurnService, germanConversationTurnService));
   thinkingRouter.post("/conversation-plan", createConversationPlanController(conversationPlanService, conversationPlanUserLimit, germanConversationPlanService));
+  thinkingRouter.post("/german-conversation-report", createGermanConversationReportController(germanConversationReportService));
   thinkingRouter.post("/report", createInterviewReportController(reportService));
   thinkingRouter.post("/report/interview/:interviewId", createPersistedInterviewReportController(persistedReportGenerator));
   thinkingRouter.post("/report/turn", createInterviewReportTurnController(reportService));
