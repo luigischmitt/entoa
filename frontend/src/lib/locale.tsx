@@ -324,7 +324,7 @@ const englishCopy: Record<string, string> = {
   "A análise desta entrevista ainda não está disponível.": "The analysis for this interview is not available yet.",
   "Ver relatório": "View report",
   "Abra o relatório para ver o que praticar.": "Open the report to see what to practice.",
-  "Como a Entoa funciona": "How Entoa works",
+  "Como o Entoa funciona": "How Entoa works",
   "Você faz uma entrevista por voz.": "You take a voice interview.",
   "Recebe um relatório do que ficou claro e do que praticar.": "You receive a report on what came through clearly and what to practice.",
   "Leva um foco para a próxima entrevista.": "You take one focus into the next interview.",
