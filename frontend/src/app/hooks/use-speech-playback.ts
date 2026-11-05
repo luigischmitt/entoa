@@ -31,12 +31,13 @@ export function useSpeechWarmup(attempt = 0) {
 
 /** Polls the backend for the interviewer voice readiness while `enabled`; stops when ready, on unmount or after 2 min. */
 export function useVoiceReadiness(enabled: boolean, attempt = 0): VoiceReadinessState {
-  const [state, setState] = useState<VoiceReadinessState>("warming");
+  // The voice is a hosted API with nothing to warm up: the setup is ready at once and only a failed status check says otherwise.
+  const [state, setState] = useState<VoiceReadinessState>("ready");
   useEffect(() => {
     if (!enabled) return;
     return startVoiceReadinessPolling({
       fetchStatus: () => fetchVoiceStatus(speechEndpoint, authorizedFetch),
-      onState: setState,
+      onState: (next) => setState(next === "warming" ? "ready" : next),
     });
   }, [enabled, attempt]);
   return state;
