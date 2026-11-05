@@ -193,6 +193,9 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
     await acknowledgements.beforeQuestion();
   }, [acknowledgements, waitForOpeningDelay]);
   const isTuckTurn = phase === "introducing" || phase === "speaking" || phase === "closing";
+  // During the call only the current round is on screen: Tuck's latest line, and the person's answer while Tuck prepares
+  // the next one. The whole conversation comes back on the ending page.
+  const currentRound = dialogue.slice(Math.max(0, dialogue.findLastIndex((line) => line.speaker === "tuck")));
   const speechSegments = useMemo(() => splitInterviewerSpeech(tuckLine), [tuckLine]);
   const { activeSegment, speechMessage, retrySpeech } = useSpeechPlayback(speechSegments, onTuckSpoken, isTuckTurn && config.playInterviewerAudio && voiceReady, undefined, preloadReactions, speechSpeed, speechFeed.push, waitForReaction, voice);
 
@@ -429,7 +432,7 @@ export function ConversationRoom({ config, plan, onLeave }: { config: InterviewC
           />
         </section>
 
-        {german && <GermanDialogue lines={dialogue} suggestions={suggestions} live />}
+        {german && <GermanDialogue lines={currentRound} suggestions={phase === "advancing" ? [] : suggestions} live />}
 
         <EndCallDialog
           open={endOpen}

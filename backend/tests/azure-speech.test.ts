@@ -113,7 +113,7 @@ describe("Azure SSML language follows the voice", () => {
   const ssmlFor = async (voice: string) => {
     let init: RequestInit | undefined;
     const provider = new AzureSpeechProvider({ key: "key", region: "brazilsouth", voice: "en-US-AndrewNeural", timeoutMs: 8_000, cooldownMs: 10_000, fetchImplementation: async (_url, requestInit) => { init = requestInit; return new Response("mp3"); } });
-    await provider.synthesize({ ...req, voice });
+    await provider.synthesize({ ...req, voice, speed: 1 });
     return String(init?.body);
   };
 
@@ -121,5 +121,8 @@ describe("Azure SSML language follows the voice", () => {
     expect(await ssmlFor("de-DE-FlorianMultilingualNeural")).toContain("<speak version='1.0' xml:lang='de-DE'><voice name='de-DE-FlorianMultilingualNeural'>");
     expect(await ssmlFor("en-US-BrianNeural")).toContain("xml:lang='en-US'");
     expect(await ssmlFor("en-GB-RyanNeural")).toContain("xml:lang='en-GB'");
+    // Beginners hear the German voice slower; the English voices keep the requested speed.
+    expect(await ssmlFor("de-DE-FlorianMultilingualNeural")).toContain("<prosody rate='-20%'>");
+    expect(await ssmlFor("en-US-BrianNeural")).toContain("<prosody rate='+0%'>");
   });
 });

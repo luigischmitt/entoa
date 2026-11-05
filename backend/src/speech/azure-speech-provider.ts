@@ -1,7 +1,10 @@
 import { SpeechProviderUnavailableError } from "./errors.js";
 import { readAudioBody } from "./provider-request.js";
 import type { SpeechProvider, SpeechProviderHealth, SpeechSynthesisRequest, SynthesizedSpeech } from "./types.js";
-import { isSelectableVoice } from "./voices.js";
+import { isAzureOnlyVoice, isSelectableVoice } from "./voices.js";
+
+/** The German voice talks to beginners: Azure renders it this much slower, which sounds natural (the client's playbackRate only stretches). */
+export const germanVoiceRate = 0.8;
 
 type AzureSpeechProviderOptions = {
   key: string;
@@ -53,6 +56,7 @@ export class AzureSpeechProvider implements SpeechProvider {
     const voice = isSelectableVoice(request.voice) ? request.voice : this.options.voice;
     // The SSML language follows the voice (de-DE for the German voice, en-US or en-GB for the English ones).
     const locale = voice.split("-").slice(0, 2).join("-");
+    const rate = azureRate(request.speed * (isAzureOnlyVoice(voice) ? germanVoiceRate : 1));
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const remaining = deadline - now();
       if (remaining <= 0) throw new SpeechProviderUnavailableError("Azure speech timed out.");
@@ -70,7 +74,7 @@ export class AzureSpeechProvider implements SpeechProvider {
             "X-Microsoft-OutputFormat": "audio-24khz-48kbitrate-mono-mp3",
             "User-Agent": "entoa-backend",
           },
-          body: `<speak version='1.0' xml:lang='${escapeXml(locale)}'><voice name='${escapeXml(voice)}'><prosody rate='${azureRate(request.speed)}'>${escapeXml(request.text)}</prosody></voice></speak>`,
+          body: `<speak version='1.0' xml:lang='${escapeXml(locale)}'><voice name='${escapeXml(voice)}'><prosody rate='${rate}'>${escapeXml(request.text)}</prosody></voice></speak>`,
           signal: controller.signal,
         });
         if (response.ok) {
