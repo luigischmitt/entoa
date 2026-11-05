@@ -30,6 +30,7 @@ import { DEFAULT_INTERVIEWER_VOICE } from "@/lib/interview/voices.mjs";
 import { readStoredInterviewerCharacter, storeInterviewerCharacter } from "@/lib/interview/interviewer-character-preference.mjs";
 import { readDashboardCache } from "@/lib/dashboard-data-cache.mjs";
 import { loadProgressRecords } from "@/lib/interview/persistence";
+import { loadSessionAllowance, readCachedSessionAllowance, TRIAL_CONTACT_EMAIL, type SessionAllowance } from "@/lib/interview/session-allowance";
 import { buildHomeInsights } from "@/lib/interview/home-insights.mjs";
 import { buildProgressInsights, type ProgressRecord } from "@/lib/interview/progress-insights.mjs";
 import { mergeVoiceSeries, voiceMetricSummary, voiceTrendCopy, voiceTrendMetrics } from "@/lib/interview/voice-trend.mjs";
@@ -309,11 +310,13 @@ function HomeView({
   onProgress,
   onOpenReport,
   onVoice,
+  allowance,
 }: {
   onStart: () => void;
   onProgress: () => void;
   onOpenReport: (interviewId: string) => void;
   onVoice: () => void;
+  allowance: SessionAllowance | null;
 }) {
   const { locale, t } = useLocale();
   const cachedRecords = readDashboardCache("progress") as ProgressRecord[] | undefined;
@@ -363,16 +366,27 @@ function HomeView({
               <>
                 <li><span><b>{insights.practiceCount}</b> {practiceCountWord}</span></li>
                 {lastInterviewDate && <li>{t("Última em {date}", { date: lastInterviewDate })}</li>}
-                <li>{t("Sessões de 5 a 25 minutos")}</li>
+                {allowance?.limited ? <li>{t("Sessões de {minutes} minutos no teste", { minutes: allowance.minutes })}</li> : <li>{t("Sessões de 5 a 25 minutos")}</li>}
               </>
             ) : (
               <>
                 <li>{t("Você responde falando, em inglês")}</li>
                 <li>{t("As perguntas saem da sua vaga")}</li>
-                <li>{t("Sessões de 5 a 25 minutos")}</li>
+                {allowance?.limited ? <li>{t("Sessões de {minutes} minutos no teste", { minutes: allowance.minutes })}</li> : <li>{t("Sessões de 5 a 25 minutos")}</li>}
               </>
             )}
           </ul>
+          {allowance?.limited && (
+            <p className="shl-home-trial ds-small">
+              {allowance.interviewsLeft + allowance.conversationsLeft > 0
+                ? t("Teste gratuito: você ainda tem {interviews} e {conversations}, de {minutes} minutos cada.", {
+                  interviews: t(allowance.interviewsLeft === 1 ? "1 entrevista" : "{count} entrevistas", { count: allowance.interviewsLeft }),
+                  conversations: t(allowance.conversationsLeft === 1 ? "1 conversa" : "{count} conversas", { count: allowance.conversationsLeft }),
+                  minutes: allowance.minutes,
+                })
+                : <>{t("Você usou suas sessões de teste. Para continuar praticando, escreva para")} <a href={`mailto:${TRIAL_CONTACT_EMAIL}`}>{TRIAL_CONTACT_EMAIL}</a>.</>}
+            </p>
+          )}
         </div>
 
           <div className="ds-block shl-home-card">
@@ -626,6 +640,19 @@ function SettingsView() {
 
 }
 
+function TrialUsedUp({ kind, onBack }: { kind: "interview" | "conversation"; onBack: () => void }) {
+  const { t } = useLocale();
+  return (
+    <main id="main-content" className={`${pageMain} shl-trial-used`}>
+      <section className="ds-card shl-trial-used-card">
+        <h1 className="ds-title">{t(kind === "interview" ? "Você já usou suas entrevistas de teste." : "Você já usou suas conversas de teste.")}</h1>
+        <p className="ds-lead">{t("O teste gratuito inclui 2 entrevistas e 2 conversas de 5 minutos. Para continuar praticando, escreva para")} <a href={`mailto:${TRIAL_CONTACT_EMAIL}`}>{TRIAL_CONTACT_EMAIL}</a>.</p>
+        <button type="button" className="ds-btn" onClick={onBack}>{t("Voltar ao início")}</button>
+      </section>
+    </main>
+  );
+}
+
 export default function App({ initialView = "home" }: { initialView?: InitialView }) {
   const { locale, t } = useLocale();
   const router = useRouter();
@@ -641,6 +668,17 @@ export default function App({ initialView = "home" }: { initialView?: InitialVie
   const [startError, setStartError] = useState(false);
   const [initialReportId, setInitialReportId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [allowance, setAllowance] = useState<SessionAllowance | null>(() => readCachedSessionAllowance());
+  const interviewTrialUsedUp = allowance?.limited === true && allowance.interviewsLeft === 0;
+  const conversationTrialUsedUp = allowance?.limited === true && allowance.conversationsLeft === 0;
+  const allowanceView = view === "home" || view === "interview-setup" || view === "free-mode" ? view : null;
+
+  useEffect(() => {
+    if (!allowanceView) return;
+    let active = true;
+    void loadSessionAllowance().then((next) => { if (active && next) setAllowance(next); });
+    return () => { active = false; };
+  }, [allowanceView]);
 
   useEffect(() => {
     let active = true;
@@ -738,13 +776,18 @@ export default function App({ initialView = "home" }: { initialView?: InitialVie
                 navigate("progress");
               }}
               onVoice={() => navigate("voice")}
+              allowance={allowance}
             />
           )}
           {startError && view === "interview-setup" && (
             <p role="alert" className="alert alert-warning mx-4 mt-4 text-sm sm:mx-8">{t("Não foi possível abrir a sala de entrevista neste navegador. Libere o armazenamento do site e tente novamente.")}</p>
           )}
-          {view === "interview-setup" && (
+          {view === "interview-setup" && interviewTrialUsedUp && (
+            <TrialUsedUp kind="interview" onBack={() => navigate("home")} />
+          )}
+          {view === "interview-setup" && !interviewTrialUsedUp && (
             <InterviewSetup
+              trialMinutes={allowance?.limited ? allowance.minutes : null}
               onBack={() => navigate("home")}
               voiceReadiness={voiceReadiness}
               onStart={(config) => {
@@ -763,7 +806,10 @@ export default function App({ initialView = "home" }: { initialView?: InitialVie
               }}
             />
           )}
-          {view === "free-mode" && <FreeModeSetup />}
+          {view === "free-mode" && conversationTrialUsedUp && (
+            <TrialUsedUp kind="conversation" onBack={() => navigate("home")} />
+          )}
+          {view === "free-mode" && !conversationTrialUsedUp && <FreeModeSetup trialMinutes={allowance?.limited ? allowance.minutes : null} />}
           {view === "progress" && (
             <ProgressView
               onStart={() => navigate("interview-setup")}

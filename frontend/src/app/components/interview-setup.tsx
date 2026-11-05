@@ -55,13 +55,18 @@ export function InterviewSetup({
   onBack,
   onStart,
   voiceReadiness,
+  trialMinutes,
 }: {
   onBack: () => void;
   /** Returns false when the hand-off could not be stored, so the start button becomes available again. */
   onStart: (config: InterviewConfig) => boolean | void;
   voiceReadiness: VoiceReadinessState;
+  trialMinutes?: number | null;
 }) {
   const [config, setConfig] = useState<InterviewConfig>(defaultInterviewConfig);
+  const trialDuration = typeof trialMinutes === "number" ? String(trialMinutes) : null;
+  // Adjusted during render (not in an effect) so the trial duration is in state from the first paint once known.
+  if (trialDuration && config.duration !== trialDuration) setConfig((current) => ({ ...current, duration: trialDuration }));
   const [jobDescription, setJobDescription] = useState("");
   const [jobDirectionStatus, setJobDirectionStatus] = useState<"idle" | "loading" | "error">("idle");
   const [jobDirectionError, setJobDirectionError] = useState("");
@@ -455,6 +460,7 @@ export function InterviewSetup({
     setStarting(true);
     const accepted = onStart({
       ...config,
+      ...(trialDuration ? { duration: trialDuration } : {}),
       role: config.role.trim(),
       voice,
       speechSpeed,
@@ -709,14 +715,18 @@ export function InterviewSetup({
 
               <fieldset className="flex min-w-0 flex-col gap-2">
                 <legend className="ds-label mb-2">{t("Duração da sessão")}</legend>
-                <SlidingSegmented
-                  name="duration"
-                  ariaLabel={t("Duração da sessão")}
-                  className="grid-cols-4 isu-duration"
-                  options={interviewDurationOptions.map((option) => ({ value: String(option), label: `${option} min` }))}
-                  value={config.duration}
-                  onChange={(value) => updateConfig("duration", value)}
-                />
+                {trialDuration ? (
+                  <p className="ds-small">{t("{minutes} minutos no teste gratuito", { minutes: trialDuration })}</p>
+                ) : (
+                  <SlidingSegmented
+                    name="duration"
+                    ariaLabel={t("Duração da sessão")}
+                    className="grid-cols-4 isu-duration"
+                    options={interviewDurationOptions.map((option) => ({ value: String(option), label: `${option} min` }))}
+                    value={config.duration}
+                    onChange={(value) => updateConfig("duration", value)}
+                  />
+                )}
               </fieldset>
             </div>
           </section>

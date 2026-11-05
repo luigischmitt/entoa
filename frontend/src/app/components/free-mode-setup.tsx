@@ -55,7 +55,7 @@ function drawSuggestions(recentIds: string[]): ConversationTopic[] {
  * until "Começar conversa". A picked suggestion starts from the bank with no backend call; a typed topic is planned
  * by Tuck first. Suggestions are drawn after mount, so server and first client render match and the area is reserved.
  */
-export function FreeModeSetup() {
+export function FreeModeSetup({ trialMinutes = null }: { trialMinutes?: number | null } = {}) {
   const { t } = useLocale();
   const router = useRouter();
   const mountedRef = useRef(false);
@@ -63,6 +63,7 @@ export function FreeModeSetup() {
   const [topic, setTopic] = useState("");
   const [bankTopic, setBankTopic] = useState<ConversationTopic | null>(null);
   const [duration, setDuration] = useState("5");
+  const trialDuration = typeof trialMinutes === "number" ? String(trialMinutes) : null;
   const [preparing, setPreparing] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
   const [startError, setStartError] = useState(false);
@@ -85,7 +86,7 @@ export function FreeModeSetup() {
       role: "Modo livre",
       seniority: "mid-level",
       focus: "mixed",
-      duration,
+      duration: trialDuration ?? duration,
       questionCount: null,
       voice,
       speechSpeed,
@@ -185,15 +186,19 @@ export function FreeModeSetup() {
 
           <fieldset className="flex min-w-0 flex-col gap-2">
             <legend className="ds-label mb-2">{t("Duração")}</legend>
-            <SlidingSegmented
-              name="free-mode-duration"
-              ariaLabel={t("Duração")}
-              className="grid-cols-3"
-              itemClassName="min-h-11"
-              options={durationOptions}
-              value={duration}
-              onChange={setDuration}
-            />
+            {trialDuration ? (
+              <p className="ds-small">{t("{minutes} minutos no teste gratuito", { minutes: trialDuration })}</p>
+            ) : (
+              <SlidingSegmented
+                name="free-mode-duration"
+                ariaLabel={t("Duração")}
+                className="grid-cols-3"
+                itemClassName="min-h-11"
+                options={durationOptions}
+                value={duration}
+                onChange={setDuration}
+              />
+            )}
           </fieldset>
 
           {planError && <p role="alert" className="text-sm font-medium text-danger">{t(planError)}</p>}
