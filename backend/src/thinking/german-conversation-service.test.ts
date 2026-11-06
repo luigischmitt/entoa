@@ -207,6 +207,43 @@ describe("German conversation turn service", () => {
     expect(result.personTranslation).toBeNull();
   });
 
+  it("asks again once when the reply comes without translation or suggestions, and keeps the complete one", async () => {
+    const replies = [{ ...validTurn, sayTranslation: null, suggestions: [] }, validTurn];
+    const calls = vi.fn();
+    const sequence: typeof fetch = async () => { calls(); return openRouterReply(replies.shift()); };
+    expect(await turnService(sequence).reply(turnInput())).toEqual({ ...validTurn, outcome: "decided" });
+    expect(calls).toHaveBeenCalledTimes(2);
+    const logged = vi.mocked(console.info).mock.calls.map((call) => String(call[0])).find((line) => line.includes("german_conversation_turn"));
+    expect(JSON.parse(logged!)).toMatchObject({ attempts: 2, translated: true, suggestions: 1, completionTokens: 80 });
+  });
+
+  it("asks only once for a complete reply and keeps the first reply when the second is no better", async () => {
+    const complete = vi.fn();
+    await turnService(fakeFetch(validTurn, complete)).reply(turnInput());
+    expect(complete).toHaveBeenCalledTimes(1);
+    const incomplete = vi.fn();
+    const result = await turnService(fakeFetch({ ...validTurn, suggestions: [] }, incomplete)).reply(turnInput());
+    expect(incomplete).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ say: validTurn.say, sayTranslation: validTurn.sayTranslation, suggestions: [], outcome: "decided" });
+  });
+
+  it("keeps the first reply when the second request times out", async () => {
+    let call = 0;
+    const slowSecond: typeof fetch = async (_url, init) => {
+      call += 1;
+      if (call === 1) return openRouterReply({ ...validTurn, suggestions: [] });
+      return new Promise<Response>((_resolve, reject) => { init?.signal?.addEventListener("abort", () => reject(new Error("aborted"))); });
+    };
+    const service = new GermanConversationTurnService({ apiKey: "test-key", model: "m", timeoutMs: 30 }, slowSecond);
+    expect(await service.reply(turnInput())).toMatchObject({ say: validTurn.say, suggestions: [], outcome: "decided" });
+  });
+
+  it("translates the German question even when it sits inside a Portuguese answer", async () => {
+    const reply = { personLanguage: "pt", answer: "Você pode dizer: \"Meine Schwester ist achtzehn.\" Wie alt bist du?", question: "Wie alt bist du?", questionTranslation: "Quantos anos você tem?", sayTranslation: null, personTranslation: null, suggestions: validTurn.suggestions, move: "CLARIFY", pathId: null };
+    const result = await turnService(fakeFetch(reply)).reply(turnInput({ transcript: "Minha irmã tem dezoito anos, como fala isso?" }));
+    expect(result).toMatchObject({ say: reply.answer, sayTranslation: "Quantos anos você tem?", outcome: "decided" });
+  });
+
   it("falls back on the timeout", async () => {
     const hanging: typeof fetch = async (_url, init) => new Promise<Response>((_resolve, reject) => { init?.signal?.addEventListener("abort", () => reject(new Error("aborted"))); });
     const service = new GermanConversationTurnService({ apiKey: "test-key", model: "m", timeoutMs: 5 }, hanging);

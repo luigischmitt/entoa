@@ -1,4 +1,4 @@
-import { parseOpenRouterUsage, type OpenRouterUsagePayload } from "./openrouter-usage.js";
+import { addOpenRouterUsage, parseOpenRouterUsage, type OpenRouterUsage, type OpenRouterUsagePayload } from "./openrouter-usage.js";
 import type { ConversationPath, ConversationTurnInput, ConversationTurnResult } from "./conversation-turn-service.js";
 import { maxConversationHistoryLines, stopRequest } from "./conversation-turn-service.js";
 
@@ -177,7 +177,8 @@ function validateTurn(value: unknown, input: ConversationTurnInput): GermanConve
   const sayTranslation = nullableText(record.sayTranslation, 600);
   // A Portuguese answer needs no translation, only the German question after it does.
   const portuguese = record.personLanguage === "pt";
-  const questionTranslation = question ? nullableText(record.questionTranslation, 200) : null;
+  // The question may sit inside the answer (and is then not repeated): its translation still covers the German in the line.
+  const questionTranslation = askedQuestion ? nullableText(record.questionTranslation, 200) : null;
   const translation = portuguese ? questionTranslation : sayTranslation && comparable(sayTranslation) !== comparable(say) ? sayTranslation : null;
   return { say, sayTranslation: translation, move: move === "NEW_PATH" && !path ? "FOLLOW" : move, pathId: path?.id ?? null, personTranslation, suggestions, outcome: "decided" };
 }
@@ -228,6 +229,14 @@ export class GermanConversationPlanService {
   }
 }
 
+/** A second request is started only this soon after the first one, so the turn stays inside the room's wait. */
+const retryWindowMs = 4_500;
+
+/** A decided turn that asks something must bring the Portuguese subtitle and the answers the person can say. */
+function isIncompleteTurn(result: GermanConversationTurnResult): boolean {
+  return result.outcome === "decided" && result.move !== "WRAP" && result.move !== "END" && (result.sayTranslation === null || result.suggestions.length === 0);
+}
+
 export class GermanConversationTurnService {
   constructor(private readonly options: { apiKey: string; model: string; timeoutMs?: number }, private readonly fetchImplementation: typeof fetch = fetch) {}
 
@@ -235,46 +244,58 @@ export class GermanConversationTurnService {
     const start = Date.now();
     let usage = parseOpenRouterUsage(undefined);
     let result = germanConversationFallback(input, "error");
+    let attempts = 0;
     const controller = new AbortController();
     let timedOut = false;
     const timer = setTimeout(() => { timedOut = true; controller.abort(); }, this.options.timeoutMs ?? 9_000);
     const abort = () => controller.abort();
     input.signal?.addEventListener("abort", abort, { once: true });
     try {
-      const response = await this.fetchImplementation("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${this.options.apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: this.options.model,
-          messages: [
-            { role: "system", content: germanConversationTurnSystemPrompt },
-            { role: "user", content: JSON.stringify({ topic: input.topic, phase: input.phase, paths: input.paths, usedPathIds: input.usedPathIds, history: input.history.slice(-maxConversationHistoryLines), transcript: input.silent ? "" : input.transcript, silent: input.silent === true }) },
-          ],
-          // Haiku 5.5 reasons by default (even at minimal effort) and the reasoning counts against max_tokens: a turn needs speed, not thought.
-          reasoning: { enabled: false },
-          max_tokens: 900,
-          usage: { include: true },
-          provider: { sort: "latency", require_parameters: true, data_collection: "deny" },
-          response_format: { type: "json_schema", json_schema: { name: "german_conversation_turn", strict: true, schema: turnSchema } },
-        }),
-        signal: controller.signal,
-      });
-      if (!response.ok) { await response.body?.cancel().catch(() => undefined); return result; }
-      const body = await response.json() as OpenRouterResponse;
-      usage = parseOpenRouterUsage(body.usage);
-      const content = body.choices?.[0]?.message?.content;
-      let value: unknown;
-      try { value = typeof content === "string" ? JSON.parse(content) : undefined; } catch { value = undefined; }
-      result = validateTurn(value, input);
+      // A reply without the Portuguese translation or the suggestions leaves the room without its subtitles: it is asked
+      // again once while there is time, and the first one is kept if the second is no better.
+      while (attempts < 2) {
+        attempts += 1;
+        const attempt = await this.request(input, controller.signal);
+        if (attempt.usage) usage = addOpenRouterUsage(usage, attempt.usage);
+        if (attempts === 1 || !isIncompleteTurn(attempt.result)) result = attempt.result;
+        if (!isIncompleteTurn(result) || Date.now() - start > retryWindowMs) break;
+      }
       return result;
     } catch {
-      result = germanConversationFallback(input, input.signal?.aborted ? "cancelled" : timedOut ? "timeout" : "error");
+      if (attempts <= 1 || result.outcome !== "decided") result = germanConversationFallback(input, input.signal?.aborted ? "cancelled" : timedOut ? "timeout" : "error");
       return result;
     } finally {
       clearTimeout(timer);
       input.signal?.removeEventListener("abort", abort);
-      console.info(JSON.stringify({ event: "german_conversation_turn", move: result.move, outcome: result.outcome, phase: input.phase, latencyMs: Math.max(0, Date.now() - start), ...usage }));
+      console.info(JSON.stringify({ event: "german_conversation_turn", move: result.move, outcome: result.outcome, phase: input.phase, attempts, translated: result.sayTranslation !== null, suggestions: result.suggestions.length, latencyMs: Math.max(0, Date.now() - start), ...usage }));
     }
+  }
+
+  private async request(input: ConversationTurnInput, signal: AbortSignal): Promise<{ result: GermanConversationTurnResult; usage?: OpenRouterUsage }> {
+    const response = await this.fetchImplementation("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${this.options.apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: this.options.model,
+        messages: [
+          { role: "system", content: germanConversationTurnSystemPrompt },
+          { role: "user", content: JSON.stringify({ topic: input.topic, phase: input.phase, paths: input.paths, usedPathIds: input.usedPathIds, history: input.history.slice(-maxConversationHistoryLines), transcript: input.silent ? "" : input.transcript, silent: input.silent === true }) },
+        ],
+        // Haiku 5.5 reasons by default (even at minimal effort) and the reasoning counts against max_tokens: a turn needs speed, not thought.
+        reasoning: { enabled: false },
+        max_tokens: 900,
+        usage: { include: true },
+        provider: { sort: "latency", require_parameters: true, data_collection: "deny" },
+        response_format: { type: "json_schema", json_schema: { name: "german_conversation_turn", strict: true, schema: turnSchema } },
+      }),
+      signal,
+    });
+    if (!response.ok) { await response.body?.cancel().catch(() => undefined); return { result: germanConversationFallback(input, "error") }; }
+    const body = await response.json() as OpenRouterResponse;
+    const content = body.choices?.[0]?.message?.content;
+    let value: unknown;
+    try { value = typeof content === "string" ? JSON.parse(content) : undefined; } catch { value = undefined; }
+    return { result: validateTurn(value, input), usage: parseOpenRouterUsage(body.usage) };
   }
 }
 
