@@ -19,6 +19,8 @@ import { CONVERSATION_TOPICS, pickConversationTopic, readRecentTopicIds, remembe
 import { unlockSharedAudio } from "@/lib/interview/audio-unlock.mjs";
 import { storeRoomHandoff } from "@/lib/interview/room-handoff.mjs";
 import { readStoredMicrophoneDeviceId } from "@/lib/interview/mic-device.mjs";
+import { requestMicrophoneAccess } from "@/lib/interview/mic-permission.mjs";
+import { micDeniedMessage } from "@/components/interview/microphone-capture";
 import { readStoredInterviewerCharacter } from "@/lib/interview/interviewer-character-preference.mjs";
 import { readStoredInterviewerVoice } from "@/lib/interview/voice-picker.mjs";
 import { readStoredInterviewerSpeechSpeed } from "@/lib/interview/interviewer-speech-speed.mjs";
@@ -125,8 +127,19 @@ export function FreeModeSetup({ trialMinutes = null }: { trialMinutes?: number |
     setBankTopic(picked);
   };
 
+  // The microphone is asked for here, while preparing, so the room has nothing left to ask. A conversation needs it, so a refusal stops.
+  const allowMicrophone = async () => {
+    const access = await requestMicrophoneAccess({ deviceId: storedMicrophoneId });
+    if (!mountedRef.current) return false;
+    if (!access.ok && access.reason === "denied") {
+      setPlanError(micDeniedMessage());
+      setPreparing(false);
+      return false;
+    }
+    return true;
+  };
+
   const startBankTopic = (picked: ConversationTopic) => {
-    unlockSharedAudio(true);
     rememberConversationTopic(window.localStorage, picked.id);
     startConversation(topicToConversationPlan(picked));
   };
@@ -138,12 +151,15 @@ export function FreeModeSetup({ trialMinutes = null }: { trialMinutes?: number |
     // English bank topics start with no backend call; German always goes through Tuck's plan in German.
     if (!german && bankTopic && text === bankTopic.title) {
       setPlanError(null);
-      startBankTopic(bankTopic);
+      unlockSharedAudio(true);
+      setPreparing(true);
+      if (await allowMicrophone()) startBankTopic(bankTopic);
       return;
     }
     unlockSharedAudio(true);
     setPreparing(true);
     setPlanError(null);
+    if (!(await allowMicrophone())) return;
     try {
       const plan = german
         ? await requestConversationPlan(text, AbortSignal.timeout(20_000), "de")

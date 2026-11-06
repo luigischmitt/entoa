@@ -17,6 +17,8 @@ import { PageIntro } from "./shared";
 import { inAppMicBody, inAppMicTitle, useCopyPageLink, useInAppBrowser } from "../hooks/use-in-app-browser";
 import { MicrophoneTest, type MicrophoneTestHandle } from "./microphone-test";
 import { readStoredMicrophoneDeviceId, storeMicrophoneDeviceId } from "@/lib/interview/mic-device.mjs";
+import { requestMicrophoneAccess } from "@/lib/interview/mic-permission.mjs";
+import { micDeniedMessage } from "@/components/interview/microphone-capture";
 import { readStoredInterviewerCharacter, storeInterviewerCharacter } from "@/lib/interview/interviewer-character-preference.mjs";
 import { VoicePicker } from "./voice-picker";
 import { playVoiceSample, readStoredInterviewerVoice, storeInterviewerVoice } from "@/lib/interview/voice-picker.mjs";
@@ -94,6 +96,12 @@ export function InterviewSetup({
   const { copied, copy } = useCopyPageLink();
   const roomOptionsRef = useRef<HTMLElement>(null);
   const micTestRef = useRef<MicrophoneTestHandle>(null);
+  // The microphone is asked for while setting up, so the room has nothing left to ask; a refusal stops here with the way out.
+  const [micDenied, setMicDenied] = useState(false);
+  const startAnywayRef = useRef<(() => void) | null>(null);
+  const micNoticeRef = useRef<HTMLDivElement>(null);
+  const mountedRef = useRef(true);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
   const draftSnapshotRef = useRef<SetupDraft | null>(null);
 
   useEffect(() => {
@@ -457,19 +465,33 @@ export function InterviewSetup({
       priorityCompetencies: config.jobDirection.priorityCompetencies.map((item) => item.trim()),
       productTeamContext: config.jobDirection.productTeamContext.trim(),
     } : undefined;
+    const begin = () => {
+      const accepted = onStart({
+        ...config,
+        ...(trialDuration ? { duration: trialDuration } : {}),
+        role: config.role.trim(),
+        voice,
+        speechSpeed,
+        showInterviewerCharacter: showCharacter,
+        microphoneDeviceId,
+        interviewSource: setupMode === "auto" ? "job" : setupMode,
+        ...(jobDirection ? { jobDirection } : {}),
+      });
+      if (accepted === false) setStarting(false);
+    };
+    startAnywayRef.current = begin;
     setStarting(true);
-    const accepted = onStart({
-      ...config,
-      ...(trialDuration ? { duration: trialDuration } : {}),
-      role: config.role.trim(),
-      voice,
-      speechSpeed,
-      showInterviewerCharacter: showCharacter,
-      microphoneDeviceId,
-      interviewSource: setupMode === "auto" ? "job" : setupMode,
-      ...(jobDirection ? { jobDirection } : {}),
+    setMicDenied(false);
+    void requestMicrophoneAccess({ deviceId: microphoneDeviceId }).then((access) => {
+      if (!mountedRef.current) return;
+      if (!access.ok && access.reason === "denied") {
+        setStarting(false);
+        setMicDenied(true);
+        requestAnimationFrame(() => micNoticeRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }));
+        return;
+      }
+      begin();
     });
-    if (accepted === false) setStarting(false);
   };
 
   const localizedSeniorityLabels = Object.fromEntries(Object.entries(seniorityLabels).map(([key, label]) => [key, t(label)])) as typeof seniorityLabels;
@@ -789,7 +811,17 @@ export function InterviewSetup({
               <span className="isu-step" aria-hidden="true">{t("3")}</span>
               <h2 id="microphone-title" className="ds-card-title">{t("Seu microfone")}</h2>
             </div>
-            <p className="ds-body mt-2 max-w-2xl">{t("Se o navegador estiver usando o microfone errado, a entrevista não ouve você. Teste e escolha o certo. Você pode pular esta etapa.")}</p>
+            <p className="ds-body mt-2 max-w-2xl">{t("Pediremos o acesso ao microfone ao iniciar, para a entrevista não precisar pedir. Se o navegador estiver usando o microfone errado, ela não ouve você: teste e escolha o certo. O teste é opcional.")}</p>
+            {micDenied && (
+              <div ref={micNoticeRef} className="isu-inapp mt-5" role="alert">
+                <p className="ds-label">{t("O microfone está bloqueado")}</p>
+                <p className="ds-small mt-1">{t(micDeniedMessage())}</p>
+                <div className="mt-3 flex flex-col gap-2 min-[460px]:flex-row">
+                  <button type="submit" className="ds-btn ds-btn-soft" disabled={starting}>{t("Tentar de novo")}</button>
+                  <button type="button" className="ds-btn ds-btn-soft" disabled={starting} onClick={() => { setMicDenied(false); setStarting(true); startAnywayRef.current?.(); }}>{t("Continuar sem microfone")}</button>
+                </div>
+              </div>
+            )}
             <div className="mt-5">
               <MicrophoneTest ref={micTestRef} deviceId={microphoneDeviceId} onDeviceChange={chooseMicrophone} />
             </div>
