@@ -14,17 +14,18 @@ const seriesColor: Record<VoiceTrendMetric, string> = {
 };
 
 /** Marker shape per metric, so identity never depends on color alone. */
-function Marker({ metric, x, y, size, className, style }: { metric: VoiceTrendMetric; x: number; y: number; size: number; className?: string; style?: React.CSSProperties }) {
+function Marker({ metric, x, y, size, className, style, color }: { metric: VoiceTrendMetric; x: number; y: number; size: number; className?: string; style?: React.CSSProperties; color?: string }) {
   const half = size / 2;
-  if (metric === "fluency") return <rect className={className} style={style} x={x - half} y={y - half} width={size} height={size} rx={1.5} fill={seriesColor[metric]} />;
-  if (metric === "prosody") return <path className={className} style={style} d={`M${x},${y - half - 1} L${x + half + 1},${y} L${x},${y + half + 1} L${x - half - 1},${y} Z`} fill={seriesColor[metric]} />;
-  return <circle className={className} style={style} cx={x} cy={y} r={half} fill={seriesColor[metric]} />;
+  const fill = color ?? seriesColor[metric];
+  if (metric === "fluency") return <rect className={className} style={style} x={x - half} y={y - half} width={size} height={size} rx={1.5} fill={fill} />;
+  if (metric === "prosody") return <path className={className} style={style} d={`M${x},${y - half - 1} L${x + half + 1},${y} L${x},${y + half + 1} L${x - half - 1},${y} Z`} fill={fill} />;
+  return <circle className={className} style={style} cx={x} cy={y} r={half} fill={fill} />;
 }
 
-export function MetricSwatch({ metric }: { metric: VoiceTrendMetric }) {
+export function MetricSwatch({ metric, color }: { metric: VoiceTrendMetric; color?: string }) {
   return (
     <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" className="vt-swatch">
-      <Marker metric={metric} x={6} y={6} size={8} />
+      <Marker metric={metric} x={6} y={6} size={8} color={color} />
     </svg>
   );
 }

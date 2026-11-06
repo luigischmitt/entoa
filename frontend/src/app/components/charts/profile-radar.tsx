@@ -55,7 +55,7 @@ export function ProfileRadar({ items, active, selected, onSelect, label }: {
   items: RadarItem[];
   active: string | null;
   selected: string | null;
-  /** Kept optional for compatibility; content no longer changes on hover or focus. */
+  /** Kept optional for compatibility. */
   onActive?: (key: string | null) => void;
   onSelect: (key: string) => void;
   label: string;
@@ -65,8 +65,24 @@ export function ProfileRadar({ items, active, selected, onSelect, label }: {
   const ring = (fraction: number) => items.map((_, i) => { const p = point(i, total, RADIUS * fraction); return `${p.x},${p.y}`; }).join(" ");
   const shape = items.map((item, i) => { const p = point(i, total, (RADIUS * Math.max(0, Math.min(100, item.value))) / 100); return `${p.x},${p.y}`; }).join(" ");
 
+  // Hover anywhere on the chart: the axis whose direction is closest to the pointer (seen from the center) becomes active.
+  const onPointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
+    if (event.pointerType !== "mouse" || total === 0) return;
+    const svg = event.currentTarget;
+    const matrix = svg.getScreenCTM();
+    if (!matrix) return;
+    const cursor = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+    const dx = cursor.x - CENTER;
+    const dy = cursor.y - CENTER;
+    if (Math.hypot(dx, dy) < 8) return;
+    const step = (Math.PI * 2) / total;
+    const turns = (Math.atan2(dy, dx) + Math.PI / 2 + step / 2 + Math.PI * 4) % (Math.PI * 2);
+    const key = items[Math.floor(turns / step) % total].key;
+    if (key !== active) onSelect(key);
+  };
+
   return (
-    <svg viewBox="-66 -24 432 348" className="pr-svg" role="group" aria-label={label}>
+    <svg viewBox="-66 -24 432 348" className="pr-svg" role="group" aria-label={label} onPointerMove={onPointerMove}>
       {[1, 0.75, 0.5, 0.25].map((fraction) => <polygon key={fraction} className="pr-ring" data-outer={fraction === 1} points={ring(fraction)} />)}
       {items.map((item, i) => {
         const edge = point(i, total, RADIUS);
@@ -99,6 +115,7 @@ export function ProfileRadar({ items, active, selected, onSelect, label }: {
             data-group={item.group}
             data-active={active === item.key}
             style={{ "--k": i } as React.CSSProperties}
+            onMouseEnter={() => onSelect(item.key)}
             onClick={() => onSelect(item.key)}
           >
             {lines.map((line, n) => (
@@ -121,6 +138,8 @@ export function ProfileRadar({ items, active, selected, onSelect, label }: {
             tabIndex={0}
             aria-label={`${item.label}: ${item.display}`}
             aria-pressed={selected === item.key}
+            onMouseEnter={() => onSelect(item.key)}
+            onFocus={() => onSelect(item.key)}
             onClick={() => onSelect(item.key)}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {

@@ -174,15 +174,16 @@ export function FreeModeSetup({ trialMinutes = null }: { trialMinutes?: number |
   };
 
   return (
-    <main id="main-content" className="mx-auto w-full min-w-0 max-w-5xl px-4 pb-[calc(var(--shl-bottom-nav-h,0px)+2rem)] pt-6 sm:px-8 sm:pt-8 lg:pb-16 lg:pt-10">
+    <main id="main-content" className="mx-auto w-full min-w-0 max-w-6xl px-4 pb-[calc(var(--shl-bottom-nav-h,0px)+2rem)] pt-6 sm:px-8 sm:pt-8 lg:px-12 lg:pb-16 lg:pt-10">
       <PageIntro
+        kicker={t("Conversa livre")}
         title={t("Modo livre")}
         description={german
           ? t("Converse em alemão com o Tuck, bem devagar e com tradução.")
           : t("Converse em inglês com o Tuck sobre o que quiser, sem roteiro de entrevista.")}
       />
 
-      <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-8">
+      <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-8">
         <form onSubmit={startTyped} className="ds-card flex min-w-0 flex-col gap-6 p-5 sm:p-7" noValidate>
           <h2 id="free-mode-topic-title" className="ds-card-title">{t("Sobre o que vamos conversar?")}</h2>
 

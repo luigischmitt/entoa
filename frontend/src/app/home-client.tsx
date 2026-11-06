@@ -109,7 +109,7 @@ function isNavigationItemActive(view: View, item: View) {
 // Wayfinding: [section, page?]. The section matches a navigation label; the page names the step inside it.
 const viewTrail: Record<View, readonly [string, string?]> = {
   home: ["Início"],
-  "interview-setup": ["Entrevista", "Preparar entrevista"],
+  "interview-setup": ["Entrevista"],
   "free-mode": ["Modo livre"],
   progress: ["Progresso"],
   voice: ["Sua voz"],
@@ -321,9 +321,18 @@ function HomeView({
   const cachedRecords = readDashboardCache("progress") as ProgressRecord[] | undefined;
   const [records, setRecords] = useState<ProgressRecord[]>(() => cachedRecords ?? []);
   const [isLoading, setIsLoading] = useState(!cachedRecords);
+  const [activeWeek, setActiveWeek] = useState<string | null>(null);
   const insights = buildHomeInsights(records);
   const progress = useMemo(() => buildProgressInsights(records, { locale: locale === "en" ? "en" : "pt-BR" }), [records, locale]);
   const voiceRows = useMemo(() => mergeVoiceSeries(progress.series), [progress.series]);
+  const hoveredWeek = progress.weekly.find((week) => week.start === activeWeek) ?? null;
+  const hoveredSessions = hoveredWeek
+    ? progress.sessions.filter((session) => {
+        const time = session.date ? new Date(session.date).getTime() : NaN;
+        const start = new Date(hoveredWeek.start).getTime();
+        return time >= start && time < start + 7 * 24 * 60 * 60 * 1000;
+      }).reverse()
+    : [];
   const weeklyMax = Math.max(1, ...progress.weekly.map((week) => week.count));
   const voiceFocusKey = voiceTrendMetrics
     .map((metric) => ({ metric, summary: voiceMetricSummary(voiceRows, metric) }))
@@ -410,7 +419,6 @@ function HomeView({
               <>
                 <div className="shl-home-card-head">
                   <p className="ds-kicker">{t("Sua última entrevista")}</p>
-                  <p className="ds-small">{lastInterviewDate ?? t("Data não disponível")}</p>
                 </div>
                 <p className="shl-home-priority">
                   {insights.lastPriority ?? t(insights.lastReportReady ? "Abra o relatório para ver o que praticar." : "A análise desta entrevista ainda não está disponível.")}
@@ -445,7 +453,6 @@ function HomeView({
               <p className="ds-kicker">{t("Até aqui")}</p>
               <h2 id="practice-history-title" className="ds-section-title">{t("Prática que já conta")}</h2>
             </div>
-            <p className="ds-lead">{insights.conversationCount > 0 ? t("Práticas por semana, nas últimas 8 semanas.") : t("Entrevistas por semana, nas últimas 8 semanas.")}</p>
           </div>
           <div className="ds-card shl-home-practice">
             <div>
@@ -454,11 +461,21 @@ function HomeView({
               </p>
               <div
                 className="shl-home-weeks"
-                role="img"
-                aria-label={locale === "en" ? `Practices per week: ${progress.weekly.map((week) => `${week.label}, ${week.count}`).join("; ")}.` : `Práticas por semana: ${progress.weekly.map((week) => `${week.label}, ${week.count}`).join("; ")}.`}
+                role="group"
+                aria-label={locale === "en" ? "Practices per week" : "Práticas por semana"}
+                onMouseLeave={() => setActiveWeek(null)}
+                onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setActiveWeek(null); }}
               >
                 {progress.weekly.map((week) => (
-                  <div key={week.start} className="shl-home-week">
+                  <div
+                    key={week.start}
+                    className="shl-home-week"
+                    tabIndex={0}
+                    data-active={week.start === activeWeek}
+                    aria-label={`${week.label}, ${week.count}`}
+                    onMouseEnter={() => setActiveWeek(week.start)}
+                    onFocus={() => setActiveWeek(week.start)}
+                  >
                     <span className="shl-home-week-n">{week.count || ""}</span>
                     <div className="shl-home-week-track"><i data-empty={week.count === 0} style={{ height: week.count === 0 ? "3px" : `${Math.max(12, (week.count / weeklyMax) * 100)}%` }} /></div>
                     <span className="shl-home-week-l">{week.label}</span>
@@ -466,13 +483,34 @@ function HomeView({
                 ))}
               </div>
             </div>
-            <div>
-              <p className="ds-label">
-                {insights.topPattern ? <>{t("Em inglês, observe")}{insights.topPattern.type ? ` ${t(insights.topPattern.type)}` : ""}</> : t("Próximo foco")}
-              </p>
-              <p className="ds-body mt-2">
-                {insights.topPattern ? insights.topPattern.suggestion : t("Seu próximo relatório vai mostrar o padrão de inglês que mais vale observar.")}
-              </p>
+            <div className="shl-home-practice-side" aria-live="polite">
+              {hoveredWeek ? (
+                <>
+                  <p className="ds-label">{t("Semana de {date}", { date: hoveredWeek.label })}</p>
+                  {hoveredSessions.length === 0 ? (
+                    <p className="ds-body mt-2">{t("Nenhuma sessão nesta semana.")}</p>
+                  ) : (
+                    <ul className="shl-home-week-list">
+                      {hoveredSessions.slice(0, 4).map((session) => (
+                        <li key={session.id}>
+                          <span>{session.title ?? session.conversationTopic ?? session.role}</span>
+                          <small>{session.date ? new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(new Date(session.date)) : ""}</small>
+                        </li>
+                      ))}
+                      {hoveredSessions.length > 4 && <li><small>{t("+{count} nesta semana", { count: hoveredSessions.length - 4 })}</small></li>}
+                    </ul>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="ds-label">
+                    {insights.topPattern ? <>{t("Em inglês, observe")}{insights.topPattern.type ? ` ${t(insights.topPattern.type)}` : ""}</> : t("Próximo foco")}
+                  </p>
+                  <p className="ds-body mt-2">
+                    {insights.topPattern ? insights.topPattern.suggestion : t("Seu próximo relatório vai mostrar o padrão de inglês que mais vale observar.")}
+                  </p>
+                </>
+              )}
               <button type="button" className="shl-home-link" onClick={onProgress}>
                 {t("Ver progresso")} <ArrowUpRight className="ds-arrow size-4" aria-hidden="true" />
               </button>
