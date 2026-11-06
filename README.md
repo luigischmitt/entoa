@@ -10,8 +10,6 @@ Practice real interviews out loud, in English, and get a report on what to fix. 
 
 [**entoa.app**](https://www.entoa.app/)
 
-<img src="frontend/public/landing/hero-mata-1152.webp" alt="Entoa" width="720" />
-
 </div>
 
 ## What it does
