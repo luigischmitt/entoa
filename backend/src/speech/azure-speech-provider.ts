@@ -1,7 +1,7 @@
 import { SpeechProviderUnavailableError } from "./errors.js";
 import { readAudioBody } from "./provider-request.js";
 import type { SpeechProvider, SpeechProviderHealth, SpeechSynthesisRequest, SynthesizedSpeech } from "./types.js";
-import { isSelectableVoice } from "./voices.js";
+import { germanConversationVoice, isSelectableVoice } from "./voices.js";
 
 type AzureSpeechProviderOptions = {
   key: string;
@@ -16,6 +16,26 @@ type AzureSpeechProviderOptions = {
 
 function escapeXml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+}
+
+const quoteMarks = /["“”„]/;
+
+/**
+ * The multilingual German voice picks one language per request, so a Portuguese sentence that quotes a German phrase
+ * read the German with a Brazilian accent. Quoted text is marked as de-DE. A quote cut by the sentence split counts as
+ * German up to the end (an opening quote) or from the start (a closing quote with nothing but punctuation after it).
+ */
+export function germanQuotedSsml(text: string): string {
+  const parts = text.split(quoteMarks);
+  const german = (part: string) => part.trim() ? `<lang xml:lang='de-DE'>${escapeXml(part)}</lang>` : escapeXml(part);
+  if (parts.length === 1) return escapeXml(text);
+  const balanced = parts.length % 2 === 1;
+  const closesAtStart = !balanced && parts.length === 2 && !/[\p{L}\p{N}]/u.test(parts[1]!);
+  return parts.map((part, index) => {
+    const quoted = closesAtStart ? index === 0 : index % 2 === 1;
+    const mark = index > 0 ? "&quot;" : "";
+    return mark + (quoted ? german(part) : escapeXml(part));
+  }).join("");
 }
 
 function waitForRetry(delayMs: number, signal?: AbortSignal): Promise<void> {
@@ -70,7 +90,7 @@ export class AzureSpeechProvider implements SpeechProvider {
             "X-Microsoft-OutputFormat": "audio-24khz-48kbitrate-mono-mp3",
             "User-Agent": "entoa-backend",
           },
-          body: `<speak version='1.0' xml:lang='${escapeXml(locale)}'><voice name='${escapeXml(voice)}'><prosody rate='${azureRate(request.speed)}'>${escapeXml(request.text)}</prosody></voice></speak>`,
+          body: `<speak version='1.0' xml:lang='${escapeXml(locale)}'><voice name='${escapeXml(voice)}'><prosody rate='${azureRate(request.speed)}'>${voice === germanConversationVoice ? germanQuotedSsml(request.text) : escapeXml(request.text)}</prosody></voice></speak>`,
           signal: controller.signal,
         });
         if (response.ok) {
