@@ -9,14 +9,17 @@
 
 /* ---- Sidebar (desktop). Leaf-wash ground in very fine linen; the engraving (toucan and palms, the left edge of the landing's
    closing art) rises from the very bottom, faint, because it stays on every screen. Active item: a surface chip. ---- */
-.shl-sidebar { isolation: isolate; background: var(--ds-sidebar); box-shadow: 1px 0 0 var(--ds-sage-200); }
+.shl-sidebar { isolation: isolate; background: var(--ds-sidebar); border-right: 1px solid var(--ds-sage-200); }
 .shl-sidebar::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: var(--ds-linen); opacity: calc(var(--ds-linen-opacity) * 0.6); filter: var(--ds-linen-filter); }
 .shl-sidebar::after {
   content: ""; position: absolute; left: 0; right: 0; bottom: 0; z-index: -1; height: min(20rem, 44dvh); pointer-events: none;
   /* full-resolution art at a modest scale: crisp lines, the toucan and palms read instead of a zoomed blur */
   background: url("/landing/footer-mata-alpha.webp") left bottom / auto 15rem no-repeat;
   filter: var(--ds-art-filter); opacity: calc(var(--ds-art-opacity) * 0.42);
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 40%); mask-image: linear-gradient(to bottom, transparent, #000 40%);
+  /* fade out toward the right edge too, so the art never meets the divider as a hard cut */
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 40%), linear-gradient(to right, #000 calc(100% - 2rem), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 40%), linear-gradient(to right, #000 calc(100% - 2rem), transparent);
+  -webkit-mask-composite: source-in; mask-composite: intersect;
 }
 /* Settings sits on the art, so it gets its own sage chip: clearly visible, and distinct from the active page (white chip). */
 .shl-nav-utility .shl-nav-item:not([aria-current="page"]) { color: var(--ds-ink); background: var(--ds-sage-100); box-shadow: inset 0 0 0 1px var(--ds-sage-200); }
@@ -155,7 +158,7 @@
   padding-top: clamp(0.5rem, 2vw, 1.5rem);
 }
 .shl-home-hero-copy { min-width: 0; }
-.shl-home-title { max-width: 13ch; margin-top: 0; font-size: clamp(2.6rem, 1.8rem + 3vw, 4rem); }
+.shl-home-title { max-width: 19ch; text-wrap: balance; margin-top: 0; font-size: clamp(2.6rem, 1.8rem + 3vw, 4rem); }
 .shl-home-subcopy { max-width: 40ch; margin-top: 1.25rem; }
 .shl-home-primary { width: auto; margin-top: 2rem; padding-inline: 1.5rem; }
 .shl-home-facts { margin-top: 2.25rem; }
@@ -192,6 +195,10 @@
   -webkit-mask-composite: source-in; mask-composite: intersect;
 }
 .shl-home-card > * { min-width: 0; }
+/* Last-interview card: the art keeps a fixed band at the bottom and the text keeps a clear strip above it, so the sentence
+   never runs over the picture however many lines it takes. Only the link chip sits on the art. */
+.shl-home-card:has(.shl-home-priority)::after { height: 9rem; }
+.shl-home-card:has(.shl-home-priority) .shl-home-priority { margin-bottom: 2.75rem; }
 /* The first-visit card keeps its size; its steps run over the art, so each line sits on a soft wash chip. */
 .shl-home-card .shl-home-steps p { justify-self: start; width: fit-content; margin-left: -0.45rem; padding: 0.15rem 0.45rem; border-radius: 6px; background: color-mix(in srgb, var(--ds-sage-50) 84%, transparent); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); color: var(--ds-ink); font-weight: 500; }
 .shl-home-card .shl-home-steps span { text-shadow: 0 0 6px var(--ds-sage-50), 0 0 12px var(--ds-sage-50); }
@@ -223,6 +230,17 @@
 .shl-home-count .ds-num { color: var(--ds-ink); font-size: 2.75rem; line-height: 1; }
 .shl-home-weeks { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 0.375rem; align-items: end; height: 7rem; margin-top: 1.5rem; }
 .shl-home-week { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; justify-items: center; gap: 0.25rem; height: 100%; font-variant-numeric: tabular-nums; }
+.shl-home-week { cursor: default; border-radius: 0.4rem; outline: none; }
+.shl-home-week:focus-visible { outline: var(--ds-focus-outline); outline-offset: 2px; }
+.shl-home-week-track > i { transition: filter 120ms ease; }
+.shl-home-week[data-active="true"] .shl-home-week-track > i:not([data-empty="true"]) { filter: brightness(0.82); }
+.shl-home-week[data-active="true"] .shl-home-week-l { color: var(--ds-ink); }
+.shl-home-practice-side { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
+.shl-home-practice-side .shl-home-link { margin-top: 1.25rem; }
+.shl-home-week-list { display: grid; gap: 0.5rem; margin: 0.6rem 0 0; padding: 0; list-style: none; color: var(--ds-text-2); }
+.shl-home-week-list > li { display: flex; justify-content: space-between; gap: 1rem; min-width: 0; }
+.shl-home-week-list > li > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ds-ink); }
+.shl-home-week-list small { flex: none; font-size: 0.8125rem; }
 .shl-home-week-track { display: flex; align-items: flex-end; width: 100%; max-width: 1.75rem; height: 100%; }
 .shl-home-week-track > i { display: block; width: 100%; border-radius: 0.3rem 0.3rem 0.2rem 0.2rem; background: var(--ds-green); }
 .shl-home-week-track > i[data-empty="true"] { background: var(--ds-track); }
@@ -259,7 +277,11 @@
   .shl-home-voice > div + div { border-top: 0; border-left: 1px solid var(--ds-hairline); }
 }
 @media (min-width: 1024px) {
-  .shl-home-hero { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: clamp(2rem, 5vw, 4.5rem); }
+  .shl-home-hero { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: clamp(2rem, 4vw, 3.5rem); }
+}
+@media (min-width: 1200px) {
+  .shl-home-facts { flex-wrap: nowrap; gap: 0.6rem 1.25rem; font-size: 0.875rem; }
+  .shl-home-facts > li { flex: none; white-space: nowrap; }
 }
 @media (max-width: 767.98px) {
   .shl-home-primary { width: 100%; justify-content: center; }

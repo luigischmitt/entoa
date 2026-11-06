@@ -69,3 +69,9 @@
   .pr-label-name { font-size: 14px; }
   .pr-label-value { font-size: 20px; }
 }
+
+/* Radar: switching the active axis eases instead of snapping. */
+.pr-point { transition: stroke-width 160ms ease, stroke 160ms ease; }
+.pr-axis { transition: stroke 160ms ease, stroke-width 160ms ease; }
+.pr-label-name, .pr-label-value { transition: fill 160ms ease; }
+@media (prefers-reduced-motion: reduce) { .pr-point, .pr-axis, .pr-label-name, .pr-label-value { transition: none; } }

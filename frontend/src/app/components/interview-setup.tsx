@@ -3,7 +3,7 @@
 
 import { getCurrentLocale, t } from "@/lib/locale";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
-import { ArrowUpRight, ArrowLeft, ChevronDown, FileText, LoaderCircle } from "lucide-react";
+import { ArrowUpRight, ChevronDown, FileText, LoaderCircle } from "lucide-react";
 import type { InterviewConfig } from "@/lib/interview/types";
 import type { JobDirection, JobSeniority } from "@/lib/interview/job-direction.mjs";
 import type { SetupMode } from "@/lib/interview/job-direction.mjs";
@@ -521,10 +521,6 @@ export function InterviewSetup({
 
   return (
     <main id="main-content" className={`isu-root mx-auto w-full min-w-0 max-w-6xl px-4 pb-[calc(var(--shl-bottom-nav-h,0px)+9rem)] pt-6 sm:px-8 sm:pt-8 lg:px-12 lg:pb-16 lg:pt-10`}>
-      <button type="button" className="ds-btn ds-btn-quiet -ml-3 mb-6 min-h-10 gap-2 px-3 text-sm" onClick={onBack}>
-        <ArrowLeft className="size-4" aria-hidden="true" />
-        {t("Voltar à visão geral ")}</button>
-
       <PageIntro
         kicker={t("Nova entrevista")}
         title={t("Configure sua entrevista.")}

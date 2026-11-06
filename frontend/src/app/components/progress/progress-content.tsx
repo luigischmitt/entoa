@@ -128,14 +128,12 @@ function ProfileView({ insights }: { insights: ProgressInsights }) {
             <li className="pg-radar-legend-english"><i aria-hidden="true" /><span><strong>{t("Inglês:")}</strong> {t("% das respostas sem erro prioritário identificado")}</span></li>
             <li className="pg-radar-legend-voice"><i aria-hidden="true" /><span><strong>{t("Voz:")}</strong> {t("nota de 0 a 100")}</span></li>
           </ul>
-          <p className="pg-radar-note">{t("Mais perto da borda é melhor. Escolha um ponto para ver o que ele mede.")}</p>
           <div className="pg-side-details">
             {active && <p className="pg-side-detail pg-side-detail-active" aria-live="polite"><strong>{active.label}.</strong> {active.explain}</p>}
             {items.map((item) => <p key={item.key} className="pg-side-detail pg-side-detail-size" aria-hidden="true"><strong>{item.label}.</strong> {item.explain}</p>)}
           </div>
         </div>
       </div>
-      <p className="pg-dims-note">{t("Baseado em ")}{plural(insights.analyzedAnswers, "resposta analisada", "respostas analisadas")} {t("de ")}{plural(insights.analyzedSessions, "prática", "práticas")}{t(". Isto não é uma medida do seu nível de inglês.")}</p>
     </>
   );
 }
@@ -155,9 +153,9 @@ function VoiceTrendView({ insights }: { insights: ProgressInsights }) {
       <div className="pg-metrics">
         {summaries.map(({ metric, summary }) => (
           <div key={metric} className="pg-metric" data-focus={metric === focus}>
-            <p className="pg-metric-label"><MetricSwatch metric={metric} />{t(voiceTrendCopy[metric].label)}{metric === focus && <span className="pg-focus">{t("seu foco")}</span>}</p>
+            <p className="pg-metric-label"><MetricSwatch metric={metric} color="var(--ds-green)" />{t(voiceTrendCopy[metric].label)}{metric === focus && <span className="pg-focus">{t("seu foco")}</span>}</p>
             <p className="pg-metric-value"><span className="ds-num">{summary ? <CountUp value={Math.round(summary.latest)} /> : "—"}</span><small>/100</small></p>
-            <span className="ds-meter" aria-hidden="true" style={{ "--p": `${summary ? Math.round(summary.latest) : 0}%`, "--ds-meter": `var(--ds-series-${metric})` } as CSSProperties} />
+            <span className="ds-meter" aria-hidden="true" style={{ "--p": `${summary ? Math.round(summary.latest) : 0}%`, "--ds-meter": "var(--ds-green)" } as CSSProperties} />
             {summary && <ChangeLabel change={summary.change} />}
             <p className="pg-metric-measure">{t(voiceTrendCopy[metric].measure)}</p>
           </div>
@@ -194,7 +192,7 @@ export function ProgressHero({ insights }: { insights: ProgressInsights }) {
           <p className="ds-kicker">{t(view === "profile" ? "Perfil" : "Voz")}</p>
           <h2 id="pg-hero-title" className="ds-section-title">{t(view === "profile" ? "Seu perfil de entrevista" : "Sua voz, entrevista a entrevista")}</h2>
           <p className="ds-lead">{t(view === "profile"
-            ? "Cada ponta do gráfico é uma parte da sua fala. Quanto mais perto da borda, melhor."
+            ? "Cada ponta do gráfico é uma parte da sua fala."
             : "Precisão, ritmo e prosódia medidos pelo Azure em cada entrevista. Não são nota de inglês nem de sotaque.")}</p>
         </div>
         <dl className="pg-totals">
