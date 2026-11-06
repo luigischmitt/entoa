@@ -426,11 +426,14 @@ main{overflow-x:clip}
 /* final: dark green block around the FAQ, then the forest art carries the closing call and the footer */
 .final{position:relative;padding:clamp(8px,2vw,24px) 0 0;overflow:hidden}
 .faq-sec h2{margin:0 0 .8rem}
-.endart{position:relative;isolation:isolate;margin-top:clamp(28px,4vw,56px);height:clamp(460px,40vw,560px)}
-.end-img{position:absolute;inset:0;z-index:-1;width:100%;height:100%;object-fit:cover;object-position:center bottom;filter:saturate(1.45) contrast(1.08);pointer-events:none;
-  mask-image:linear-gradient(to bottom,transparent,#000 32px);-webkit-mask-image:linear-gradient(to bottom,transparent,#000 32px)}
+.endart{position:relative;isolation:isolate;margin-top:clamp(-24px,-2vw,-8px);height:clamp(520px,44vw,620px);
+  background:linear-gradient(to bottom,var(--cream) 0%,#eef1e6 50%,#e9eee0 84%,#e4eadb 100%)}
+/* same faint, pale-sage treatment as the hero: linen grain under the art, art at 36% */
+.endart::before{content:"";position:absolute;inset:0;z-index:-2;pointer-events:none;background:url("/textures/linen.webp");opacity:.1;-webkit-mask-image:linear-gradient(to bottom,transparent,#000 160px);mask-image:linear-gradient(to bottom,transparent,#000 160px)}
+.end-img{position:absolute;inset:0;z-index:-1;width:100%;height:100%;object-fit:cover;object-position:center bottom;opacity:.36;pointer-events:none;
+  mask-image:linear-gradient(to bottom,transparent,#000 200px);-webkit-mask-image:linear-gradient(to bottom,transparent,#000 200px)}
 /* the closing call sits in the empty sky at the top centre of the artwork */
-.end-cta{display:flex;flex-direction:column;align-items:center;gap:1.2rem;text-align:center;padding-top:clamp(28px,4vw,56px)}
+.end-cta{display:flex;flex-direction:column;align-items:center;gap:1.2rem;text-align:center;padding-top:clamp(72px,9vw,128px)}
 .end-cta h2{max-width:30ch;margin:0;font-size:clamp(1.9rem,4vw,3rem);text-shadow:0 0 18px var(--cream),0 0 2px var(--cream)}
 /* footer: one compact frosted pill centred at the foot of the artwork (reads over the leaves without a full-width band) */
 .foot{position:absolute;left:0;right:0;bottom:clamp(12px,2vw,22px);display:flex;justify-content:center;padding-inline:16px}
@@ -664,11 +667,9 @@ html.leaving .leave{opacity:1;visibility:visible;pointer-events:auto;transition:
     <div class="pair" id="diff" lang="en">
       <figure class="pair-card">
         <div class="pair-box"><p class="pair-txt">I have five years <button class="seg" data-d="0">experience on</button> backend and <button class="seg" data-d="1">I am working</button> with Go since 2021.</p></div>
-        <figcaption lang="pt-BR"><b>O que você disse</b>A preposição e o tempo verbal saem do jeito do português.</figcaption>
       </figure>
       <figure class="pair-card good">
         <div class="pair-box"><p class="pair-txt">I have five years <button class="seg" data-d="0">of experience in</button> backend and <button class="seg" data-d="1">I’ve been working</button> with Go since 2021.</p></div>
-        <figcaption lang="pt-BR"><b>Como soa melhor</b>Experiência numa área pede <em>in</em>. O que começou em 2021 e continua hoje pede <em>I’ve been working</em>.</figcaption>
       </figure>
     </div>
   </div>
@@ -872,8 +873,6 @@ AWS e observabilidade</div></div>
           <button class="snd-btn" id="dSnd" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="w" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path class="x" d="M17 9.5l5 5M22 9.5l-5 5"/></svg><span>Ativar som</span></button>
           <input type="range" id="dVol" min="0" max="1" step="0.05" value="0.8" aria-label="Volume" hidden>
         </div>
-        <p id="dCap" aria-live="off"></p>
-        <a class="btn sm" href="/signup" data-cta>Fazer a minha</a>
       </div>
       <p class="fine">Exemplo ilustrativo.</p>
     </div>
@@ -890,7 +889,7 @@ AWS e observabilidade</div></div>
       <ul class="pp-list">
         <li><b>Seu inglês</b><span>Cada erro com a forma certa e por que brasileiros erram isso.</span></li>
         <li><b>Sua voz</b><span>Clareza, ritmo e entonação de 0 a 100, sem avaliar sotaque.</span></li>
-        <li><b>Conteúdo técnico</b><span>O que convenceu e o que um entrevistador sentiria falta, com como responder.</span></li>
+        <li><b>Conteúdo técnico</b><span>O que convenceu e o que um entrevistador sentiria falta.</span></li>
         <li><b>Prioridades</b><span>Por onde começar antes da próxima entrevista.</span></li>
       </ul>
     </div>
@@ -979,31 +978,6 @@ AWS e observabilidade</div></div>
   </div>
 </section>
 
-<!-- RELATÓRIO sobre a mata (gráfico do site atual, com menos texto) -->
-<section id="relatorio" class="rstage" aria-label="Exemplo de relatório">
-  <picture class="stage-art" aria-hidden="true"><source media="(max-width:767px)" srcset="/landing/hero-mata-mobile.webp" width="704" height="552"><img src="/landing/hero-mata.webp" srcset="/landing/hero-mata-1152.webp 1152w, /landing/hero-mata.webp 1536w" sizes="100vw" alt="" width="1536" height="1024" fetchpriority="low" decoding="async"></picture>
-  <div class="wrap">
-    <div class="rep in" id="rep">
-      <div class="rep-top">
-        <div class="rep-copy">
-          <span class="badge"><i></i>Exemplo · 6 entrevistas</span>
-          <p class="rep-title">A cada entrevista, você vê onde já melhorou e onde ainda trava.</p>
-          <p class="rep-role">Backend Engineer · Sênior</p>
-          <ul class="rep-read">
-            <li class="en"><i></i><span><b>Inglês:</b> % das respostas sem erro prioritário identificado</span></li>
-            <li><i class="v"></i><span><b>Voz:</b> nota de 0 a 100</span></li>
-          </ul>
-          <p class="rep-note">Mais perto da borda é melhor. Escolha um ponto para ver o que ele mede.</p>
-          <div class="dim-box rep-meta" id="dimBox"><p id="dimDetail" aria-live="polite"></p></div>
-        </div>
-        <div class="radar">
-          <svg viewBox="-62 -22 424 344" id="radar" role="group" aria-label="Perfil de exemplo. Cada ponto pode ser selecionado para ver o que a dimensão mede."></svg>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
 <!-- VOZ: two attempts side by side -->
 <section id="voz" class="voz" aria-labelledby="vozT">
   <div class="wrap">
@@ -1020,7 +994,7 @@ AWS e observabilidade</div></div>
     <div class="vz-frame">
     <div class="vz-pair">
       <article class="vz-try" aria-label="Tentativa 1">
-        <header><span class="vz-tl">Tentativa 1</span><span class="vz-tag bad">Travou em “experience”</span></header>
+        <header><span class="vz-tl">Tentativa 1</span></header>
         <p class="vz-phrase" lang="en">I have five years of <span class="vz-w bad">experience</span> in backend.</p>
         <ul class="vz-m">
           <li><span>Precisão</span><b>72</b><i style="--p:72%"></i></li>
@@ -1029,7 +1003,7 @@ AWS e observabilidade</div></div>
         </ul>
       </article>
       <article class="vz-try good" aria-label="Tentativa 2">
-        <header><span class="vz-tl">Tentativa 2</span><span class="vz-tag">Saiu clara</span></header>
+        <header><span class="vz-tl">Tentativa 2</span></header>
         <p class="vz-phrase" lang="en">I have five years of <span class="vz-w">experience<svg class="sw" viewBox="0 0 120 12" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M2 8 C 28 2, 62 12, 118 4"/></svg></span> in backend.</p>
         <ul class="vz-m">
           <li><span>Precisão</span><b>84 <em>+12</em></b><i style="--p:84%"></i></li>
@@ -1039,7 +1013,7 @@ AWS e observabilidade</div></div>
       </article>
     </div>
     </div>
-    <p class="vz-foot">Exemplo ilustrativo. Precisão é a clareza de cada som e palavra; ritmo, as pausas e a velocidade; prosódia, a entonação e o acento.</p>
+    <p class="vz-foot">Exemplo ilustrativo.</p>
   </div>
 </section>
 
@@ -1050,8 +1024,7 @@ AWS e observabilidade</div></div>
       <div class="faq-sec">
         <p class="kicker">Perguntas</p>
         <h2>Antes de começar.</h2>
-        <p class="lead">Por enquanto é grátis. Você só precisa de um microfone.</p>
-        <a class="btn" href="/signup" data-cta>Treinar minha entrevista</a>
+        <p class="lead">Perguntas frequentes sobre o treino, o relatório e o que você precisa para começar.</p>
       </div>
       <div class="faq" id="faq">
         <div class="qa" style="--k:0"><button class="q-btn" aria-expanded="false" aria-controls="a1" id="b1"><span class="qt">Preciso falar inglês perfeito?</span></button><div class="a" id="a1" role="region" aria-labelledby="b1"><div><p>Não. O objetivo é ser entendido com clareza e confiança. Sotaque brasileiro não é defeito.</p></div></div></div>
@@ -1071,7 +1044,7 @@ AWS e observabilidade</div></div>
     <footer class="foot">
       <div class="foot-panel">
         <a class="brand" href="#"><img src="/landing/tucano-mark.webp" alt="" width="22" height="26"> <span class="wordmark">Entoa</span></a>
-        <nav aria-label="Rodapé"><a href="#relatorio">Relatório</a><a href="#demo">Como funciona</a><a href="/login">Entrar</a><a href="/signup">Criar conta</a></nav>
+        <nav aria-label="Rodapé"><a href="#demo">Como funciona</a><a href="/login">Entrar</a><a href="/signup">Criar conta</a></nav>
         <span class="foot-base">© 2026 · Feito no Brasil, para vaga lá fora.</span>
       </div>
     </footer>
@@ -1092,7 +1065,6 @@ AWS e observabilidade</div></div>
   const LINE2="Got it. You mentioned payment APIs. How did you keep a payment from being charged twice?";
   const ANS="I have five years experience on backend and I am working with Go since 2021. I built payment APIs for make them safer, and the payments got more fast.";
   const CPS=16, T1=27.0, T2=54.0, ANS_T=42.0, ANS_CPS=14;
-  const CAPTXT=['Cole a vaga e a IA monta a entrevista.','O entrevistador pergunta, você responde falando.','O relatório separa seu inglês do conteúdo técnico e mostra o que treinar.'];
 
   const scenes=$('#scenes'),cur=$('#cur'),panels=$$('.sc'),pg0=$('#pg0'),pg2=$('#pg2');
   const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
@@ -1194,7 +1166,6 @@ AWS e observabilidade</div></div>
     placeCursor(t);
     const pc=Math.min(100,t/DUR*100);css(scrubFill,'width',pc+'%');css(knob,'left',pc+'%');scrub.setAttribute('aria-valuenow',Math.round(pc));
     chapBtns.forEach((b,i)=>{tg(b,'act',i===s);if(i===s)b.setAttribute('aria-current','step');else b.removeAttribute('aria-current')});
-    txt($('#dCap'),CAPTXT[s]);
   }
 
   /* voices, the app's toucan and a soft forest bed. Tuk's and the candidate's lines are real audio: while one plays, the
@@ -1316,47 +1287,6 @@ AWS e observabilidade</div></div>
   render(t);
   requestAnimationFrame(n=>{last=n;requestAnimationFrame(frame)});
 
-
-  /* ================= relatório: radar do perfil ================= */
-  const NS='http://www.w3.org/2000/svg',mk=(tag,at)=>{const e=document.createElementNS(NS,tag);for(const k in at)e.setAttribute(k,at[k]);return e};
-  const DIM=[
-    ['Gramática',70,'en','70% das respostas sem erro prioritário identificado de tempo verbal, artigo ou preposição.'],
-    ['Escolha de palavras',85,'en','85% das respostas sem erro prioritário de escolha de palavras identificado.'],
-    ['Falsos cognatos',95,'en','95% das respostas sem falso cognato prioritário identificado.'],
-    ['Estrutura',80,'en','80% das respostas sem problema prioritário de estrutura identificado.'],
-    ['Precisão',84,'v','84 de 100 na clareza de cada som e palavra.'],
-    ['Ritmo',78,'v','78 de 100 em fluidez: pausas, hesitações e velocidade.'],
-    ['Prosódia',72,'v','72 de 100 em entonação e acento das palavras.']];
-  const C=150,R=112,N=DIM.length,ang=i=>-Math.PI/2+i*Math.PI*2/N,rpt=(i,r)=>[C+r*Math.cos(ang(i)),C+r*Math.sin(ang(i))];
-  const poly=f=>DIM.map((d,i)=>rpt(i,R*f(d)).map(n=>n.toFixed(1)).join(',')).join(' ');
-  const radar=$('#radar'),detail=$('#dimDetail');
-  DIM.forEach(d=>{const s=document.createElement('p');s.setAttribute('aria-hidden','true');s.innerHTML=`<strong>${d[0]}:</strong> ${d[3]}`;$('#dimBox').appendChild(s)});
-  [1,.75,.5,.25].forEach(f=>radar.appendChild(mk('polygon',{class:f===1?'ring out':'ring',points:poly(()=>f)})));
-  const axes=[],pts=[],labs=[],hits=[];
-  DIM.forEach((d,i)=>{const a=rpt(i,R);const l=mk('line',{class:d[2]==='v'?'axis v':'axis',x1:C,y1:C,x2:a[0].toFixed(1),y2:a[1].toFixed(1)});radar.appendChild(l);axes.push(l)});
-  radar.appendChild(mk('polygon',{class:'poly',points:poly(d=>d[1]/100)}));
-  DIM.forEach((d,i)=>{
-    const [x,y]=rpt(i,R*d[1]/100),k=`--k:${i}`;
-    const pt=d[2]==='v'?mk('rect',{class:'pt',x:x-4,y:y-4,width:8,height:8,rx:1.5,fill:'#17563a',transform:`rotate(45 ${x} ${y})`,style:k}):mk('circle',{class:'pt',cx:x,cy:y,r:4.5,fill:'#1f6b45',style:k});
-    radar.appendChild(pt);pts.push(pt);
-    const [lx,ly]=rpt(i,R+22),c=Math.cos(ang(i)),anchor=Math.abs(c)<.2?'middle':c>0?'start':'end';
-    const g=mk('g',{class:d[2]==='v'?'lab v':'lab',style:k}),dy=Math.sin(ang(i))<-.5?-14:Math.sin(ang(i))>.5?6:-4;
-    const tn=mk('text',{class:'ln',x:lx.toFixed(1),y:(ly+dy).toFixed(1),'text-anchor':anchor});tn.textContent=d[0];
-    const tv=mk('text',{class:'lv',x:lx.toFixed(1),y:(ly+dy+18).toFixed(1),'text-anchor':anchor});tv.textContent=d[2]==='en'?d[1]+'%':d[1];
-    g.append(tn,tv);radar.appendChild(g);labs.push(g);
-    const metric=d[2]==='en'?`${d[1]}% das respostas sem erro prioritário identificado`:`${d[1]} de 100`;
-    const hit=mk('circle',{class:'hit',cx:x,cy:y,r:16,role:'button',tabindex:'0','aria-label':`${d[0]}: ${metric}`,'aria-pressed':'false'});
-    radar.appendChild(hit);hits.push(hit);
-    g.addEventListener('click',()=>{pinned=i;hl(i)});
-    hit.addEventListener('click',()=>{pinned=i;hl(i)});
-    hit.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pinned=i;hl(i)}});
-  });
-  let pinned=0;
-  function hl(k){const on=k<0?pinned:k;
-    axes.forEach((a,i)=>a.classList.toggle('on',i===on));pts.forEach((p,i)=>p.classList.toggle('on',i===on));
-    labs.forEach((l,i)=>l.classList.toggle('on',i===on));hits.forEach((h,i)=>h.setAttribute('aria-pressed',String(i===pinned)));
-    detail.innerHTML=`<strong>${DIM[on][0]}:</strong> ${DIM[on][3]}`}
-  hl(-1);
 
   /* ================= você × nativo ================= */
   // hovering or tapping a marked part lights up the same part in the other sentence
