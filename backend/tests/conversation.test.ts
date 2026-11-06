@@ -132,6 +132,34 @@ describe("conversation turn service", () => {
     expect(result).toMatchObject({ move: "END", outcome: "decided" });
   });
 
+  it.each([
+    "Okay, I remember, uh, okay, uh, finish that conversation, please?",
+    "No, no, just finish that interview, please.",
+    "Talk, please, finish this interview.",
+    "encerrar a conversa por favor",
+  ])("ends at once on an order to end the talk, without asking the model: %s", async (transcript) => {
+    const fetchSpy = vi.fn();
+    const result = await turnService(fetchSpy as unknown as typeof fetch).reply(turnInput({ transcript }));
+    expect(result).toEqual({ say: closingLine, move: "END", pathId: null, outcome: "decided" });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("leaves a long story that mentions an interview to the model", async () => {
+    const transcript = "Last year I had to finish this interview process at a company in Berlin and it took three months because they asked for many rounds.";
+    const result = await turnService(fakeFetch({ say: "Three months sounds exhausting to me. What was the hardest round?", move: "FOLLOW", pathId: null })).reply(turnInput({ transcript }));
+    expect(result).toMatchObject({ move: "FOLLOW", outcome: "decided" });
+  });
+
+  it.each(["I want to finish this now", "that's all for today", "could you please stop"])("lets the model end on a wider way of asking: %s", async (transcript) => {
+    const result = await turnService(fakeFetch({ say: "Of course, thanks for the chat!", move: "END", pathId: null })).reply(turnInput({ transcript }));
+    expect(result).toMatchObject({ move: "END", outcome: "decided" });
+  });
+
+  it("does not run the end command on a silence", async () => {
+    const result = await turnService(fakeFetch({ say: "Hey, are you still there? What is your favourite fruit?", move: "FOLLOW", pathId: null })).reply(turnInput({ silent: true, transcript: "finish this interview" }));
+    expect(result.move).not.toBe("END");
+  });
+
   it("hands over a question after a short reply when the model only commented", async () => {
     const result = await turnService(fakeFetch({ say: "That sounds like a really lovely way to spend the day.", move: "FOLLOW", pathId: null })).reply(turnInput({ transcript: "Yes." }));
     expect(result).toMatchObject({ move: "NEW_PATH", pathId: "p1", outcome: "decided" });
