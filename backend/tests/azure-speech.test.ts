@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AzureSpeechProvider } from "../src/speech/azure-speech-provider.js";
+import { AzureSpeechProvider, germanQuotedSsml } from "../src/speech/azure-speech-provider.js";
 import { loadSpeechConfig } from "../src/speech/config.js";
 import { createSpeechProvider } from "../src/speech/create-speech-provider.js";
 import { SpeechProviderUnavailableError } from "../src/speech/errors.js";
@@ -20,6 +20,25 @@ describe("Azure TTS", () => {
     expect(init?.body).toContain("voice name='en-US-BrianNeural'");
     expect(init?.body).toContain("rate='-15%'");
     expect(init?.body).toContain("A &amp; B &lt; C &gt; &quot;D&quot; &apos;E&apos;");
+  });
+
+  it("marks quoted phrases as German for the German voice only", async () => {
+    let init: RequestInit | undefined;
+    const provider = make(async (_url, requestInit) => { init = requestInit; return new Response("mp3"); });
+    const text = 'Você pode responder: "Meine Schwester ist achtzehn."';
+    await provider.synthesize({ ...req, text, voice: "de-DE-FlorianMultilingualNeural" });
+    expect(init?.body).toContain("xml:lang='de-DE'><voice name='de-DE-FlorianMultilingualNeural'>");
+    expect(init?.body).toContain("Você pode responder: &quot;<lang xml:lang='de-DE'>Meine Schwester ist achtzehn.</lang>&quot;");
+    await provider.synthesize({ ...req, text });
+    expect(init?.body).not.toContain("<lang");
+  });
+
+  it("finds German in quotes cut by the sentence split", () => {
+    expect(germanQuotedSsml("Spielt Max gern im Wasser?")).toBe("Spielt Max gern im Wasser?");
+    expect(germanQuotedSsml("Diga \u201eIch bin Tuck\u201c, por favor.")).toBe("Diga &quot;<lang xml:lang='de-DE'>Ich bin Tuck</lang>&quot;, por favor.");
+    expect(germanQuotedSsml('Você diz: "Ich bin achtzehn.')).toBe("Você diz: &quot;<lang xml:lang='de-DE'>Ich bin achtzehn.</lang>");
+    expect(germanQuotedSsml('Und du?"')).toBe("<lang xml:lang='de-DE'>Und du?</lang>&quot;");
+    expect(germanQuotedSsml('Fale "Ja" ou "Nein & so" agora')).toBe("Fale &quot;<lang xml:lang='de-DE'>Ja</lang>&quot; ou &quot;<lang xml:lang='de-DE'>Nein &amp; so</lang>&quot; agora");
   });
 
   it("uses the configured Azure voice for an untrusted request voice", async () => {
